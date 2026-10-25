@@ -1,0 +1,54 @@
+{
+  "name": "sanchay-new",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sanchay - Public Asset Intelligence. Fleet-first operations platform for Gwalior.",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "node scripts/copy-maplibre-worker.mjs && prisma generate && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "prisma generate && node scripts/copy-maplibre-worker.mjs",
+    "db:generate": "prisma generate",
+    "db:push": "node --env-file=.env.local scripts/db-push.mjs",
+    "db:seed": "tsx --env-file=.env.local --conditions=react-server prisma/seed.ts",
+    "db:rls": "tsx --env-file=.env.local --conditions=react-server scripts/enforce-rls.ts",
+    "predev": "node scripts/copy-maplibre-worker.mjs",
+    "db:local": "node scripts/local-db.mjs",
+    "db:studio": "node --env-file=.env.local node_modules/prisma/build/index.js studio",
+    "db:reset": "node --env-file=.env.local scripts/db-push.mjs --reset",
+    "test": "tsx --env-file=.env.local --conditions=react-server --test --test-concurrency=1 tests/*.test.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.118.0",
+    "framer-motion": "14.6.0",
+    "lucide-react": "1.61.0",
+    "maplibre-gl": "6.15.0",
+    "next": "16.4.3",
+    "ogl": "1.0.11",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "embedded-postgres": "18.4.0-beta.17",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.3",
+    "prisma": "5.22.0",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3"
+  },
+  "prisma": {
+    "seed": "tsx --conditions=react-server prisma/seed.ts"
+  }
+}

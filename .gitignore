@@ -1,0 +1,25 @@
+node_modules
+.next
+out
+build
+*.tsbuildinfo
+next-env.d.ts
+
+# secrets - never commit
+.env
+.env.local
+.env.*.local
+serviceaccount.json
+service-account.json
+*.pem
+
+# logs
+*.log
+.vercel
+.DS_Store
+
+# local throwaway database
+.local-pg/
+
+# local document storage (filesystem driver)
+.local-storage/

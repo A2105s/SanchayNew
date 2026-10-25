@@ -1,0 +1,237 @@
+/* ============================================================
+   SHARED CONTROL STATES
+   One hover / focus / click treatment for every text-like control:
+   search fields, text inputs, textareas, native + custom selects
+   and date pickers. Loaded after globals.css so it wins ties.
+     rest   → flat tinted background
+     hover  → slightly darker tint
+     focus  → white surface, brand border, soft 4px halo
+   ============================================================ */
+
+:root {
+  /* Single crisp 1px brand border on focus — no glow / halo. */
+  --focus-ring: 0 0 0 1px var(--color-brand);
+}
+
+/* Text-like controls show focus through the border highlight above,
+   so suppress the global keyboard outline (which browsers also apply on click for inputs). */
+.search-field input:focus-visible,
+.datepicker-input:focus-visible,
+.field input:focus-visible,
+.field textarea:focus-visible,
+.field select:focus-visible,
+select:focus-visible,
+.login-field__input-wrap input:focus-visible {
+  outline: none;
+}
+
+.search-field,
+.custom-select-trigger,
+.datepicker-input,
+.field input:not([type='checkbox']):not([type='radio']),
+.field textarea,
+select {
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
+}
+
+/* hover */
+.search-field:hover:not(:focus-within),
+.custom-select-trigger:hover:not(.is-active):not(:focus),
+.datepicker-input-wrapper:hover .datepicker-input:not(:focus),
+.field input:not([type='checkbox']):not([type='radio']):hover:not(:focus):not(:disabled),
+.field textarea:hover:not(:focus):not(:disabled),
+select:hover:not(:focus):not(:disabled) {
+  background-color: var(--color-bg-tertiary);
+}
+
+/* focus / click */
+.search-field:focus-within,
+.custom-select-trigger.is-active,
+.custom-select-trigger:focus,
+.datepicker-input:focus,
+.field input:not([type='checkbox']):not([type='radio']):focus,
+.field textarea:focus,
+select:focus {
+  background-color: var(--color-bg-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.search-field--inline:focus-within {
+  background: var(--color-bg-primary) !important;
+  box-shadow: var(--focus-ring) !important;
+}
+
+/* placeholders */
+.search-field input::placeholder,
+.field input:not([type='checkbox']):not([type='radio'])::placeholder,
+.field textarea::placeholder,
+.datepicker-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+
+/* search field icon + clear button */
+.search-field > svg:first-child {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+}
+
+
+.search-field__inner {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.search-field__placeholder-carousel {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  z-index: 0;
+}
+
+.search-field__placeholder-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.search-field--inline .search-field__placeholder-text {
+  font-size: 0.76rem !important;
+}
+
+@media (max-width: 400px) {
+  .search-field--inline .search-field__placeholder-text {
+    font-size: 0.72rem !important;
+  }
+}
+
+.cal-toolbar__controls .search-field .search-field__placeholder-text {
+  font-size: 0.84rem !important;
+}
+
+.search-field:focus-within > svg:first-child {
+  color: var(--color-brand);
+}
+
+.search-field__clear {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.search-field__clear:hover {
+  background: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.search-field__clear:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+}
+
+/* disabled controls never show interactive states */
+.field input:not([type='checkbox']):not([type='radio']):disabled,
+.field textarea:disabled,
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Pagination scroll-back (see lib/utils/scroll.ts): leave room for the sticky top bar. */
+.panel,
+.table-wrap {
+  scroll-margin-top: calc(var(--top-nav-height) + var(--space-4));
+}
+
+/* ============================================================
+   ICON MOTION
+   One shared micro-interaction for icons inside interactive
+   controls (buttons, tabs, segmented controls, table actions,
+   links): a quick scale on hover, a slight press on click.
+   Sidebar nav icons keep their bespoke animated icons; spinners
+   (.spin) and the theme toggle keep their own motion.
+   ============================================================ */
+
+:is(.button, .icon-button, .table-action, .settings-tab-btn, .an-segmented button, .db-health, .sidebar__logout, .form-card__header .panel-header__icon) svg:not(.spin) {
+  transition: transform var(--transition-fast), color var(--transition-fast);
+  transform-origin: center;
+}
+
+:is(.button, .icon-button, .table-action, .settings-tab-btn, .an-segmented button, .db-health, .sidebar__logout):not(.theme-toggle):is(:hover, :focus-visible):not(:disabled):not(.is-disabled) svg:not(.spin) {
+  transform: scale(1.12);
+}
+
+:is(.button, .icon-button, .table-action, .settings-tab-btn, .an-segmented button, .sidebar__logout):not(.theme-toggle):active:not(:disabled):not(.is-disabled) svg:not(.spin) {
+  transform: scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.button, .icon-button, .table-action, .settings-tab-btn, .an-segmented button, .db-health, .sidebar__logout, .form-card__header .panel-header__icon) svg {
+    transition: none;
+    transform: none !important;
+  }
+}
+
+/* Inline toast action button - single solid brand pill, zero nested outlines */
+.toast-inline__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  margin-left: auto;
+  border: 0 !important;
+  outline: none !important;
+  border-radius: var(--radius-md);
+  background: var(--color-brand);
+  color: #fff !important;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.toast-inline__action:hover:not(:disabled) {
+  opacity: 0.92;
+}
+
+.toast-inline__action:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.toast-inline__action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+:root[data-theme='dark'] .toast-inline__action {
+  background: var(--color-brand);
+  color: #0b1519 !important;
+}

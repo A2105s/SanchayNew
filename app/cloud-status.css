@@ -1,0 +1,176 @@
+/* ============================================================
+   CLOUD STATUS POPOVER (top bar)
+   Click the cloud chip to see connection metadata and, when
+   something is wrong, what exactly happened.
+   ============================================================ */
+
+.cloud-status {
+  position: relative;
+}
+
+.db-health--button {
+  font-family: inherit;
+  cursor: pointer;
+  box-shadow: none !important;
+}
+
+.db-health--button:hover {
+  box-shadow: none !important;
+}
+
+.cloud-status__panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: min(380px, calc(100vw - 24px));
+  padding: var(--space-4);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-primary);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text-primary);
+  white-space: normal;
+  animation: cloud-status-in 140ms ease-out;
+}
+
+@keyframes cloud-status-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cloud-status__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.cloud-status__head > .db-health__dot {
+  margin-top: 6px;
+}
+
+.cloud-status__heading {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cloud-status__heading strong {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.cloud-status__heading small {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cloud-status__close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+}
+
+.cloud-status__issue {
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg);
+}
+
+.cloud-status__issue strong {
+  color: var(--color-danger);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cloud-status__issue p {
+  margin: 4px 0 0;
+  color: var(--color-text-primary);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.cloud-status__issue .cloud-status__hint {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+}
+
+.cloud-status__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--color-border);
+}
+
+.cloud-status__meta > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 8px var(--space-3);
+  background: var(--color-bg-secondary);
+}
+
+.cloud-status__meta dt {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.cloud-status__meta dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-text-primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.cloud-status__meta dd.is-online { color: var(--color-success); }
+.cloud-status__meta dd.is-offline { color: var(--color-danger); }
+.cloud-status__meta dd.is-checking { color: var(--color-warning); }
+
+.cloud-status__note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.cloud-status__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.cloud-status__actions .button {
+  min-height: 34px;
+}
+
+@media (max-width: 820px) {
+  .cloud-status__panel {
+    position: fixed;
+    top: calc(var(--top-nav-height) + 6px);
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cloud-status__panel {
+    animation: none;
+  }
+}

@@ -1,0 +1,756 @@
+// Sanchay - Public Asset Intelligence
+// Same backend shape as EasyLife: Prisma ORM -> Supabase PostgreSQL, accessed ONLY from server
+// route handlers (PostgREST/anon access is revoked by prisma/enable_rls.sql).
+//
+// Extra database-level guarantees that Prisma cannot express live in prisma/post-push.sql and are applied by
+// `npm run db:push` (allocation overlap exclusion constraint, append-only audit trigger, check constraints).
+//
+// Phase 1 (this schema): Fleet / Vehicles (spec files 13-19). Spaces models are added in a later phase.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Organizations, identity
+// ---------------------------------------------------------------------------
+
+/// Government organizations and their units. `parentId` forms the hierarchy used for scope and approver escalation.
+model Organization {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  /// DISTRICT | POLICE | HEALTH | MUNICIPAL | PWD | ELECTION | OTHER
+  kind      String   @default("OTHER")
+  parentId  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parent   Organization?  @relation("OrgTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Organization[] @relation("OrgTree")
+  operators Operator[]
+  stations  Station[]
+  vehicles  Vehicle[]
+  requests  AssetRequest[]
+}
+
+model Operator {
+  id             String    @id @default(cuid())
+  username       String    @unique
+  displayName    String
+  email          String?
+  phone          String?
+  /// ADMIN (platform) | ORG_ADMIN | DEPT_OFFICER (approver) | STATION_OFFICER (unit/fleet officer) | FIELD_STAFF | AUDITOR
+  role           String
+  organizationId String?
+  /// Home station for STATION_OFFICER / FIELD_STAFF scoping
+  stationId      String?
+  passwordHash   String
+  active         Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  station      Station?      @relation(fields: [stationId], references: [id], onDelete: SetNull)
+
+  @@index([role])
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------------------
+// Fleet
+// ---------------------------------------------------------------------------
+
+model Station {
+  id             String   @id @default(cuid())
+  /// Stable slug, e.g. "kotwali-police-station"
+  code           String   @unique
+  name           String
+  organizationId String?
+  zone           String   @default("Central")
+  district       String   @default("Gwalior")
+  lat            Float
+  lng            Float
+  inchargeName   String?
+  phone          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  vehicles           Vehicle[]
+  operators          Operator[]
+  inventory          StationInventory?
+  transfersOut       TransferRequest[] @relation("TransferSource")
+  transfersIn        TransferRequest[] @relation("TransferDestination")
+  transfersRequested TransferRequest[] @relation("TransferRequester")
+}
+
+/// Allocatable pool counts per vehicle class: ELIGIBLE government-fleet vehicles only.
+model StationInventory {
+  stationId  String   @id
+  patrolCar  Int      @default(0)
+  motorcycle Int      @default(0)
+  van        Int      @default(0)
+  heavy      Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id                     String    @id @default(cuid())
+  /// Human asset code, e.g. SCH-V-0042 (globally unique, never reused)
+  assetCode              String    @unique
+  /// As recorded (original value is preserved)
+  registrationNumber     String
+  /// Uppercase alphanumerics only; unique per owning organization
+  registrationNormalized String
+  displayName            String
+  /// GMC_WASTE | AMBULANCE_108 | POLICE_PATROL | PWD_HEAVY | HEALTH_VAN | ELECTION_REQUISITION
+  sector                 String
+  /// PATROL_CAR | MOTORCYCLE | VAN | HEAVY
+  vehicleClass           String
+  vehicleType            String
+  organizationId         String
+  /// Free-text managing unit within the organization
+  managingUnit           String?
+  stationId              String?
+  driverName             String?
+  driverPhone            String?
+
+  /// LIVE motion state from telemetry: MOVING | IDLE | BREAKDOWN | OFFLINE (never drives eligibility)
+  status                 String    @default("IDLE")
+
+  /// Registry operational status: ACTIVE | MAINTENANCE | OUT_OF_SERVICE | RETIRED
+  operationalStatus      String    @default("ACTIVE")
+
+  /// GOVERNMENT_FLEET | SEIZED_IMPOUNDED | OTHER_UNVERIFIED  (default fails closed)
+  ownershipCategory      String    @default("OTHER_UNVERIFIED")
+  /// Cached output of the server-side eligibility service
+  /// ELIGIBLE | RESTRICTED | PENDING_VERIFICATION | INELIGIBLE
+  eligibilityState       String    @default("PENDING_VERIFICATION")
+  eligibilityReasons     Json?
+  eligibilityPolicyVersion String?
+  eligibilityEvaluatedAt DateTime?
+
+  makeModel              String?
+  year                   Int?
+  fuelType               String?
+  seating                Int?
+  color                  String?
+  chassisNumber          String?
+  engineNumber           String?
+  odometerKm             Int       @default(0)
+  /// AIS_140 | QR_PWA | MANUAL_CSV | SIMULATED
+  gpsSource              String    @default("MANUAL_CSV")
+  lat                    Float?
+  lng                    Float?
+  speedKmph              Float     @default(0)
+  heading                Float     @default(0)
+  ignition               Boolean   @default(false)
+  fuelPercent            Float?
+  /// Time of the last accepted telemetry event (device time) and when the server ingested it
+  lastSeenAt             DateTime?
+  lastIngestedAt         DateTime?
+  idleSince              DateTime?
+  pucExpiry              DateTime?
+  insuranceExpiry        DateTime?
+  fitnessExpiry          DateTime?
+  maintenanceRisk        Int       @default(0)
+  hoursWeek              Float     @default(0)
+  photoPath              String?
+  notes                  String?
+  createdBy              String    @default("system")
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  station       Station?     @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  trips         Trip[]
+  maintenance   MaintenanceRecord[]
+  legal         LegalRecord[]
+  incidents     IncidentReport[]
+  fuelLogs      FuelLog[]
+  requests      AssetRequest[]
+  allocations   Allocation[]
+  devices       IotDevice[]
+  telemetry     TelemetryPoint[]
+  verifications VehicleOwnershipVerification[]
+  restrictions  VehicleRestriction[]
+  documents     VehicleDocument[]
+
+  @@unique([organizationId, registrationNormalized])
+  @@index([sector, status])
+  @@index([stationId])
+  @@index([organizationId, operationalStatus])
+  @@index([eligibilityState])
+  @@index([lastSeenAt])
+  @@index([registrationNormalized])
+}
+
+/// Evidence that a vehicle is controlled by the stated organization. Append-only; the latest VERIFIED row wins.
+model VehicleOwnershipVerification {
+  id           String    @id @default(cuid())
+  vehicleId    String
+  /// The category this evidence supports
+  category     String
+  /// PENDING | VERIFIED | REJECTED | SUPERSEDED
+  status       String    @default("PENDING")
+  evidenceRef  String
+  evidenceNote String?
+  submittedBy  String
+  verifiedBy   String?
+  verifiedAt   DateTime?
+  rejectionNote String?
+  createdAt    DateTime  @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, status])
+}
+
+/// Legal / custody / safety restriction. Lifting appends liftedAt/liftedBy (rows are never deleted).
+model VehicleRestriction {
+  id          String    @id @default(cuid())
+  vehicleId   String
+  /// LEGAL_CUSTODY | COURT_ORDER | SAFETY | MAINTENANCE_HOLD | COMPLIANCE | OTHER
+  type        String
+  reasonCode  String
+  description String?
+  evidenceRef String?
+  authority   String
+  decidedBy   String
+  decidedAt   DateTime  @default(now())
+  /// Next review date; expiry stops the restriction automatically
+  reviewAt    DateTime?
+  expiresAt   DateTime?
+  liftedAt    DateTime?
+  liftedBy    String?
+  liftReason  String?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, liftedAt])
+}
+
+model VehicleDocument {
+  id          String    @id @default(cuid())
+  vehicleId   String
+  /// RC | INSURANCE | PUC | FITNESS | OWNERSHIP_EVIDENCE | HANDOVER_EVIDENCE | OTHER
+  kind        String
+  title       String
+  /// Private Supabase Storage object path (never a public URL)
+  storagePath String
+  mimeType    String
+  sizeBytes   Int
+  uploadedBy  String
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  access  DocumentAccessLog[]
+
+  @@index([vehicleId, kind])
+}
+
+model DocumentAccessLog {
+  id         String   @id @default(cuid())
+  documentId String
+  accessedBy String
+  action     String
+  at         DateTime @default(now())
+
+  document VehicleDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, at])
+}
+
+model Trip {
+  id            String    @id @default(cuid())
+  tripCode      String    @unique
+  vehicleId     String
+  driverName    String
+  purpose       String
+  /// ONGOING | COMPLETED | ABORTED
+  status        String    @default("ONGOING")
+  startedAt     DateTime  @default(now())
+  endedAt       DateTime?
+  startAddress  String
+  endAddress    String?
+  startOdometer Int
+  endOdometer   Int?
+  distanceKm    Float?
+  durationMin   Int?
+  fuelLiters    Float?
+  routePath     Json?
+  allocationId  String?
+  createdBy     String    @default("system")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, startedAt])
+  @@index([status])
+}
+
+model MaintenanceRecord {
+  id          String    @id @default(cuid())
+  ticketCode  String    @unique
+  vehicleId   String
+  title       String
+  /// LOW | MEDIUM | HIGH | CRITICAL (CRITICAL blocks availability by policy)
+  severity    String    @default("MEDIUM")
+  /// SCHEDULED | IN_PROGRESS | COMPLETED | OVERDUE | CANCELLED
+  status      String    @default("SCHEDULED")
+  dueDate     DateTime?
+  /// Maintenance window: while open it removes the vehicle from availability
+  windowStart DateTime?
+  windowEnd   DateTime?
+  blocksAvailability Boolean @default(false)
+  completedAt DateTime?
+  odometerKm  Int?
+  costInr     Int       @default(0)
+  vendor      String?
+  notes       String?
+  raisedBy    String    @default("system")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, status])
+  @@index([status, dueDate])
+}
+
+model LegalRecord {
+  id           String    @id @default(cuid())
+  vehicleId    String
+  /// CHALLAN | COURT_CASE | ACCIDENT | SEIZURE
+  type         String
+  referenceNo  String
+  date         DateTime
+  description  String
+  /// PENDING | ACTIVE | APPEALED | RESOLVED
+  status       String    @default("PENDING")
+  amountInr    Int?
+  nextActionAt DateTime?
+  authority    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, status])
+}
+
+model IncidentReport {
+  id              String    @id @default(cuid())
+  incidentCode    String    @unique
+  vehicleId       String
+  /// SOS | BREAKDOWN | ACCIDENT | DAMAGE | GEOFENCE | OTHER
+  type            String
+  /// INFO | WARNING | CRITICAL
+  severity        String    @default("WARNING")
+  message         String
+  reporterName    String
+  lat             Float?
+  lng             Float?
+  photoPath       String?
+  offlineCaptured Boolean   @default(false)
+  /// OPEN | ACKNOWLEDGED | RESOLVED
+  status          String    @default("OPEN")
+  acknowledgedBy  String?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([vehicleId])
+}
+
+model FuelLog {
+  id         String   @id @default(cuid())
+  vehicleId  String
+  liters     Float
+  costInr    Int?
+  odometerKm Int?
+  /// MANUAL | SENSOR
+  source     String   @default("MANUAL")
+  loggedBy   String   @default("system")
+  loggedAt   DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, loggedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Requests -> approvals -> reservations (allocations) -> handover -> return
+// ---------------------------------------------------------------------------
+
+/// Cross-organization vehicle request. Request state is independent from allocation lifecycle.
+model AssetRequest {
+  id                   String    @id @default(cuid())
+  requestCode          String    @unique
+  requestingOrgId      String
+  requesterUsername    String
+  requesterName        String
+  /// Specific vehicle (must be eligible) or null when only a class is requested
+  vehicleId            String?
+  requestedClass       String
+  purpose              String
+  destination          String?
+  passengers           Int       @default(1)
+  startAt              DateTime
+  endAt                DateTime
+  accountableOfficer   String
+  accountablePhone     String?
+  contactPhone         String?
+  /// DRAFT | SUBMITTED | UNDER_REVIEW | CHANGES_REQUESTED | APPROVED | REJECTED | CANCELLED | EXPIRED
+  state                String    @default("DRAFT")
+  /// Org whose approvers must decide (the vehicle's owning org, or its parent after escalation)
+  approverOrgId        String?
+  submittedAt          DateTime?
+  decidedAt            DateTime?
+  decisionReason       String?
+  /// Caller-supplied key making submit/approve retries idempotent
+  idempotencyKey       String?   @unique
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  requestingOrg Organization @relation(fields: [requestingOrgId], references: [id])
+  vehicle       Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  steps         ApprovalStep[]
+  allocation    Allocation?
+
+  @@index([state, startAt])
+  @@index([requestingOrgId, state])
+  @@index([approverOrgId, state])
+  @@index([vehicleId, startAt])
+}
+
+model ApprovalStep {
+  id         String    @id @default(cuid())
+  requestId  String
+  stepOrder  Int
+  approverOrgId String
+  /// PENDING | APPROVED | REJECTED | CHANGES_REQUESTED | ESCALATED | SKIPPED
+  decision   String    @default("PENDING")
+  decidedBy  String?
+  decidedByRole String?
+  comment    String?
+  decidedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  request AssetRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, stepOrder])
+}
+
+/// A reservation of one vehicle for a period. Overlap for the same vehicle is prevented by a PostgreSQL exclusion
+/// constraint (prisma/post-push.sql), not only by application checks.
+model Allocation {
+  id             String    @id @default(cuid())
+  allocationCode String    @unique
+  requestId      String    @unique
+  vehicleId      String
+  startAt        DateTime
+  endAt          DateTime
+  /// RESERVED | AWAITING_HANDOVER | ACTIVE | RETURNED_PENDING_INSPECTION | COMPLETED | CANCELLED | INCIDENT_HOLD
+  /// (RETURN_DUE is derived: ACTIVE and endAt in the past)
+  lifecycle      String    @default("RESERVED")
+  holdReason     String?
+  cancelReason   String?
+  createdBy      String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  request    AssetRequest @relation(fields: [requestId], references: [id])
+  vehicle    Vehicle      @relation(fields: [vehicleId], references: [id])
+  handover   HandoverRecord?
+  returnRec  ReturnRecord?
+  extensions ExtensionRequest[]
+
+  @@index([vehicleId, startAt])
+  @@index([lifecycle, endAt])
+}
+
+model HandoverRecord {
+  id           String   @id @default(cuid())
+  allocationId String   @unique
+  handedOverBy String
+  receivedBy   String
+  conditionNotes String
+  odometerKm   Int?
+  fuelPercent  Float?
+  /// Accessories / documents checklist
+  checklist    Json
+  evidenceRef  String?
+  acknowledgedAt DateTime @default(now())
+  recordedAt   DateTime @default(now())
+
+  allocation Allocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+}
+
+model ReturnRecord {
+  id              String    @id @default(cuid())
+  allocationId    String    @unique
+  returnedBy      String
+  receivedBy      String
+  returnedAt      DateTime  @default(now())
+  conditionNotes  String
+  odometerKm      Int?
+  fuelPercent     Float?
+  discrepancies   String?
+  evidenceRef     String?
+  inspectionRequired Boolean @default(true)
+  /// PENDING | ACCEPTED | DISPUTED | NOT_REQUIRED
+  inspectionStatus String   @default("PENDING")
+  inspectedBy     String?
+  inspectedAt     DateTime?
+  inspectionNotes String?
+
+  allocation Allocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+}
+
+model ExtensionRequest {
+  id           String    @id @default(cuid())
+  allocationId String
+  requestedBy  String
+  newEndAt     DateTime
+  reason       String
+  /// PENDING | APPROVED | REJECTED
+  status       String    @default("PENDING")
+  decidedBy    String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime  @default(now())
+
+  allocation Allocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+
+  @@index([allocationId, status])
+}
+
+/// Created only AFTER the originating state change committed. `eventKey` makes retries idempotent.
+model Notification {
+  id          String    @id @default(cuid())
+  eventKey    String    @unique
+  /// Target a specific operator OR everyone with a role inside an organization
+  recipientUsername String?
+  recipientRole     String?
+  recipientOrgId    String?
+  kind        String
+  title       String
+  body        String
+  href        String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([recipientUsername, readAt])
+  @@index([recipientOrgId, recipientRole, readAt])
+}
+
+model IdempotencyKey {
+  key       String   @id
+  scope     String
+  response  Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Station pool transfers (kept from the original prototype): counts of ELIGIBLE vehicles per class
+// ---------------------------------------------------------------------------
+
+model TransferRequest {
+  id                   String    @id @default(cuid())
+  transferCode         String    @unique
+  requesterStationId   String
+  sourceStationId      String
+  destinationStationId String
+  requestedBy          String
+  startAt              DateTime
+  endAt                DateTime
+  patrolCar            Int       @default(0)
+  motorcycle           Int       @default(0)
+  van                  Int       @default(0)
+  heavy                Int       @default(0)
+  purpose              String
+  comments             String?
+  /// PENDING | ALLOCATED | COMPLETED | REJECTED | CANCELLED
+  status               String    @default("PENDING")
+  reviewedBy           String?
+  reviewedAt           DateTime?
+  rejectionReason      String?
+  completedBy          String?
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  requesterStation   Station @relation("TransferRequester", fields: [requesterStationId], references: [id])
+  sourceStation      Station @relation("TransferSource", fields: [sourceStationId], references: [id])
+  destinationStation Station @relation("TransferDestination", fields: [destinationStationId], references: [id])
+
+  @@index([status, createdAt])
+  @@index([sourceStationId])
+  @@index([destinationStationId])
+}
+
+// ---------------------------------------------------------------------------
+// IoT: devices authenticate with a per-device ingest key scoped to their own vehicle
+// ---------------------------------------------------------------------------
+
+model IotDevice {
+  id             String    @id @default(cuid())
+  /// IMEI / serial printed on the device
+  deviceCode     String    @unique
+  /// GPS_TRACKER | OBD_DONGLE | FUEL_SENSOR | SOS_BUTTON | DASHCAM | TEMP_SENSOR
+  kind           String
+  vehicleId      String?
+  organizationId String?
+  /// AIS_140 | MQTT | HTTP | BLE
+  protocol       String    @default("AIS_140")
+  /// ONLINE | STALE | OFFLINE | UNPROVISIONED
+  status         String    @default("UNPROVISIONED")
+  /// True while this device is fed by the built-in simulator (placeholder data)
+  simulated      Boolean   @default(true)
+  /// SHA-256 of the device ingest key; the key itself is shown once at provisioning
+  ingestKeyHash  String?
+  ingestKeyPrefix String?
+  /// Highest accepted device event time, for replay protection
+  lastEventAt    DateTime?
+  firmware       String?
+  batteryPct     Int?
+  signalDbm      Int?
+  lastSeenAt     DateTime?
+  provisionedAt  DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
+  @@index([status])
+}
+
+model TelemetryPoint {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  deviceCode  String?
+  lat         Float
+  lng         Float
+  speedKmph   Float    @default(0)
+  heading     Float    @default(0)
+  accuracyM   Float?
+  ignition    Boolean  @default(false)
+  fuelPercent Float?
+  batteryV    Float?
+  /// Device clock vs server ingestion time are stored separately
+  recordedAt  DateTime
+  receivedAt  DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, recordedAt])
+  @@index([recordedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Governance & platform
+// ---------------------------------------------------------------------------
+
+/// Tamper-evident, append-only ledger: each row's hash = sha256(prevHash | canonical payload).
+/// UPDATE and DELETE are rejected by a database trigger (prisma/post-push.sql).
+model AuditLog {
+  id              String   @id @default(cuid())
+  seq             Int      @default(autoincrement())
+  entityType      String
+  entityId        String
+  action          String
+  fieldName       String?
+  oldValue        String?
+  newValue        String?
+  performedBy     String   @default("system")
+  performedByRole String?
+  organizationId  String?
+  /// Groups every row written by one request / command
+  correlationId   String?
+  /// SUCCESS | DENIED | FAILED
+  outcome         String   @default("SUCCESS")
+  performedAt     DateTime @default(now())
+  reason          String?
+  prevHash        String?
+  hash            String?
+
+  @@index([entityType, entityId])
+  @@index([performedAt])
+  @@index([seq])
+  @@index([organizationId])
+  @@index([correlationId])
+}
+
+model UsageCounter {
+  key       String   @id
+  value     BigInt   @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model BackendEvent {
+  id          String   @id @default(cuid())
+  operationId String
+  level       String
+  category    String
+  action      String
+  status      String
+  recordCount Int?
+  message     String
+  details     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([operationId])
+  @@index([category, status, createdAt])
+}
+
+model SyncJob {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  type           String
+  status         String    @default("Pending")
+  payload        Json
+  result         Json?
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(10)
+  nextAttemptAt  DateTime  @default(now())
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastError      String?
+  operationId    String
+  recordCount    Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  completedAt    DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([type, createdAt])
+  @@index([operationId])
+}

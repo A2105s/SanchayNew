@@ -1,0 +1,30 @@
+﻿app/compliance/page.tsx(229,34): error TS2345: Argument of type '"fleet.write"' is not assignable to parameter of type 'Permission'.
+app/dashboard/page.tsx(27,3): error TS2305: Module '"@/components/ops/shared"' has no exported member 'utilizationPct'.
+app/dashboard/page.tsx(28,3): error TS2305: Module '"@/components/ops/shared"' has no exported member 'complianceHealthPct'.
+app/dashboard/page.tsx(45,7): error TS2741: Property 'ORG_ADMIN' is missing in type '{ ADMIN: string; DEPT_OFFICER: string; STATION_OFFICER: string; FIELD_STAFF: string; AUDITOR: string; }' but required in type 'Record<Role, string>'.
+app/dashboard/page.tsx(75,48): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/dashboard/page.tsx(128,13): error TS2345: Argument of type '"booking.review"' is not assignable to parameter of type 'Permission'.
+app/dashboard/page.tsx(129,40): error TS2339: Property 'bookings' does not exist on type 'FleetSnapshot'.
+app/dashboard/page.tsx(129,57): error TS7006: Parameter 'b' implicitly has an 'any' type.
+app/dashboard/page.tsx(266,27): error TS2339: Property 'bookings' does not exist on type 'FleetSnapshot'.
+app/dashboard/page.tsx(266,44): error TS7006: Parameter 'b' implicitly has an 'any' type.
+app/dashboard/page.tsx(366,20): error TS2345: Argument of type '"fleet.write"' is not assignable to parameter of type 'Permission'.
+app/dashboard/page.tsx(368,20): error TS2345: Argument of type '"booking.create"' is not assignable to parameter of type 'Permission'.
+app/idle/page.tsx(75,48): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/idle/page.tsx(75,76): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/idle/page.tsx(228,46): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/idle/page.tsx(228,92): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/idle/page.tsx(229,36): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/idle/page.tsx(237,28): error TS2345: Argument of type '"fleet.write"' is not assignable to parameter of type 'Permission'.
+app/idle/page.tsx(237,56): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/maintenance/page.tsx(65,24): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/maintenance/page.tsx(65,56): error TS2339: Property 'lifecycle' does not exist on type 'VehicleView'.
+app/reports/page.tsx(7,24): error TS2305: Module '"@/components/ops/shared"' has no exported member 'utilizationPct'.
+app/reports/page.tsx(7,40): error TS2305: Module '"@/components/ops/shared"' has no exported member 'complianceHealthPct'.
+app/settings/page.tsx(23,17): error TS2322: Type '"fleet.write"' is not assignable to type 'Permission'.
+app/settings/page.tsx(23,32): error TS2322: Type '"fleet.delete"' is not assignable to type 'Permission'.
+app/settings/page.tsx(24,3): error TS2322: Type '"booking.create"' is not assignable to type 'Permission'.
+app/settings/page.tsx(24,21): error TS2322: Type '"booking.review"' is not assignable to type 'Permission'.
+app/settings/page.tsx(28,7): error TS2741: Property 'ORG_ADMIN' is missing in type '{ ADMIN: string; DEPT_OFFICER: string; STATION_OFFICER: string; FIELD_STAFF: string; AUDITOR: string; }' but required in type 'Record<Role, string>'.
+app/settings/page.tsx(173,83): error TS2551: Property 'telemetryStaleMinutes' does not exist on type 'FleetSettings'. Did you mean 'telemetryFreshMinutes'?
+app/settings/page.tsx(173,127): error TS2345: Argument of type '"telemetryStaleMinutes"' is not assignable to parameter of type 'keyof FleetSettings'.

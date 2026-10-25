@@ -1,0 +1,424 @@
+/* Ops pages styling. Builds on globals.css tokens/classes. Prefix: ops- */
+
+.ops-greeting {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ops-greeting h1 {
+  font-size: 1.5rem;
+  font-weight: 650;
+  margin: 0;
+  line-height: 1.2;
+}
+.ops-greeting .ops-date {
+  font-size: 0.85rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Needs-attention ranked list */
+.ops-attn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ops-attn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #fff);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.ops-attn-row:hover,
+.ops-attn-row:focus-visible {
+  background: var(--surface-hover, #f8fafc);
+  border-color: var(--border-strong, #cbd5e1);
+  outline: none;
+}
+.ops-attn-row:focus-visible {
+  box-shadow: 0 0 0 2px var(--brand, #2563eb);
+}
+.ops-attn-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  flex: none;
+}
+.ops-attn-icon--danger {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.ops-attn-icon--warning {
+  background: #fffbeb;
+  color: #d97706;
+}
+.ops-attn-icon--info {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.ops-attn-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.ops-attn-title {
+  font-weight: 560;
+  font-size: 0.9rem;
+}
+.ops-attn-detail {
+  font-size: 0.78rem;
+  color: var(--text-muted, #64748b);
+}
+.ops-attn-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  font-size: 1.05rem;
+}
+
+/* generic column board */
+.ops-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.ops-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.ops-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 2px;
+}
+.ops-card {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ops-card--sos {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+.ops-card-title {
+  font-weight: 580;
+  font-size: 0.88rem;
+}
+.ops-card-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* station / generic grid cards */
+.ops-grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+.ops-tile {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  text-align: left;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+}
+.ops-tile:hover,
+.ops-tile:focus-visible {
+  border-color: var(--brand, #2563eb);
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06);
+  outline: none;
+}
+.ops-inv {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.ops-inv-cell {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 7px;
+  background: var(--surface-hover, #f1f5f9);
+}
+.ops-inv-cell b {
+  font-variant-numeric: tabular-nums;
+}
+
+/* timeline */
+.ops-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-left: 4px;
+}
+.ops-tl-step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  padding-bottom: 14px;
+  position: relative;
+}
+.ops-tl-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 20px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--border, #e2e8f0);
+}
+.ops-tl-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong, #cbd5e1);
+  background: var(--surface, #fff);
+  z-index: 1;
+}
+.ops-tl-dot--done {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+.ops-tl-dot--active {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+.ops-tl-dot--rejected {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+.ops-tl-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ops-tl-label {
+  font-weight: 560;
+  font-size: 0.85rem;
+}
+.ops-tl-time {
+  font-size: 0.76rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* stepper */
+.ops-stepper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.ops-stepper button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--surface-hover, #f1f5f9);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.ops-stepper button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ops-stepper .ops-stepper-val {
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* signal bars */
+.ops-signal {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.ops-signal span {
+  width: 3px;
+  background: var(--border-strong, #cbd5e1);
+  border-radius: 1px;
+}
+.ops-signal span.on {
+  background: #16a34a;
+}
+
+/* telemetry stream */
+.ops-stream {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.78rem;
+}
+.ops-stream-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--surface-hover, #f8fafc);
+  align-items: center;
+}
+
+/* code block */
+.ops-code {
+  position: relative;
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 44px 14px 14px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+.ops-code .ops-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* audit expandable */
+.ops-audit-expand {
+  background: var(--surface-hover, #f8fafc);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.ops-hashline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.74rem;
+}
+.ops-hashline .ops-hash {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* spaces hero */
+.ops-hero {
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+  border: 1px solid #dbeafe;
+}
+.ops-hero h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+.ops-roadmap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ops-roadmap-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 0.9rem;
+}
+
+/* reports print */
+@media print {
+  .ops-no-print,
+  .toolbar,
+  nav,
+  aside {
+    display: none !important;
+  }
+  .page {
+    padding: 0 !important;
+  }
+}
+
+/* small inline svg bar chart */
+.ops-svgbar {
+  width: 100%;
+  height: auto;
+}
+
+/* teaser card */
+.ops-teaser {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--brand, #2563eb);
+  background: linear-gradient(135deg, #eff6ff, #ffffff);
+  text-decoration: none;
+  color: inherit;
+}
+.ops-teaser:hover {
+  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.12);
+}
+
+.ops-gateway {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ops-gateway-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-hover, #f1f5f9);
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .ops-board {
+    grid-template-columns: 1fr;
+  }
+  .ops-grid-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* IoT registry: keep cells on one line, let the table scroll horizontally in its panel */
+.iot-registry table th,
+.iot-registry table td {
+  white-space: nowrap;
+}

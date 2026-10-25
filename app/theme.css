@@ -1,0 +1,428 @@
+/* ============================================================
+   THEME LAYER
+   - Light theme = the default token set in globals.css (:root).
+   - Dark theme  = token overrides + a small set of component
+     overrides for places that use literal colors.
+   - The active theme is set on <html data-theme="light|dark">
+     by the pre-paint script in app/layout.tsx (no flash).
+   Loaded last so equal-specificity rules win; every dark rule is
+   prefixed with :root[data-theme='dark'] so light mode is untouched.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+}
+
+/* ---------- Top bar controls (theme-independent layout) ---------- */
+
+.top-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.theme-toggle {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+.theme-toggle svg {
+  transition: transform var(--transition-normal);
+}
+
+.theme-toggle:hover svg {
+  transform: rotate(18deg);
+}
+
+@media (max-width: 820px) {
+  .theme-toggle {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle svg {
+    transition: none;
+  }
+
+  .theme-toggle:hover svg {
+    transform: none;
+  }
+}
+
+/* ============================================================
+   DARK THEME — TOKENS
+   ============================================================ */
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* Brand: a touch lighter so brand-colored text stays readable on dark
+     surfaces while white text on brand buttons keeps >= 3.4:1 contrast. */
+  --color-brand: #1596a6;
+  --color-brand-hover: #0f8492;
+  --color-brand-light: rgba(21, 150, 166, 0.2);
+  --color-brand-subtle: rgba(21, 150, 166, 0.14);
+  --brand-border: rgba(60, 190, 205, 0.26);
+
+  --color-success: #4cc38a;
+  --color-success-bg: rgba(76, 195, 138, 0.14);
+  --color-warning: #e8a04e;
+  --color-warning-bg: rgba(232, 160, 78, 0.14);
+  --color-danger: #f07b76;
+  --color-danger-bg: rgba(240, 123, 118, 0.14);
+  --color-info: #7aa5f2;
+  --color-info-bg: rgba(122, 165, 242, 0.14);
+
+  --color-bg-shell: #0c1417;
+  --color-bg-primary: #131e22;
+  --color-bg-secondary: #19272c;
+  --color-bg-tertiary: #223238;
+
+  --color-text-primary: #e7eff1;
+  --color-text-secondary: #a8b8bf;
+  --color-text-muted: #82959d;
+  --color-border: #2a3b42;
+
+  --shadow-panel: 0 12px 28px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 18px 36px rgba(0, 0, 0, 0.5);
+  --color-bg-overlay: rgba(0, 0, 0, 0.62);
+}
+
+/* ============================================================
+   DARK THEME — COMPONENT OVERRIDES (literal colors in CSS)
+   ============================================================ */
+
+/* Shell */
+:root[data-theme='dark'] .sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent),
+    #0f2126;
+  border-right-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .top-nav {
+  background: rgba(19, 30, 34, 0.84);
+}
+
+/* Cloud / sync status chip */
+:root[data-theme='dark'] .db-health {
+  border-color: var(--brand-border);
+  background: rgba(25, 39, 44, 0.8);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .db-health:hover {
+  background: var(--color-bg-tertiary);
+}
+
+:root[data-theme='dark'] .db-health.is-syncing { color: #7dd3fc; border-color: rgba(125, 211, 252, 0.3); }
+:root[data-theme='dark'] .db-health.is-queued { color: #f0b36b; border-color: rgba(240, 179, 107, 0.3); }
+:root[data-theme='dark'] .db-health.is-failed { color: #fca5a5; border-color: rgba(252, 165, 165, 0.3); }
+:root[data-theme='dark'] .db-health.is-synced { color: #6ee7b7; border-color: rgba(110, 231, 183, 0.28); }
+
+/* Sync activity banner */
+:root[data-theme='dark'] .sync-activity--syncing {
+  border-color: rgba(125, 211, 252, 0.2);
+  background: rgba(14, 116, 144, 0.2);
+  color: #bae6fd;
+}
+
+:root[data-theme='dark'] .sync-activity--queued {
+  border-color: rgba(240, 179, 107, 0.22);
+  background: rgba(184, 100, 19, 0.2);
+  color: #f6cf9b;
+}
+
+:root[data-theme='dark'] .sync-activity--failed {
+  border-color: rgba(252, 165, 165, 0.22);
+  background: rgba(185, 28, 28, 0.22);
+  color: #fecaca;
+}
+
+/* Inline toasts */
+:root[data-theme='dark'] .toast-inline--danger {
+  border-color: rgba(252, 165, 165, 0.28);
+  background: rgba(185, 28, 28, 0.2);
+  color: #fecaca;
+}
+
+:root[data-theme='dark'] .toast-inline--info {
+  border-color: rgba(147, 197, 253, 0.28);
+  background: rgba(30, 64, 175, 0.24);
+  color: #bfdbfe;
+}
+
+:root[data-theme='dark'] .toast-inline__close:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Secondary buttons (declared with !important in globals.css) */
+:root[data-theme='dark'] .button--secondary {
+  background: var(--color-bg-tertiary) !important;
+  border-color: var(--color-border) !important;
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .button--secondary:hover {
+  background: #2c4048 !important;
+  border-color: #3a5159 !important;
+}
+
+/* Sunken / track surfaces */
+:root[data-theme='dark'] .audit-panel,
+:root[data-theme='dark'] .ocr-comparison,
+:root[data-theme='dark'] .verification-status-picker,
+:root[data-theme='dark'] .activity-log-toolbar .search-field,
+:root[data-theme='dark'] .activity-log-toolbar .custom-select-trigger {
+  background: var(--color-bg-secondary);
+}
+
+:root[data-theme='dark'] .activity-log-toolbar .custom-select-trigger:hover {
+  background: var(--color-bg-tertiary);
+}
+
+:root[data-theme='dark'] .image-stage {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.03) 25%, transparent 25%),
+    #0a1114;
+  background-size: 28px 28px;
+}
+
+/* Hover/active tints that used translucent white */
+:root[data-theme='dark'] .settings-tab-btn:hover,
+:root[data-theme='dark'] .status-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+:root[data-theme='dark'] .initial-machine-toggle__tag {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Review editor sections */
+:root[data-theme='dark'] .form-section,
+:root[data-theme='dark'] .form-section--machine,
+:root[data-theme='dark'] .form-section--service,
+:root[data-theme='dark'] .form-section--outcome {
+  --section-accent: var(--color-brand);
+  --section-fill: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .form-section:focus-within {
+  border-color: rgba(45, 178, 199, 0.35);
+}
+
+:root[data-theme='dark'] .form-section__label {
+  color: var(--color-text-secondary);
+}
+
+:root[data-theme='dark'] .form-section__label > span {
+  background: rgba(45, 178, 199, 0.16);
+  color: var(--color-brand);
+  border-color: rgba(45, 178, 199, 0.3);
+}
+
+/* Form inputs & controls in dark theme */
+:root[data-theme='dark'] .field input,
+:root[data-theme='dark'] .field textarea,
+:root[data-theme='dark'] .field select,
+:root[data-theme='dark'] .form-section .field input,
+:root[data-theme='dark'] .form-section .field textarea,
+:root[data-theme='dark'] .form-section .field select,
+:root[data-theme='dark'] .review-editor .form-section .field input,
+:root[data-theme='dark'] .review-editor .form-section .field textarea,
+:root[data-theme='dark'] .review-editor .form-section .field select {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .field input:hover,
+:root[data-theme='dark'] .field textarea:hover,
+:root[data-theme='dark'] .field select:hover,
+:root[data-theme='dark'] .form-section .field input:hover,
+:root[data-theme='dark'] .form-section .field textarea:hover,
+:root[data-theme='dark'] .form-section .field select:hover,
+:root[data-theme='dark'] .review-editor .form-section .field input:hover,
+:root[data-theme='dark'] .review-editor .form-section .field textarea:hover,
+:root[data-theme='dark'] .review-editor .form-section .field select:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .field input:focus,
+:root[data-theme='dark'] .field textarea:focus,
+:root[data-theme='dark'] .field select:focus,
+:root[data-theme='dark'] .form-section .field input:focus,
+:root[data-theme='dark'] .form-section .field textarea:focus,
+:root[data-theme='dark'] .form-section .field select:focus,
+:root[data-theme='dark'] .review-editor .form-section .field input:focus,
+:root[data-theme='dark'] .review-editor .form-section .field textarea:focus,
+:root[data-theme='dark'] .review-editor .form-section .field select:focus {
+  background: var(--color-bg-primary);
+  border-color: var(--color-brand);
+  box-shadow: var(--focus-ring);
+  color: var(--color-text-primary);
+}
+
+:root[data-theme='dark'] .field input::placeholder,
+:root[data-theme='dark'] .field textarea::placeholder,
+:root[data-theme='dark'] .form-section .field input::placeholder,
+:root[data-theme='dark'] .form-section .field textarea::placeholder,
+:root[data-theme='dark'] .review-editor .form-section .field input::placeholder,
+:root[data-theme='dark'] .review-editor .form-section .field textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+:root[data-theme='dark'] .field input:disabled,
+:root[data-theme='dark'] .field textarea:disabled,
+:root[data-theme='dark'] .form-section .field input:disabled,
+:root[data-theme='dark'] .form-section .field textarea:disabled,
+:root[data-theme='dark'] .review-editor .form-section .field input:disabled,
+:root[data-theme='dark'] .review-editor .form-section .field textarea:disabled {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-muted);
+  opacity: 0.65;
+}
+
+:root[data-theme='dark'] .field .custom-select-trigger,
+:root[data-theme='dark'] .form-section .custom-select-trigger,
+:root[data-theme='dark'] .review-editor .form-section .custom-select-trigger {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .field .custom-select-trigger:hover,
+:root[data-theme='dark'] .form-section .custom-select-trigger:hover,
+:root[data-theme='dark'] .review-editor .form-section .custom-select-trigger:hover {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .field .custom-select-trigger.is-active,
+:root[data-theme='dark'] .field .custom-select-trigger:focus,
+:root[data-theme='dark'] .form-section .custom-select-trigger.is-active,
+:root[data-theme='dark'] .form-section .custom-select-trigger:focus,
+:root[data-theme='dark'] .review-editor .form-section .custom-select-trigger.is-active,
+:root[data-theme='dark'] .review-editor .form-section .custom-select-trigger:focus {
+  background: var(--color-bg-primary);
+  border-color: var(--color-brand);
+  box-shadow: var(--focus-ring);
+}
+
+/* Memo highlight sits on a light "paper" sheet; keep its text readable in dark mode */
+:root[data-theme='dark'] .memo-highlight {
+  background: rgba(232, 160, 78, 0.22);
+  color: #f6cf9b;
+}
+
+/* Import drop zone */
+:root[data-theme='dark'] .ocr-drop-area {
+  border-color: #3a5159;
+}
+
+/* Skeleton loaders */
+:root[data-theme='dark'] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+}
+
+:root[data-theme='dark'] .an-skeleton__block {
+  background: linear-gradient(90deg, #19272c 25%, #223238 37%, #19272c 63%);
+  background-size: 400% 100%;
+}
+
+/* Scrollbars inside settings log windows */
+:root[data-theme='dark'] .settings-log-window:hover,
+:root[data-theme='dark'] .settings-log-window:focus-within {
+  scrollbar-color: rgba(168, 184, 191, 0.35) transparent;
+}
+
+:root[data-theme='dark'] .settings-log-window::-webkit-scrollbar-thumb {
+  background: rgba(168, 184, 191, 0.35);
+}
+
+/* Login screen (rendered outside the app shell) */
+:root[data-theme='dark'] .login-field__input-wrap input {
+  background: var(--color-bg-secondary);
+}
+
+:root[data-theme='dark'] .login-field__input-wrap input:focus {
+  background: var(--color-bg-primary);
+}
+
+/* AI Polish HUD in dark theme */
+:root[data-theme='dark'] .ai-polish-hud {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .ai-polish-hud--loading {
+  background: linear-gradient(135deg, #101c22 0%, #15242b 100%);
+  border-color: rgba(45, 178, 199, 0.35);
+}
+
+:root[data-theme='dark'] .ai-polish-hud--success {
+  background: var(--color-bg-primary);
+  border-color: rgba(45, 178, 199, 0.32);
+}
+
+:root[data-theme='dark'] .ai-polish-badge {
+  background: rgba(45, 178, 199, 0.16);
+  color: var(--color-brand);
+  border-color: rgba(45, 178, 199, 0.3);
+}
+
+:root[data-theme='dark'] .ai-polish-diff__col {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .ai-polish-diff__col--polished {
+  background: rgba(45, 178, 199, 0.08);
+  border-color: rgba(45, 178, 199, 0.3);
+}
+
+/* Stepper controls & toast close button in dark mode */
+:root[data-theme='dark'] .viewer-stepper {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+:root[data-theme='dark'] .viewer-stepper__btn {
+  background: var(--color-bg-primary);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+:root[data-theme='dark'] .viewer-stepper__btn:hover:not(:disabled) {
+  background: rgba(45, 178, 199, 0.16);
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+:root[data-theme='dark'] .toast-inline {
+  background: rgba(45, 178, 199, 0.12);
+  border-color: rgba(45, 178, 199, 0.32);
+  color: #5eead4;
+}
+
+:root[data-theme='dark'] .toast-inline__close {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  opacity: 0.9;
+}
+
+:root[data-theme='dark'] .toast-inline__close:hover {
+  background: rgba(255, 255, 255, 0.22);
+  border-color: #fff;
+  opacity: 1;
+}
+

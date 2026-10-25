@@ -270,7 +270,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <AiCopilotModal />
             <button
               type="button"
-              className="icon-button"
+              className="icon-button top-nav__cmd"
               aria-label="Open command palette (Ctrl or Cmd + K)"
               title="Command palette (Ctrl/Cmd + K)"
               onClick={() => setPaletteOpen(true)}

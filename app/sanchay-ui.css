@@ -1055,3 +1055,64 @@ th.is-sorted {
   border-color: var(--color-brand);
   color: var(--color-brand);
 }
+
+/* ---- Phones: keep the top bar from colliding (title is centered, five controls on the right) ---- */
+@media (max-width: 820px) {
+  .top-nav__cmd {
+    display: none; /* Ctrl/Cmd+K is a keyboard shortcut; the sidebar already lists every page */
+  }
+  /* Ask AI collapses to an icon button */
+  .top-nav__actions .ai-copilot-btn-inner span,
+  .top-nav__actions .ai-copilot-btn-inner kbd {
+    display: none;
+  }
+  .top-nav__actions .ai-copilot-btn-inner {
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    justify-content: center;
+  }
+}
+@media (max-width: 560px) {
+  /* Logo mark only: the wordmark would sit under the controls */
+  .top-nav__brand-text {
+    display: none;
+  }
+}
+
+/* Screen-reader-only tables (e.g. inside BarTrend) must not take layout width: the global `table { min-width: 760px }`
+   otherwise widens the whole page on phones even though the table is visually clipped. */
+table.sr-only,
+.sr-only table {
+  min-width: 0;
+  width: 1px;
+}
+
+@media (max-width: 560px) {
+  /* Logo sits next to the menu button instead of being absolutely centered under the controls */
+  .top-nav__title {
+    position: static;
+    transform: none;
+    margin-right: auto;
+  }
+}
+
+/* Empty/error states inside small popovers: no page-sized minimum height */
+.notif__panel .empty-state,
+.cmdk .empty-state,
+.modal .empty-state {
+  min-height: 0;
+}
+
+/* Sidebar section headings */
+.sidebar__group {
+  margin: 14px 12px 4px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(248, 251, 252, 0.45);
+}
+.app-shell.is-collapsed .sidebar__group {
+  display: none;
+}

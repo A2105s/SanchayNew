@@ -308,6 +308,7 @@ interface SyncSummary {
 
 export function DataCloudPanel({ isAdmin, toast }: { isAdmin: boolean; toast: ToastFn }) {
   const [summary, setSummary] = useState<SyncSummary | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
   const [seedMode, setSeedMode] = useState<null | 'demo' | 'reset'>(null);
   const [confirmText, setConfirmText] = useState('');
@@ -315,9 +316,11 @@ export function DataCloudPanel({ isAdmin, toast }: { isAdmin: boolean; toast: To
 
   async function load() {
     try {
+      setLoadError(null);
       setSummary(await api.get<SyncSummary>('/api/cloud/sync-jobs'));
-    } catch {
+    } catch (e) {
       setSummary(null);
+      setLoadError(e instanceof ApiError ? e.message : 'Could not load sync status.');
     }
   }
   useEffect(() => {
@@ -360,7 +363,12 @@ export function DataCloudPanel({ isAdmin, toast }: { isAdmin: boolean; toast: To
       <Panel title="Cloud status" subtitle="Background sync queue" icon={<Database size={17} />} action={
         <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} loading={retrying} onClick={retry}>Process retries</Button>
       }>
-        {summary === null ? (
+        {summary === null && loadError ? (
+          <div role="alert" className="cluster" style={{ justifyContent: 'space-between', gap: 12 }}>
+            <span className="text-muted">Could not load sync status: {loadError}</span>
+            <Button variant="secondary" size="sm" onClick={() => void load()}>Try again</Button>
+          </div>
+        ) : summary === null ? (
           <Skeleton height={80} />
         ) : (
           <>

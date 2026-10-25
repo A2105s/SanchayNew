@@ -101,7 +101,11 @@ export function FleetProvider({ children }: { children: ReactNode }) {
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) return;
-      setError(err instanceof Error ? err.message : 'Failed to load fleet data.');
+      if (err instanceof ApiError && (err.status === 503 || err.status === 500)) {
+        setError('Sanchay cannot reach its database, or the database has no tables yet. If you are running locally, start the database, then run "npm run db:push" and "npm run db:seed" and refresh. On a hosted setup, check DATABASE_URL.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load fleet data.');
+      }
     } finally {
       setLoading(false);
     }

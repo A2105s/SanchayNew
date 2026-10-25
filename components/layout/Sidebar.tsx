@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ComponentType } from 'react';
+import { Fragment, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LoaderCircle, LogOut, X } from 'lucide-react';
@@ -72,6 +72,15 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, badge: 'Soon' }
 ];
 
+/** Sidebar sections. Items keep their permission filtering; this only decides order and headings. */
+const GROUPS: { id: string; heading: string | null; hrefs: string[] }[] = [
+  { id: 'overview', heading: null, hrefs: ['/dashboard'] },
+  { id: 'fleet', heading: 'Fleet', hrefs: ['/vehicles', '/vehicles/discover', '/vehicles/map', '/stations'] },
+  { id: 'requests', heading: 'Requests', hrefs: ['/requests', '/allocations', '/transfers'] },
+  { id: 'oversight', heading: 'Oversight', hrefs: ['/operations', '/compliance', '/maintenance', '/idle', '/incidents', '/iot'] },
+  { id: 'insights', heading: 'Insights', hrefs: ['/reports', '/audit'] },
+  { id: 'more', heading: 'More', hrefs: ['/settings', '/spaces'] }
+];
 /** FIELD_STAFF sees a reduced set: Dashboard, Fleet, Live map, Incidents. */
 const FIELD_STAFF_HREFS = new Set(['/dashboard', '/vehicles', '/vehicles/map', '/incidents']);
 
@@ -107,6 +116,23 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
     });
   }, [me]);
 
+  // Group the permitted items under headings (a heading only shows when at least one of its items is visible).
+  const grouped = useMemo(() => {
+    const out: { item: NavItem; heading: string | null }[] = [];
+    for (const group of GROUPS) {
+      let first = true;
+      for (const href of group.hrefs) {
+        const item = items.find((i) => i.href === href);
+        if (!item) continue;
+        out.push({ item, heading: first ? group.heading : null });
+        first = false;
+      }
+    }
+    // Anything not assigned to a group (future pages) is appended so it never disappears.
+    for (const item of items) if (!out.some((o) => o.item.href === item.href)) out.push({ item, heading: null });
+    return out;
+  }, [items]);
+
   function isActive(href: string): boolean {
     if (href === '/vehicles') {
       return (
@@ -134,13 +160,14 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
       </div>
 
       <nav className="sidebar__nav">
-        {items.map((item) => {
+        {grouped.map(({ item, heading }) => {
           const Icon = item.icon;
           const active = isActive(item.href);
           const pending = pendingHref === item.href;
           return (
+            <Fragment key={item.href}>
+            {heading ? <div className="sidebar__group" aria-hidden="true">{heading}</div> : null}
             <Link
-              key={item.href}
               href={item.href}
               prefetch
               className={`${active ? 'is-active' : ''} ${pending ? 'is-pending' : ''}`.trim()}
@@ -167,6 +194,7 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
               {item.badge ? <span className="sidebar__nav-badge">{item.badge}</span> : null}
               {pending ? <LoaderCircle className="sidebar__nav-pending spin" size={15} aria-hidden="true" /> : null}
             </Link>
+            </Fragment>
           );
         })}
       </nav>

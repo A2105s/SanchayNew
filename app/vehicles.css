@@ -501,6 +501,7 @@
   width: 100%;
   height: calc(100vh - var(--top-nav-height, 60px));
   min-height: 520px;
+  overflow: hidden;
 }
 .veh-map-page--fullscreen {
   position: fixed;

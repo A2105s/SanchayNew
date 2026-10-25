@@ -97,7 +97,8 @@ export function Modal({ title, children, footer, onClose, size = 'default', clos
           <button
             className="icon-button"
             type="button"
-            aria-label="Close dialog"
+            aria-label="Close"
+            title="Close"
             disabled={closeDisabled}
             onClick={onClose}
           >

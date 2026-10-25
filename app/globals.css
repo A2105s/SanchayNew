@@ -449,6 +449,9 @@ main {
   border-radius: var(--radius-lg);
   background: var(--color-bg-primary);
   box-shadow: var(--shadow-panel);
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .panel--bleed {
@@ -632,6 +635,7 @@ main {
 
   .panel-header {
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .panel-header__icon {
@@ -651,9 +655,9 @@ main {
 
   .panel-header__action {
     flex: 1 1 auto !important;
-    max-width: 62% !important;
-    min-width: 110px !important;
-    justify-content: flex-end !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    justify-content: flex-start !important;
   }
 
   .search-field--inline {

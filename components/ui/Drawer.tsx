@@ -65,7 +65,7 @@ export function Drawer({ title, onClose, children, width = 480 }: DrawerProps) {
       >
         <div className="drawer__header">
           <h2 className="drawer__title" id={titleId}>{title}</h2>
-          <button className="icon-button" type="button" aria-label="Close panel" onClick={onClose}>
+          <button className="icon-button" type="button" aria-label="Close" title="Close" onClick={onClose}>
             <X size={18} />
           </button>
         </div>

@@ -147,7 +147,9 @@ export function VehicleRegistry() {
     (patch: Partial<RegistryFilters>, resetPage = true) => {
       setFilters((prev) => {
         const next = { ...prev, ...patch, ...(resetPage ? { page: 1 } : {}) };
-        router.replace(`/vehicles${filtersToQuery(next)}`, { scroll: false });
+        queueMicrotask(() => {
+          router.replace(`/vehicles${filtersToQuery(next)}`, { scroll: false });
+        });
         return next;
       });
     },

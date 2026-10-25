@@ -98,6 +98,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   useEffect(() => {
     if (active >= results.length) setActive(0);
+    const el = document.querySelector('.cmdk__item.is-active') as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: 'nearest' });
   }, [results, active]);
 
   function go(result: Result | undefined) {
@@ -147,7 +149,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="cmdk__results">
+        <div className="cmdk__results" role="listbox" aria-label="Command suggestions">
           {results.length === 0 ? (
             <p className="cmdk__empty">No matches for “{query}”.</p>
           ) : (
@@ -159,6 +161,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   <button
                     key={result.href}
                     type="button"
+                    role="option"
+                    aria-selected={idx === active}
                     className={`cmdk__item ${idx === active ? 'is-active' : ''}`.trim()}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => go(result)}
@@ -178,6 +182,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
                   <button
                     key={result.href}
                     type="button"
+                    role="option"
+                    aria-selected={idx === active}
                     className={`cmdk__item ${idx === active ? 'is-active' : ''}`.trim()}
                     onMouseEnter={() => setActive(idx)}
                     onClick={() => go(result)}

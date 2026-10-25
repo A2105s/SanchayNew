@@ -11,6 +11,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { SearchField } from '@/components/ui/SearchField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useApiResource } from '@/hooks/useApiResource';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import { ALLOCATION_LABEL, allocationTone, fmtDateTime } from '@/lib/fleet/format';
 import type { AllocationView, AllocationLifecycle } from '@/types';
 
@@ -43,6 +44,7 @@ function matchesTab(a: AllocationView, tab: TabId): boolean {
 
 export function AllocationList() {
   const [tab, setTab] = useState<TabId>('active');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [q, setQ] = useState('');
 
   const query = useMemo(() => {
@@ -67,8 +69,11 @@ export function AllocationList() {
       <Tabs tabs={TABS} active={tab} onChange={(id) => setTab(id as TabId)} />
 
       <Panel>
-        <div className="veh-search">
-          <SearchField value={q} onChange={setQ} placeholder="Search by code or vehicle" ariaLabel="Search allocations" />
+        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="veh-search" style={{ flex: '1 1 320px', maxWidth: '420px', margin: 0 }}>
+            <SearchField value={q} onChange={setQ} placeholder="Search by code or vehicle" ariaLabel="Search allocations" />
+          </div>
+          <ViewToggle value={viewMode} onChange={setViewMode} />
         </div>
       </Panel>
 
@@ -82,7 +87,7 @@ export function AllocationList() {
         <EmptyState icon={<AlertTriangle size={28} />} title="Could not load allocations" description={error} action={<Button variant="primary" onClick={refetch}>Retry</Button>} />
       ) : rows.length === 0 ? (
         <EmptyState icon={<PackageCheck size={28} />} title="Nothing here" description={`No ${tab} allocations in your scope.`} />
-      ) : (
+      ) : viewMode === 'table' ? (
         <div className="table-wrap">
           <table>
             <thead>
@@ -118,6 +123,44 @@ export function AllocationList() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="veh-cards">
+          {rows.map((a) => (
+            <Link
+              key={a.id}
+              href={`/allocations/${a.id}`}
+              className="veh-card"
+              style={{ textDecoration: 'none' }}
+            >
+              <div className="veh-card-head">
+                <div>
+                  <div className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                    {a.allocationCode}
+                  </div>
+                  <div className="veh-card-sub" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {a.vehicleLabel}
+                  </div>
+                </div>
+                <Badge tone={allocationTone(a.lifecycle)}>
+                  {ALLOCATION_LABEL[a.lifecycle as AllocationLifecycle]}
+                </Badge>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+                <div><strong>Window:</strong> {fmtDateTime(a.startAt)} → {fmtDateTime(a.endAt)}</div>
+              </div>
+              <div className="veh-card-foot">
+                {a.returnDue ? (
+                  <Badge tone="danger">Return due{a.overdueHours > 0 ? ` · ${a.overdueHours}h overdue` : ''}</Badge>
+                ) : (
+                  <span className="text-muted">On schedule</span>
+                )}
+                <span style={{ fontWeight: 600, color: 'var(--color-brand)', fontSize: '0.8rem' }}>
+                  Manage →
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>

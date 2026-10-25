@@ -189,7 +189,7 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
                 }
               }}
             >
-              <Icon size={18} isHovered={hoveredHref === item.href || active} />
+              <Icon size={18} isHovered={hoveredHref === item.href} />
               <span>{item.label}</span>
               {item.badge ? <span className="sidebar__nav-badge">{item.badge}</span> : null}
               {pending ? <LoaderCircle className="sidebar__nav-pending spin" size={15} aria-hidden="true" /> : null}

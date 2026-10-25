@@ -18,6 +18,7 @@ import { api } from '@/lib/client/api';
 import { CLASS_LABEL, REQUEST_STATE_LABEL, requestStateTone, fmtDateTime } from '@/lib/fleet/format';
 import type { AssetRequestView, RequestState } from '@/types';
 import { RequestWizard } from '@/components/requests/RequestWizard';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 
 const STATES: RequestState[] = [
   'DRAFT',
@@ -39,6 +40,7 @@ export function RequestList() {
   const urlTab = params.get('tab');
   const initialTab: TabId = urlTab === 'all' ? 'all' : urlTab === 'needs' || urlTab === 'decide' ? 'needs' : 'mine';
   const [tab, setTab] = useState<TabId>(initialTab);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [q, setQ] = useState('');
   const [stateFilter, setStateFilter] = useState(params.get('state') ?? '');
   const [showWizard, setShowWizard] = useState(params.get('new') === '1');
@@ -104,16 +106,19 @@ export function RequestList() {
       <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
 
       <Panel>
-        <div className="veh-toolbar-row">
-          <div className="veh-search">
-            <SearchField value={q} onChange={setQ} placeholder="Search by code, purpose, vehicle" ariaLabel="Search requests" />
+        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="veh-toolbar-row" style={{ flex: '1 1 auto' }}>
+            <div className="veh-search">
+              <SearchField value={q} onChange={setQ} placeholder="Search by code, purpose, vehicle" ariaLabel="Search requests" />
+            </div>
+            <Select
+              value={stateFilter}
+              onChange={setStateFilter}
+              options={[{ value: '', label: 'Any state' }, ...STATES.map((s) => ({ value: s, label: REQUEST_STATE_LABEL[s] }))]}
+              ariaLabel="Filter by state"
+            />
           </div>
-          <Select
-            value={stateFilter}
-            onChange={setStateFilter}
-            options={[{ value: '', label: 'Any state' }, ...STATES.map((s) => ({ value: s, label: REQUEST_STATE_LABEL[s] }))]}
-            ariaLabel="Filter by state"
-          />
+          <ViewToggle value={viewMode} onChange={setViewMode} />
         </div>
       </Panel>
 
@@ -144,7 +149,7 @@ export function RequestList() {
             ) : undefined
           }
         />
-      ) : (
+      ) : viewMode === 'table' ? (
         <div className="table-wrap">
           <table>
             <thead>
@@ -183,6 +188,42 @@ export function RequestList() {
               ))}
             </tbody>
           </table>
+        </div>
+      ) : (
+        <div className="veh-cards">
+          {rows.map((r) => (
+            <div
+              key={r.id}
+              className="veh-card"
+              onClick={() => router.push(`/requests/${r.id}`)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') router.push(`/requests/${r.id}`);
+              }}
+            >
+              <div className="veh-card-head">
+                <div>
+                  <div className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                    {r.requestCode}
+                  </div>
+                  <div className="veh-card-sub" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {r.purpose}
+                  </div>
+                </div>
+                <Badge tone={requestStateTone(r.state)}>{REQUEST_STATE_LABEL[r.state]}</Badge>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div><strong>Vehicle:</strong> {r.vehicleLabel ?? CLASS_LABEL[r.requestedClass] + ' (class)'}</div>
+                <div><strong>Org:</strong> {r.requestingOrgName}</div>
+              </div>
+              <div className="veh-card-foot">
+                <span>{fmtDateTime(r.startAt)} → {fmtDateTime(r.endAt)}</span>
+                <Link href={`/requests/${r.id}`} style={{ fontWeight: 600, fontSize: '0.8rem' }} onClick={(e) => e.stopPropagation()}>
+                  View details →
+                </Link>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

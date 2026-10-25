@@ -20,6 +20,7 @@ import { Select } from '@/components/ui/Select';
 import { Tabs } from '@/components/ui/Tabs';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import type { TransferStatus, TransferView } from '@/types';
 
 type TabId = 'ACTION' | 'MINE' | 'ALL';
@@ -28,6 +29,7 @@ export default function TransfersPage() {
   const { snapshot, loading, error, refresh, can, me } = useFleet();
   const { toast } = useToast();
   const [tab, setTab] = useState<TabId>('ACTION');
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [statusFilter, setStatusFilter] = useState<TransferStatus | 'ALL'>('ALL');
   const [newOpen, setNewOpen] = useState(false);
   const [detail, setDetail] = useState<TransferView | null>(null);
@@ -98,7 +100,7 @@ export default function TransfersPage() {
         onChange={(id) => setTab(id as TabId)}
       />
 
-      <div className="toolbar">
+      <div className="toolbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <Select
           ariaLabel="Status filter"
           value={statusFilter}
@@ -112,6 +114,7 @@ export default function TransfersPage() {
             { value: 'CANCELLED', label: 'Cancelled' },
           ]}
         />
+        <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
       {filtered.length === 0 ? (
@@ -121,7 +124,7 @@ export default function TransfersPage() {
           description={tab === 'ACTION' ? 'Pending requests requiring your approval will appear here.' : 'Create a transfer to get started.'}
           action={canCreate ? <Button onClick={() => setNewOpen(true)}>New transfer</Button> : undefined}
         />
-      ) : (
+      ) : viewMode === 'table' ? (
         <Panel>
           <div className="table-wrap">
             <table>
@@ -160,6 +163,46 @@ export default function TransfersPage() {
             </table>
           </div>
         </Panel>
+      ) : (
+        <div className="veh-cards">
+          {filtered.map((t) => (
+            <div
+              key={t.id}
+              className="veh-card"
+              style={{ cursor: 'pointer' }}
+              onClick={() => setDetail(t)}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setDetail(t);
+              }}
+            >
+              <div className="veh-card-head">
+                <div>
+                  <div className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                    {t.transferCode}
+                  </div>
+                  <div className="veh-card-sub" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {stationName(t.sourceStationId)} → {stationName(t.destinationStationId)}
+                  </div>
+                </div>
+                <Badge tone={transferStatusTone(t.status)}>{t.status}</Badge>
+              </div>
+              <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="cluster" style={{ gap: 4 }}>
+                  {VEHICLE_CLASSES.filter((c) => (t.counts[c] ?? 0) > 0).map((c) => (
+                    <span className="chip" key={c}>{CLASS_LABEL_LOCAL[c].slice(0, 3)}:{t.counts[c]}</span>
+                  ))}
+                </div>
+                <div><strong>Start:</strong> {fmtDateTime(t.startAt)}</div>
+              </div>
+              <div className="veh-card-foot" style={{ justifyContent: 'flex-end' }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-brand)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  View details <ArrowRight size={12} />
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
       {newOpen && me && (

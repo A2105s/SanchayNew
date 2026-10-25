@@ -435,7 +435,7 @@ export function LiveMap() {
             <span>Sector</span>
             <span>{SECTOR_LABEL[selected.sector]}</span>
             <span>Speed</span>
-            <span>{Math.round(selected.speedKmph)} km/h</span>
+            <span className="mono">{Math.round(selected.speedKmph)} km/h</span>
             <span>Driver</span>
             <span>{selected.driverName ?? '—'}</span>
             <span>Compliance</span>
@@ -533,7 +533,7 @@ function VehicleList({
             <span className="mono" style={{ fontWeight: 600, fontSize: '0.82rem' }}>{v.registrationNumber}</span>
             <span className="text-muted" style={{ fontSize: '0.72rem' }}>{SECTOR_LABEL[v.sector]} · {STATUS_LABEL[v.status]}</span>
           </span>
-          <span className="text-muted" style={{ fontSize: '0.72rem' }}>{Math.round(v.speedKmph)} km/h</span>
+          <span className="text-muted mono" style={{ fontSize: '0.72rem' }}>{Math.round(v.speedKmph)} km/h</span>
         </button>
       ))}
     </div>

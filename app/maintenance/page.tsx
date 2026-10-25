@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { BarList } from '@/components/ui/BarList';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import type { MaintenanceSeverity, MaintenanceStatus, MaintenanceView, VehicleView } from '@/types';
 
 const SEV_TONE: Record<MaintenanceSeverity, 'info' | 'warning' | 'danger' | 'neutral'> = {
@@ -37,6 +38,7 @@ const STATUS_TONE: Record<MaintenanceStatus, 'info' | 'warning' | 'success' | 'd
 export default function MaintenancePage() {
   const { snapshot, loading, error, refresh, can, vehicleById } = useFleet();
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [statusFilter, setStatusFilter] = useState<MaintenanceStatus | 'ALL'>('ALL');
   const [sevFilter, setSevFilter] = useState<MaintenanceSeverity | 'ALL'>('ALL');
   const [query, setQuery] = useState('');
@@ -116,7 +118,7 @@ export default function MaintenancePage() {
       </div>
 
       <div className="grid-2">
-        <Panel title="Service tickets">
+        <Panel title="Service tickets" action={<ViewToggle value={viewMode} onChange={setViewMode} />}>
           <div className="toolbar">
             <SearchField value={query} onChange={setQuery} ariaLabel="Search tickets" placeholder="Search ticket, vehicle, title" />
             <Select
@@ -148,7 +150,7 @@ export default function MaintenancePage() {
 
           {filtered.length === 0 ? (
             <EmptyState icon={<Wrench size={28} />} title="No tickets" description="No maintenance tickets match the filters." />
-          ) : (
+          ) : viewMode === 'table' ? (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -171,7 +173,7 @@ export default function MaintenancePage() {
                           <div style={{ fontWeight: 540 }} className="mono">{t.ticketCode}</div>
                           <div className="text-muted" style={{ fontSize: '0.8rem' }}>{t.title}</div>
                         </td>
-                        <td>{v?.registrationNumber ?? '-'}</td>
+                        <td className="mono">{v?.registrationNumber ?? '-'}</td>
                         <td><Badge tone={SEV_TONE[t.severity]}>{t.severity}</Badge></td>
                         <td><Badge tone={STATUS_TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></td>
                         <td>{t.dueDate ? fmtDate(t.dueDate) : '-'}</td>
@@ -186,6 +188,38 @@ export default function MaintenancePage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          ) : (
+            <div className="veh-cards" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+              {filtered.map((t) => {
+                const v = vehicleById(t.vehicleId);
+                return (
+                  <div key={t.id} className="veh-card">
+                    <div className="veh-card-head">
+                      <div>
+                        <div className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                          {t.ticketCode}
+                        </div>
+                        <div className="veh-card-sub" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                          {t.title}
+                        </div>
+                      </div>
+                      <Badge tone={SEV_TONE[t.severity]}>{t.severity}</Badge>
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div><strong>Vehicle:</strong> <span className="mono">{v?.registrationNumber ?? '-'}</span></div>
+                      <div><strong>Status:</strong> <Badge tone={STATUS_TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></div>
+                      <div><strong>Due:</strong> {t.dueDate ? fmtDate(t.dueDate) : '—'}</div>
+                      <div><strong>Cost:</strong> <span className="mono">{t.costInr ? fmtInr(t.costInr) : '—'}</span></div>
+                    </div>
+                    {can('maintenance.write') && t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && (
+                      <div className="veh-card-foot" style={{ justifyContent: 'flex-end' }}>
+                        <Button size="sm" variant="secondary" onClick={() => setUpdate(t)}>Update</Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </Panel>

@@ -160,11 +160,11 @@ function LoginForm() {
           <summary>Demo accounts</summary>
           <div className="login-demo__list">
             {DEMO_ACCOUNTS.map((a) => (
-              <button key={a.user} type="button" className="login-demo__user" title={a.role} onClick={() => setUsername(a.user)}>
+              <button key={a.user} type="button" className="login-demo__user" title={a.role} onClick={() => { setUsername(a.user); setPassword('Sanchay@Demo1'); }}>
                 {a.user}
               </button>
             ))}
-            <small className="text-muted" style={{ flexBasis: '100%', marginTop: 4 }}>Click a name to fill it in. The demo password is printed by the seed command (npm run db:seed).</small>
+            <small className="text-muted" style={{ flexBasis: '100%', marginTop: 4 }}>Click a name to fill it in. Default demo password is Sanchay@Demo1 (auto-fills on click).</small>
           </div>
         </details>
 

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 interface PageTitleProps {
   eyebrow?: string;
-  title: string;
+  title: ReactNode;
   description?: string;
   action?: ReactNode;
   back?: { href: string; label: string };

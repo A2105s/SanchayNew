@@ -18,6 +18,7 @@ import { api, ApiError } from '@/lib/client/api';
 import { CLASS_LABEL, fmtDateTime } from '@/lib/fleet/format';
 import type { AvailabilityView, VehicleCardView, VehicleClass, VehicleSearchResult } from '@/types';
 import { RequestWizard, type RequestWizardPrefill } from '@/components/requests/RequestWizard';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 
 const CLASSES: VehicleClass[] = ['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY'];
 const PAGE_SIZE = 25;
@@ -31,6 +32,7 @@ function toIso(local: string): string {
 export function VehicleDiscover() {
   const { toast } = useToast();
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [q, setQ] = useState('');
   const [vehicleClass, setVehicleClass] = useState('');
   const [from, setFrom] = useState('');
@@ -114,16 +116,21 @@ export function VehicleDiscover() {
 
       <Panel>
         <div className="stack">
-          <div className="veh-toolbar-row">
-            <div className="veh-search">
+          <div className="grid-2">
+            <div className="field">
+              <span>Search query</span>
               <SearchField value={q} onChange={setQ} placeholder="Search asset code or name" ariaLabel="Search vehicles" />
             </div>
-            <Select
-              value={vehicleClass}
-              onChange={setVehicleClass}
-              options={[{ value: '', label: 'All classes' }, ...CLASSES.map((c) => ({ value: c, label: CLASS_LABEL[c] }))]}
-              ariaLabel="Filter by class"
-            />
+            <div className="field">
+              <span>Vehicle class</span>
+              <Select
+                value={vehicleClass}
+                onChange={setVehicleClass}
+                options={[{ value: '', label: 'All classes' }, ...CLASSES.map((c) => ({ value: c, label: CLASS_LABEL[c] }))]}
+                ariaLabel="Filter by class"
+                width="100%"
+              />
+            </div>
           </div>
           <div className="grid-2">
             <Field label="Available from" hint="Both from and to are required to check availability." error={dateError ?? undefined}>
@@ -133,15 +140,20 @@ export function VehicleDiscover() {
               <input className="input" type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} />
             </Field>
           </div>
-          <div className="cluster">
-            <Button variant="primary" icon={<Search size={16} />} onClick={onSearch} loading={loading}>
-              Search
-            </Button>
-            {result?.from && result?.to ? (
-              <span className="text-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem' }}>
-                <CalendarClock size={14} aria-hidden="true" />
-                Availability for {fmtDateTime(result.from)} – {fmtDateTime(result.to)} (as of {fmtDateTime(result.asOf)})
-              </span>
+          <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="cluster">
+              <Button variant="primary" icon={<Search size={16} />} onClick={onSearch} loading={loading}>
+                Search
+              </Button>
+              {result?.from && result?.to ? (
+                <span className="text-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem' }}>
+                  <CalendarClock size={14} aria-hidden="true" />
+                  Availability for {fmtDateTime(result.from)} – {fmtDateTime(result.to)} (as of {fmtDateTime(result.asOf)})
+                </span>
+              ) : null}
+            </div>
+            {rows.length > 0 ? (
+              <ViewToggle value={viewMode} onChange={setViewMode} />
             ) : null}
           </div>
         </div>
@@ -167,53 +179,123 @@ export function VehicleDiscover() {
           description="No eligible government-fleet vehicles match your search for this window. Try a different class or date range."
         />
       ) : rows.length > 0 ? (
-        <div className="veh-discover-grid">
-          {rows.map((v) => {
-            const availability = v.availability as AvailabilityView;
-            const requestable = availability?.state === 'AVAILABLE';
-            return (
-              <div key={v.id} className="veh-card veh-card--discover">
-                <div className="veh-card-head">
-                  <div>
-                    <div className="veh-card-reg mono">{v.registrationMasked}</div>
-                    <div className="veh-card-sub">{v.displayName}</div>
+        viewMode === 'table' ? (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Registration</th>
+                  <th>Vehicle</th>
+                  <th>Class</th>
+                  <th>Organization</th>
+                  <th>Station</th>
+                  <th>Operational</th>
+                  <th>Eligibility & Availability</th>
+                  <th>Telemetry</th>
+                  <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((v) => {
+                  const availability = v.availability as AvailabilityView;
+                  const requestable = availability?.state === 'AVAILABLE';
+                  return (
+                    <tr key={v.id} className="veh-row">
+                      <td className="mono reg-plate">
+                        <strong>{v.registrationMasked}</strong>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 540 }}>{v.displayName}</div>
+                      </td>
+                      <td>
+                        <span>{CLASS_LABEL[v.vehicleClass]}</span>
+                      </td>
+                      <td>{v.organizationName}</td>
+                      <td>{v.stationName ?? <span className="text-muted">—</span>}</td>
+                      <td>
+                        <OperationalBadge status={v.operationalStatus} />
+                      </td>
+                      <td>
+                        <div className="cluster" style={{ gap: '0.3rem', flexWrap: 'wrap' }}>
+                          <EligibilityBadge state={v.eligibilityState} />
+                          <AvailabilityBadge availability={availability} />
+                        </div>
+                      </td>
+                      <td>
+                        <FreshnessBadge freshness={v.telemetryFreshness} lastSeenAt={v.lastSeenAt} />
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <Button
+                          variant={requestable ? 'primary' : 'secondary'}
+                          size="sm"
+                          onClick={() =>
+                            setPrefill({
+                              vehicleId: v.id,
+                              vehicleLabel: `${v.registrationMasked} · ${v.displayName}`,
+                              requestedClass: v.vehicleClass,
+                              from: result?.from ?? (toIso(from) || undefined),
+                              to: result?.to ?? (toIso(to) || undefined)
+                            })
+                          }
+                        >
+                          Request
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="veh-discover-grid">
+            {rows.map((v) => {
+              const availability = v.availability as AvailabilityView;
+              const requestable = availability?.state === 'AVAILABLE';
+              return (
+                <div key={v.id} className="veh-card veh-card--discover">
+                  <div className="veh-card-head">
+                    <div>
+                      <div className="veh-card-reg mono">{v.registrationMasked}</div>
+                      <div className="veh-card-sub">{v.displayName}</div>
+                    </div>
+                  </div>
+                  <div className="cluster" style={{ gap: '0.3rem', flexWrap: 'wrap' }}>
+                    <OperationalBadge status={v.operationalStatus} />
+                    <EligibilityBadge state={v.eligibilityState} />
+                    <AvailabilityBadge availability={availability} />
+                  </div>
+                  <div className="veh-card-meta">
+                    <span>{CLASS_LABEL[v.vehicleClass]}</span>
+                    <span>{v.organizationName}</span>
+                    {v.stationName ? <span>{v.stationName}</span> : null}
+                  </div>
+                  {availability?.reasons?.length ? (
+                    <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>{availability.reasons.join(' · ')}</p>
+                  ) : null}
+                  <FreshnessBadge freshness={v.telemetryFreshness} lastSeenAt={v.lastSeenAt} />
+                  <div className="veh-card-foot">
+                    <Button
+                      variant={requestable ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() =>
+                        setPrefill({
+                          vehicleId: v.id,
+                          vehicleLabel: `${v.registrationMasked} · ${v.displayName}`,
+                          requestedClass: v.vehicleClass,
+                          from: result?.from ?? (toIso(from) || undefined),
+                          to: result?.to ?? (toIso(to) || undefined)
+                        })
+                      }
+                    >
+                      Request this vehicle
+                    </Button>
                   </div>
                 </div>
-                <div className="cluster" style={{ gap: '0.3rem', flexWrap: 'wrap' }}>
-                  <OperationalBadge status={v.operationalStatus} />
-                  <EligibilityBadge state={v.eligibilityState} />
-                  <AvailabilityBadge availability={availability} />
-                </div>
-                <div className="veh-card-meta">
-                  <span>{CLASS_LABEL[v.vehicleClass]}</span>
-                  <span>{v.organizationName}</span>
-                  {v.stationName ? <span>{v.stationName}</span> : null}
-                </div>
-                {availability?.reasons?.length ? (
-                  <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>{availability.reasons.join(' · ')}</p>
-                ) : null}
-                <FreshnessBadge freshness={v.telemetryFreshness} lastSeenAt={v.lastSeenAt} />
-                <div className="veh-card-foot">
-                  <Button
-                    variant={requestable ? 'primary' : 'secondary'}
-                    size="sm"
-                    onClick={() =>
-                      setPrefill({
-                        vehicleId: v.id,
-                        vehicleLabel: `${v.registrationMasked} · ${v.displayName}`,
-                        requestedClass: v.vehicleClass,
-                        from: result?.from ?? (toIso(from) || undefined),
-                        to: result?.to ?? (toIso(to) || undefined)
-                      })
-                    }
-                  >
-                    Request this vehicle
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )
       ) : (
         <EmptyState
           icon={<Search size={28} />}

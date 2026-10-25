@@ -124,7 +124,7 @@ export function VehicleDetail({ id }: { id: string }) {
       </Link>
 
       <PageTitle
-        title={reg}
+        title={<span className="mono reg-plate">{reg}</span>}
         description={`${vehicle.displayName} · ${CLASS_LABEL[vehicle.vehicleClass]}`}
         action={
           full ? (
@@ -708,7 +708,7 @@ function OperationsSection({
           <ul className="plain-list">
             {trips.map((t) => (
               <li key={t.id}>
-                <strong>{t.tripCode}</strong> · {t.status} · {t.driverName}
+                <strong className="mono">{t.tripCode}</strong> · {t.status} · {t.driverName}
                 <div className="text-muted" style={{ fontSize: '0.8rem' }}>{fmtDateTime(t.startedAt)}{t.endedAt ? ` → ${fmtDateTime(t.endedAt)}` : ''}</div>
               </li>
             ))}
@@ -728,7 +728,7 @@ function OperationsSection({
         {fuelLogs.length === 0 ? <p className="text-muted">No fuel logs.</p> : (
           <ul className="plain-list">
             {fuelLogs.map((f) => (
-              <li key={f.id}>{f.liters} L · {fmtDateTime(f.loggedAt)} · {f.source}</li>
+              <li key={f.id}><span className="mono">{f.liters} L</span> · <span className="mono">{fmtDateTime(f.loggedAt)}</span> · {f.source}</li>
             ))}
           </ul>
         )}
@@ -737,7 +737,7 @@ function OperationsSection({
         {legal.length === 0 ? <p className="text-muted">No legal records.</p> : (
           <ul className="plain-list">
             {legal.map((l) => (
-              <li key={l.id}><strong>{l.type}</strong> · {l.referenceNo} · {l.status}</li>
+              <li key={l.id}><strong>{l.type}</strong> · <span className="mono">{l.referenceNo}</span> · {l.status}</li>
             ))}
           </ul>
         )}

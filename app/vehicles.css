@@ -7,9 +7,20 @@
   gap: 0.6rem;
   align-items: center;
 }
+.veh-toolbar-row > * {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
 .veh-toolbar-row > .veh-search {
   flex: 1 1 260px;
   min-width: 220px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+}
+.veh-toolbar-row .search-field {
+  margin: 0 !important;
+  width: 100%;
 }
 
 .veh-chips {

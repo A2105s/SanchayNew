@@ -17,6 +17,7 @@ import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import type { IncidentView, VehicleView } from '@/types';
 
 type IncidentStatus = IncidentView['status'];
@@ -29,6 +30,7 @@ const COLUMNS: { id: IncidentStatus; label: string }[] = [
 export default function IncidentsPage() {
   const { snapshot, loading, error, refresh, can, vehicleById } = useFleet();
   const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [sevFilter, setSevFilter] = useState<string>('ALL');
   const [reportOpen, setReportOpen] = useState(false);
@@ -123,34 +125,104 @@ export default function IncidentsPage() {
             { value: 'INFO', label: 'Info' },
           ]}
         />
+        <ViewToggle value={viewMode} onChange={setViewMode} tableLabel="Table" cardsLabel="Board" />
       </div>
 
-      <div className="ops-board">
-        {COLUMNS.map((col) => (
-          <div className="ops-col" key={col.id}>
-            <div className="ops-col-head">
-              <span>{col.label}</span>
-              <Badge tone="neutral">{byStatus[col.id].length}</Badge>
-            </div>
-            {byStatus[col.id].length === 0 ? (
-              <div className="ops-card">
-                <span className="text-muted" style={{ fontSize: '0.82rem' }}>None</span>
-              </div>
-            ) : (
-              byStatus[col.id].map((i) => (
-                <IncidentCard
-                  key={i.id}
-                  incident={i}
-                  vehicle={vehicleById(i.vehicleId)}
-                  canAct={can('incident.write')}
-                  onAck={() => setNoteFor({ incident: i, resolution: 'ACKNOWLEDGED' })}
-                  onResolve={() => setNoteFor({ incident: i, resolution: 'RESOLVED' })}
-                />
-              ))
-            )}
+      {viewMode === 'table' ? (
+        <Panel>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Incident</th>
+                  <th>Vehicle</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Description</th>
+                  <th>Reported</th>
+                  <th aria-label="Actions" style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((i) => {
+                  const v = vehicleById(i.vehicleId);
+                  const canAct = can('incident.write');
+                  return (
+                    <tr key={i.id} className="veh-row">
+                      <td className="mono">
+                        <strong>{i.incidentCode}</strong>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 540 }} className="mono">{v?.registrationNumber ?? '-'}</div>
+                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>{v?.displayName}</div>
+                      </td>
+                      <td>
+                        <span className="chip" style={{ fontSize: '0.78rem' }}>{i.type}</span>
+                      </td>
+                      <td>
+                        <Badge tone={incidentSeverityTone(i.severity)}>{i.severity}</Badge>
+                      </td>
+                      <td>
+                        <Badge tone={i.status === 'RESOLVED' ? 'success' : i.status === 'ACKNOWLEDGED' ? 'info' : 'danger'}>
+                          {i.status}
+                        </Badge>
+                      </td>
+                      <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {i.message}
+                      </td>
+                      <td className="text-muted mono" style={{ fontSize: '0.8rem' }}>
+                        {fmtRelative(i.createdAt)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {canAct && i.status !== 'RESOLVED' && (
+                          <div className="cluster" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                            {i.status === 'OPEN' && (
+                              <Button size="sm" variant="secondary" onClick={() => setNoteFor({ incident: i, resolution: 'ACKNOWLEDGED' })}>
+                                Ack
+                              </Button>
+                            )}
+                            <Button size="sm" variant="primary" onClick={() => setNoteFor({ incident: i, resolution: 'RESOLVED' })}>
+                              Resolve
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
+        </Panel>
+      ) : (
+        <div className="ops-board">
+          {COLUMNS.map((col) => (
+            <div className="ops-col" key={col.id}>
+              <div className="ops-col-head">
+                <span>{col.label}</span>
+                <Badge tone="neutral">{byStatus[col.id].length}</Badge>
+              </div>
+              {byStatus[col.id].length === 0 ? (
+                <div className="ops-card">
+                  <span className="text-muted" style={{ fontSize: '0.82rem' }}>None</span>
+                </div>
+              ) : (
+                byStatus[col.id].map((i) => (
+                  <IncidentCard
+                    key={i.id}
+                    incident={i}
+                    vehicle={vehicleById(i.vehicleId)}
+                    canAct={can('incident.write')}
+                    onAck={() => setNoteFor({ incident: i, resolution: 'ACKNOWLEDGED' })}
+                    onResolve={() => setNoteFor({ incident: i, resolution: 'RESOLVED' })}
+                  />
+                ))
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {reportOpen && (
         <ReportIncidentModal vehicles={snapshot!.vehicles} onClose={() => setReportOpen(false)} onDone={async () => { setReportOpen(false); await refresh(); }} toast={toast} />

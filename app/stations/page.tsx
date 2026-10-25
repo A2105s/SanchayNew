@@ -17,10 +17,12 @@ import { Drawer } from '@/components/ui/Drawer';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusDot } from '@/components/ui/StatusDot';
+import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
 import type { StationView, VehicleView } from '@/types';
 
 export default function StationsPage() {
   const { snapshot, loading, error, refresh } = useFleet();
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [query, setQuery] = useState('');
   const [zone, setZone] = useState('ALL');
   const [detail, setDetail] = useState<StationView | null>(null);
@@ -75,18 +77,93 @@ export default function StationsPage() {
     <div className="page stack">
       <PageTitle eyebrow="Fleet" title="Stations" description="Police station fleet pools, inventory and live counts." />
 
-      <div className="toolbar">
-        <SearchField value={query} onChange={setQuery} ariaLabel="Search stations" placeholder="Search name, code, district" />
-        <Select
-          ariaLabel="Zone filter"
-          value={zone}
-          onChange={setZone}
-          options={[{ value: 'ALL', label: 'All zones' }, ...zones.map((z) => ({ value: z, label: z }))]}
-        />
+      <div className="toolbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="cluster" style={{ flex: '1 1 auto', alignItems: 'center' }}>
+          <div style={{ flex: '1 1 260px', maxWidth: '380px' }}>
+            <SearchField value={query} onChange={setQuery} ariaLabel="Search stations" placeholder="Search name, code, district" />
+          </div>
+          <Select
+            ariaLabel="Zone filter"
+            value={zone}
+            onChange={setZone}
+            options={[{ value: 'ALL', label: 'All zones' }, ...zones.map((z) => ({ value: z, label: z }))]}
+            width="180px"
+          />
+        </div>
+        <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState icon={<Building size={28} />} title="No stations" description="No stations match your filters." />
+      ) : viewMode === 'table' ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Station</th>
+                <th>Zone</th>
+                <th>District</th>
+                <th>Fleet Pool</th>
+                <th>Live Status</th>
+                <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((s) => {
+                const live = liveCounts.get(s.id) ?? { total: 0, moving: 0 };
+                return (
+                  <tr
+                    key={s.id}
+                    className="veh-row"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setDetail(s)}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') setDetail(s);
+                    }}
+                  >
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{s.name}</div>
+                      <div className="text-muted mono" style={{ fontSize: '0.78rem' }}>{s.code}</div>
+                    </td>
+                    <td>
+                      <Badge tone="neutral">{s.zone}</Badge>
+                    </td>
+                    <td>
+                      <div className="cluster" style={{ gap: 4, fontSize: '0.85rem' }}>
+                        <MapPin size={13} className="text-muted" /> {s.district}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="cluster" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
+                        {VEHICLE_CLASSES.map((c) => {
+                          const count = s.inventory?.[c] ?? 0;
+                          if (count === 0) return null;
+                          return (
+                            <span key={c} className="chip" style={{ fontSize: '0.75rem' }}>
+                              {CLASS_LABEL_LOCAL[c].slice(0, 3)}: <strong className="mono">{count}</strong>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="cluster" style={{ gap: '0.75rem' }}>
+                        <StatusDot tone={live.moving > 0 ? 'success' : 'neutral'} label={`${live.total} vehicles`} />
+                        <span className="text-muted mono" style={{ fontSize: '0.8rem' }}>{live.moving} moving</span>
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      <Button size="sm" variant="secondary" onClick={() => setDetail(s)}>
+                        View details
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="ops-grid-cards">
           {filtered.map((s) => {

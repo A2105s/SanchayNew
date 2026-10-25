@@ -236,7 +236,7 @@ export default function IotPage() {
                         <td><StatusDot tone={deviceStatusTone(d.status)} label={d.status} /></td>
                         <td className="mono">{d.batteryPct == null ? '—' : `${d.batteryPct}%`}</td>
                         <td><SignalBars dbm={d.signalDbm} /></td>
-                        <td className="text-muted" style={{ fontSize: '0.8rem' }}>{d.firmware ?? '—'}</td>
+                        <td className="text-muted mono" style={{ fontSize: '0.8rem' }}>{d.firmware ?? '—'}</td>
                         <td className="text-muted" style={{ fontSize: '0.8rem' }}>{fmtRelative(d.lastSeenAt)}</td>
                         {canManage && (
                           <td>

@@ -18,6 +18,9 @@ service-account.json
 .vercel
 .DS_Store
 
+# generated diagnostics
+tsc_errors.txt
+
 # local throwaway database
 .local-pg/
 

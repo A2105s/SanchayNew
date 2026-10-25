@@ -177,7 +177,7 @@ Vercel will:
 1. Run `postinstall` (`prisma generate && node scripts/copy-maplibre-worker.mjs`).
 2. Run `build` (`next build`).
 3. Deploy serverless routes to the `bom1` (Mumbai) region.
-4. Automatically register the Vercel Cron for `/api/cloud/sync-jobs/process` configured in `vercel.json`.
+4. Expose the `/api/cloud/sync-jobs/process` endpoint for external or native scheduled execution.
 
 ---
 
@@ -200,9 +200,13 @@ Once deployed, verify the live production URL:
    - Verify all connection indicators show green.
    - If needed, the **"Reset database to seed fleet"** button can be used by the admin directly from the UI.
 
-4. **Verify Vercel Cron**:
-   - In the Vercel Dashboard, go to your project → **Cron Jobs**.
-   - Verify that `/api/cloud/sync-jobs/process` is active and scheduled for `*/10 * * * *`.
+4. **Verify Scheduled Sync Jobs (Cron)**:
+   - **Vercel Hobby Plan (Free)**: Hobby accounts are restricted to once-per-day cron jobs. To run every 10 minutes (`*/10 * * * *`), configure a free external scheduler (e.g. [Cron-Job.org](https://cron-job.org/), EasyCron, or Crontap):
+     - **URL**: `https://your-app.vercel.app/api/cloud/sync-jobs/process`
+     - **Schedule**: `*/10 * * * *` (every 10 minutes)
+     - **Request Method**: `GET`
+     - **Header**: `Authorization: Bearer <YOUR_CRON_SECRET>` (or `x-cron-secret: <YOUR_CRON_SECRET>`, or URL query parameter `?key=<YOUR_CRON_SECRET>`)
+   - **Vercel Pro Plan**: If on Pro, you can optionally restore the `crons` block inside `vercel.json` for native execution.
 
 ---
 

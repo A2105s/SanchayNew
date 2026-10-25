@@ -36,6 +36,21 @@ export async function proxy(request: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
+  // Cron-authenticated sync-job processing (handles external cron services via Bearer token, header, or query param).
+  if (pathname === '/api/cloud/sync-jobs/process' && process.env.CRON_SECRET) {
+    const authHeader = request.headers.get('authorization');
+    const xCronSecret = request.headers.get('x-cron-secret');
+    const querySecret = request.nextUrl.searchParams.get('key') || request.nextUrl.searchParams.get('secret');
+
+    if (
+      authHeader === `Bearer ${process.env.CRON_SECRET}` ||
+      xCronSecret === process.env.CRON_SECRET ||
+      querySecret === process.env.CRON_SECRET
+    ) {
+      return withSecurityHeaders(NextResponse.next());
+    }
+  }
+
   // Cross-origin guard for unsafe API methods (CSRF defense-in-depth).
   if (pathname.startsWith('/api/') && isUnsafeMethod(request.method) && !isSameOriginRequest(request)) {
     return withSecurityHeaders(
@@ -56,15 +71,6 @@ export async function proxy(request: NextRequest) {
   // Local-storage document files are authorized by a short-lived HMAC signature in the URL,
   // not the session cookie (the signed URL is the capability).
   if (pathname.startsWith('/api/cloud/documents/file')) {
-    return withSecurityHeaders(NextResponse.next());
-  }
-
-  // Cron-authenticated sync-job processing.
-  if (
-    pathname === '/api/cloud/sync-jobs/process' &&
-    process.env.CRON_SECRET &&
-    request.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
-  ) {
     return withSecurityHeaders(NextResponse.next());
   }
 

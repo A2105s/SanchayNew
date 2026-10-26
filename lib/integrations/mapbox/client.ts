@@ -51,7 +51,7 @@ function memorySet(key: string, value: GeoSearchResult | GeoReverseResult): void
 
 /** Server-side token. Prefers a server-only name, falls back to the public pk. token. */
 export function getMapboxToken(): string {
-  return (process.env.MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || '').trim();
+  return (process.env.MAPBOX_ACCESS_TOKEN || process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN || process.env.MapBox_Token || '').trim();
 }
 
 export function isMapboxConfigured(): boolean {

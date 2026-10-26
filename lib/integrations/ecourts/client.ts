@@ -89,7 +89,7 @@ export function isEcourtsConfigured(): boolean {
 }
 
 export function getEcourtsToken(): string {
-  return (process.env.ECOURTS_API_TOKEN || '').trim();
+  return (process.env.ECOURTS_API_TOKEN || process.env.eCourt_Token || '').trim();
 }
 
 function getBaseUrl(): string {

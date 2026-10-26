@@ -293,7 +293,7 @@ function StationDrawer({
     <Drawer title={station.name} onClose={onClose} width={460}>
       <div className="stack" style={{ gap: 'var(--space-4)' }}>
         {/* Station identity badge strip */}
-        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
           <div className="cluster" style={{ gap: 6 }}>
             <span className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>{station.code}</span>
             <Badge tone="neutral">{station.zone} Zone</Badge>
@@ -334,7 +334,6 @@ function StationDrawer({
                   style={{
                     padding: '0.6rem 0.8rem',
                     borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-border)',
                     background: count > 0 ? 'var(--color-brand-subtle)' : 'var(--color-bg-secondary)',
                     display: 'flex',
                     alignItems: 'center',

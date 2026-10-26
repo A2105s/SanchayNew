@@ -3962,18 +3962,32 @@ select:focus,
 }
 
 /* ============================================================
-   SETTINGS SEGMENTED TABS STYLE
+   SETTINGS SEGMENTED TABS STYLE (Solid background, no outline)
    ============================================================ */
 .settings-tabs {
   display: inline-flex;
   max-width: 100%;
   gap: 2px;
   padding: 3px;
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-md);
   background: var(--color-bg-secondary);
   overflow-x: auto;
   scrollbar-width: none; /* Hide scrollbar for standard browsers */
+}
+
+/* Strict provision: No outline inside outline. Nested tabs, segmented switchers,
+   and inner cards must use solid backgrounds without nested borders. */
+:is(.an-toolbar, .settings-toolbar, .panel, .card, .settings-card, .an-card, .drawer) :is(.settings-tabs, .an-segmented, .veh-viewtoggle) {
+  border: none !important;
+  background: var(--color-bg-secondary) !important;
+  box-shadow: none !important;
+}
+
+:is(.panel, .an-card, .settings-card, .drawer) :is(.sub-card, .inner-card, .readiness-item) {
+  border: none !important;
+  background: var(--color-bg-secondary) !important;
+  box-shadow: none !important;
 }
 
 .settings-page-content {

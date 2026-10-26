@@ -1411,9 +1411,11 @@ code {
 /* ---- Standardized ViewToggle & Card Views (EasyLife parity) ---- */
 .veh-viewtoggle {
   display: inline-flex;
-  border: 1px solid var(--color-border);
+  align-items: center;
+  border: none;
   border-radius: var(--radius-md);
-  overflow: hidden;
+  padding: 3px;
+  gap: 2px;
   background: var(--color-bg-secondary);
   flex-shrink: 0;
 }
@@ -1422,30 +1424,32 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.38rem 0.75rem;
+  padding: 0.35rem 0.75rem;
   background: transparent;
   border: none;
+  border-radius: var(--radius-sm);
   color: var(--color-text-secondary);
   cursor: pointer;
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 500;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .veh-viewtoggle button + button {
-  border-left: 1px solid var(--color-border);
+  border-left: none;
 }
 
 .veh-viewtoggle button:hover:not([aria-pressed='true']) {
-  background: var(--color-bg-tertiary);
+  background: var(--color-surface-hover, var(--color-bg-tertiary));
   color: var(--color-text-primary);
 }
 
 .veh-viewtoggle button[aria-pressed='true'] {
-  background: var(--color-brand-soft, rgba(10, 127, 140, 0.12));
+  background: var(--color-bg-primary);
   color: var(--color-brand);
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
 .veh-viewtoggle button:focus-visible {

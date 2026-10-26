@@ -620,7 +620,6 @@ export function AiSettingsSection() {
                 padding: '12px 14px',
                 borderRadius: 'var(--radius-md)',
                 background: 'color-mix(in srgb, var(--color-brand) 6%, var(--color-bg-secondary))',
-                border: '1px solid var(--color-border)',
                 fontSize: '0.80rem',
                 color: 'var(--color-text-secondary)',
                 lineHeight: 1.5

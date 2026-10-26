@@ -41,12 +41,12 @@ export function AiPulseSlot() {
       <div className="ai-pulse-card-inner">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 'var(--radius-md)', background: 'var(--color-brand-subtle)', border: '1px solid var(--brand-border)', color: 'var(--color-brand)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: 'var(--radius-md)', background: 'var(--color-brand-subtle)', color: 'var(--color-brand)' }}>
               <Bot size={16} />
             </div>
             <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>Sanchay AI operations pulse</span>
             {pulse?.provider && !pulse.degraded ? (
-              <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--color-brand-subtle)', border: '1px solid var(--brand-border)', color: 'var(--color-brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }} title={`Generated with ${PROVIDER_LABEL[pulse.provider]} (${pulse.model})`}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--color-brand-subtle)', color: 'var(--color-brand)', display: 'inline-flex', alignItems: 'center', gap: 4 }} title={`Generated with ${PROVIDER_LABEL[pulse.provider]} (${pulse.model})`}>
                 <Sparkles size={10} />
                 {PROVIDER_LABEL[pulse.provider]}
               </span>

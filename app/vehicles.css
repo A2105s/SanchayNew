@@ -56,31 +56,43 @@
   outline-offset: 2px;
 }
 
-/* ---- View toggle ---- */
+/* ---- View toggle (solid background pill switcher, no nested outline) ---- */
 .veh-viewtoggle {
   display: inline-flex;
-  border: 1px solid var(--border, #d8dee9);
-  border-radius: 8px;
-  overflow: hidden;
+  align-items: center;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 3px;
+  gap: 2px;
+  background: var(--color-bg-secondary, #f0f4f5);
+  flex-shrink: 0;
 }
 .veh-viewtoggle button {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.7rem;
-  background: var(--surface, #fff);
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  background: transparent;
   border: none;
-  color: var(--text-muted, #64748b);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-secondary, #64748b);
   cursor: pointer;
   font-size: 0.82rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast, 0.15s), color var(--transition-fast, 0.15s), box-shadow var(--transition-fast, 0.15s);
 }
 .veh-viewtoggle button + button {
-  border-left: 1px solid var(--border, #d8dee9);
+  border-left: none;
+}
+.veh-viewtoggle button:hover:not([aria-pressed='true']) {
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
+  color: var(--color-text-primary);
 }
 .veh-viewtoggle button[aria-pressed='true'] {
-  background: var(--color-brand-subtle);
+  background: var(--color-bg-primary, #fff);
   color: var(--color-brand);
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .veh-viewtoggle button:focus-visible {
   outline: 2px solid var(--color-brand);

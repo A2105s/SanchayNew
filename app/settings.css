@@ -190,7 +190,7 @@
   display: inline-flex;
   align-items: center;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: 9999px !important;
   padding: 3px;
   gap: 3px;
@@ -905,16 +905,16 @@
 }
 
 .cal-system-card {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  border: none;
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: all var(--transition-fast);
 }
 
 .cal-system-card:hover {
-  background: var(--color-bg-secondary);
-  border-color: var(--color-border-strong, var(--color-border));
+  background: var(--color-surface-hover, var(--color-bg-tertiary));
+  border: none;
 }
 
 .cal-system-card__header {
@@ -1385,25 +1385,25 @@
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   outline: 0;
   box-shadow: none;
   border-radius: var(--radius-md);
   cursor: pointer;
   position: relative;
-  transition: background-color var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast), transform var(--transition-fast);
   user-select: none;
 }
 
 .ai-provider-card:hover {
-  background: var(--color-surface-hover);
-  border-color: var(--color-border-strong, var(--color-brand));
+  background: var(--color-surface-hover, var(--color-bg-tertiary));
+  border: none;
   transform: translateY(-1px);
 }
 
 .ai-provider-card--active {
   background: color-mix(in srgb, var(--color-brand) 12%, var(--color-bg-secondary));
-  border-color: var(--color-brand);
+  border: none;
 }
 
 .ai-provider-card--active .ai-provider-card__title {
@@ -1467,21 +1467,21 @@
   align-items: center;
   padding: var(--space-3) var(--space-4);
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   outline: 0;
   box-shadow: none;
   border-radius: var(--radius-md);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .ai-fallback-item:hover {
-  background: var(--color-surface-hover);
-  border-color: var(--color-border-strong, var(--color-brand));
+  background: var(--color-surface-hover, var(--color-bg-tertiary));
+  border: none;
 }
 
 .ai-fallback-item--primary {
   background: color-mix(in srgb, var(--color-brand) 9%, var(--color-bg-secondary));
-  border-color: var(--color-brand);
+  border: none;
 }
 
 .ai-fallback-item__left {
@@ -1761,7 +1761,7 @@
   width: 100%;
   max-width: 360px;
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
+  border: none;
   border-radius: var(--radius-lg, 12px);
   padding: var(--space-6) var(--space-5);
   display: flex;

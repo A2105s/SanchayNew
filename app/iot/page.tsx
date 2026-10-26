@@ -208,12 +208,11 @@ export default function IotPage() {
                 gap: 'var(--space-2)',
                 padding: 'var(--space-3)',
                 borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--color-border)',
                 background: 'var(--color-bg-secondary)',
               }}
             >
               <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="ops-gateway-icon" style={{ width: 36, height: 36, background: 'var(--color-bg-primary)', border: '1px solid var(--color-border)' }}>
+                <span className="ops-gateway-icon" style={{ width: 36, height: 36, background: 'var(--color-bg-primary)' }}>
                   {g.icon}
                 </span>
                 <Badge tone={g.online > 0 ? 'success' : 'neutral'}>
@@ -419,14 +418,14 @@ export default function IotPage() {
       <Panel title="Connect physical telemetry hardware" subtitle="Direct ingestion endpoint for AIS-140 GPS trackers and on-board units" icon={<Satellite size={16} />}>
         <div className="stack" style={{ gap: 'var(--space-3)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-3)' }}>
-            <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' }}>
+            <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)' }}>
               <span className="text-muted" style={{ fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Ingest Endpoint</span>
               <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                 <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 600 }}>POST {ingestUrl}</span>
                 <CopyButton text={ingestUrl} label="Copy" />
               </div>
             </div>
-            <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' }}>
+            <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)' }}>
               <span className="text-muted" style={{ fontSize: '0.78rem', textTransform: 'uppercase', fontWeight: 700 }}>Authorization Header</span>
               <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                 <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 600 }}>Bearer &lt;SANCHAY_IOT_INGEST_TOKEN&gt;</span>

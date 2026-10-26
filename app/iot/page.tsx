@@ -22,7 +22,7 @@ import { api, ApiError } from '@/lib/client/api';
 import { fmtRelative } from '@/lib/fleet/format';
 import { deviceStatusTone } from '@/components/ops/shared';
 import { SignalBars, CopyButton, KvRow } from '@/components/ops/primitives';
-import { ProvisionModal, DEVICE_KIND_LABEL } from '@/components/ops/IotParts';
+import { ProvisionModal, InlineProvisionForm, DEVICE_KIND_LABEL } from '@/components/ops/IotParts';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
@@ -33,6 +33,7 @@ import { SearchField } from '@/components/ui/SearchField';
 import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ExpandableCard } from '@/components/ui/ExpandableCard';
 import type { DeviceView, LiveDelta } from '@/types';
 
 interface StreamEvent {
@@ -47,7 +48,11 @@ interface StreamEvent {
 export default function IotPage() {
   const { snapshot, loading, error, refresh, live, vehicleById, can } = useFleet();
   const { toast } = useToast();
-  const [provisionOpen, setProvisionOpen] = useState(false);
+  const [showProvisionForm, setShowProvisionForm] = useState(false);
+  const [showLiveFeed, setShowLiveFeed] = useState(false);
+  const [showGateways, setShowGateways] = useState(true);
+  const [showHardwareEndpoint, setShowHardwareEndpoint] = useState(false);
+  const [provisionModalOpen, setProvisionModalOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [protocolFilter, setProtocolFilter] = useState<'ALL' | DeviceView['protocol']>('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -183,8 +188,12 @@ export default function IotPage() {
         description="Tracking device registry, gateway ingestion health and live telemetry streams."
         action={
           canManage ? (
-            <Button variant="primary" icon={<Plus size={15} />} onClick={() => setProvisionOpen(true)}>
-              Provision device
+            <Button
+              variant="primary"
+              icon={<Plus size={15} />}
+              onClick={() => setShowProvisionForm((prev) => !prev)}
+            >
+              {showProvisionForm ? 'Hide form' : 'Provision device'}
             </Button>
           ) : undefined
         }
@@ -197,7 +206,46 @@ export default function IotPage() {
         <KpiCard label="Simulated testbeds" value={coverage.simulated.toLocaleString('en-IN')} tone="warning" hint="Virtual test devices" />
       </section>
 
-      <Panel title="Ingest gateways & brokers" subtitle="Telemetry ingestion protocol status" icon={<Radio size={16} />}>
+      {/* Expandable Provisioning Banner (EasyLife Parity: "Add Customer / Show form v") */}
+      {canManage && (
+        <ExpandableCard
+          icon={<Plus size={20} />}
+          iconTone="brand"
+          title="Provision Telematics Tracker"
+          subtitle="Register physical AIS-140 hardware, OBD-II dongles, or generate a simulated vehicle testbed."
+          expandLabel="Show form"
+          collapseLabel="Hide form"
+          expanded={showProvisionForm}
+          onToggle={setShowProvisionForm}
+        >
+          <InlineProvisionForm
+            vehicles={vehicles}
+            onDone={async () => {
+              setShowProvisionForm(false);
+              await refresh();
+            }}
+            onCancel={() => setShowProvisionForm(false)}
+            toast={toast}
+          />
+        </ExpandableCard>
+      )}
+
+      {/* Ingestion Gateways & Brokers Expandable Card */}
+      <ExpandableCard
+        icon={<Radio size={18} />}
+        iconTone="brand"
+        title="Ingest Gateways & Protocol Status"
+        subtitle="Telemetry ingestion protocol status for AIS-140 (TCP/UDP 5000), MQTT broker, and HTTP REST webhooks."
+        badge={
+          <Badge tone={coverage.online > 0 ? 'success' : 'neutral'}>
+            {coverage.online} online
+          </Badge>
+        }
+        expandLabel="Show gateway telemetry"
+        collapseLabel="Hide gateways"
+        expanded={showGateways}
+        onToggle={setShowGateways}
+      >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-3)' }}>
           {gateways.map((g) => (
             <div
@@ -237,185 +285,210 @@ export default function IotPage() {
             </div>
           ))}
         </div>
-      </Panel>
+      </ExpandableCard>
 
-      <div className="page-grid-2">
-        <Panel
-          title={`Device registry (${filteredDevices.length})`}
-          subtitle="Provisioned telematics hardware and vehicle bindings"
-          icon={<Cpu size={16} />}
-        >
-          <div className="stack" style={{ gap: 'var(--space-4)' }}>
-            <div className="toolbar" style={{ margin: 0, gap: 'var(--space-2)' }}>
-              <div style={{ flex: '1 1 240px', minWidth: '200px' }}>
-                <SearchField
-                  value={query}
-                  onChange={setQuery}
-                  placeholder="Search device code, protocol or vehicle…"
-                  placeholders={[
-                    'Search device code (e.g. "DEV-")…',
-                    'Search vehicle registration (e.g. "MP-07-")…',
-                    'Search protocol or kind…',
-                    'Search firmware version…'
-                  ]}
-                  ariaLabel="Search devices"
-                />
+      {/* Live Telemetry Feed Expandable Card */}
+      <ExpandableCard
+        icon={<Activity size={18} />}
+        iconTone="brand"
+        title="Live Telemetry Feed"
+        subtitle="Real-time vehicle position and speed delta broadcasts from active devices."
+        badge={
+          <Badge tone={stream.length ? 'success' : 'neutral'}>
+            {stream.length} active updates
+          </Badge>
+        }
+        expandLabel="Show live feed"
+        collapseLabel="Hide live feed"
+        expanded={showLiveFeed}
+        onToggle={setShowLiveFeed}
+      >
+        {stream.length === 0 ? (
+          <EmptyState title="Waiting for telemetry events" description="Live deltas from provisioned devices will appear here." />
+        ) : (
+          <div className="ops-stream" aria-live="polite" style={{ maxHeight: 380 }}>
+            {stream.map((s) => (
+              <div key={s.key} className="ops-stream-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0.75rem' }}>
+                <div className="cluster" style={{ gap: 8, alignItems: 'center' }}>
+                  <Badge tone={s.simulated ? 'neutral' : 'success'}>
+                    {s.simulated ? 'Sim' : 'Live'}
+                  </Badge>
+                  <Link href={`/vehicles/${s.vehicleId}`} className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)', textDecoration: 'none', fontSize: '0.84rem' }}>
+                    {s.reg}
+                  </Link>
+                </div>
+                <div className="cluster" style={{ gap: 12, alignItems: 'center' }}>
+                  <span className="mono" style={{ fontSize: '0.84rem', fontWeight: 600 }}>
+                    {Math.round(s.speed)} km/h
+                  </span>
+                  <span className="text-muted" style={{ fontSize: '0.76rem' }}>
+                    {fmtRelative(s.at)}
+                  </span>
+                </div>
               </div>
-              <Select
-                ariaLabel="Protocol filter"
-                width="150px"
-                value={protocolFilter}
-                onChange={(v) => setProtocolFilter(v as 'ALL' | DeviceView['protocol'])}
-                options={[
-                  { value: 'ALL', label: 'All protocols' },
-                  { value: 'AIS_140', label: 'AIS-140' },
-                  { value: 'MQTT', label: 'MQTT' },
-                  { value: 'HTTP', label: 'HTTP' },
-                  { value: 'BLE', label: 'BLE' },
+            ))}
+          </div>
+        )}
+      </ExpandableCard>
+
+      {/* Main Device Registry Table (100% full width) */}
+      <Panel
+        title="Device registry"
+        subtitle="Provisioned telematics hardware, signal telemetry, and vehicle bindings"
+        icon={<Cpu size={16} />}
+        action={
+          <Badge tone="neutral">
+            {filteredDevices.length} {filteredDevices.length === 1 ? 'device' : 'devices'}
+          </Badge>
+        }
+      >
+        <div className="stack" style={{ gap: 'var(--space-4)' }}>
+          <div className="toolbar" style={{ margin: 0, gap: 'var(--space-2)', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: '1 1 280px', minWidth: '220px' }}>
+              <SearchField
+                value={query}
+                onChange={setQuery}
+                placeholder="Search device code, protocol or vehicle…"
+                placeholders={[
+                  'Search device code (e.g. "DEV-")…',
+                  'Search vehicle registration (e.g. "MP-07-")…',
+                  'Search protocol or kind…',
+                  'Search firmware version…',
                 ]}
+                ariaLabel="Search devices"
               />
             </div>
+            <Select
+              ariaLabel="Protocol filter"
+              width="160px"
+              value={protocolFilter}
+              onChange={(v) => setProtocolFilter(v as 'ALL' | DeviceView['protocol'])}
+              options={[
+                { value: 'ALL', label: 'All protocols' },
+                { value: 'AIS_140', label: 'AIS-140' },
+                { value: 'MQTT', label: 'MQTT' },
+                { value: 'HTTP', label: 'HTTP' },
+                { value: 'BLE', label: 'BLE' },
+              ]}
+            />
+          </div>
 
-            {filteredDevices.length === 0 ? (
-              <EmptyState icon={<Cpu size={26} />} title="No devices match" description="Adjust search filters or provision a new tracker." />
-            ) : (
-              <div className="table-wrap iot-registry">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Device Code</th>
-                      <th>Bound Vehicle</th>
-                      <th>Status</th>
-                      <th>Battery</th>
-                      <th>Signal</th>
-                      <th>Firmware</th>
-                      <th>Last Heartbeat</th>
-                      {canManage && <th aria-label="Actions" style={{ textAlign: 'right' }}>Actions</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredDevices.map((d) => {
-                      const v = d.vehicleId ? vehicleById(d.vehicleId) : undefined;
-                      return (
-                        <tr key={d.id}>
-                          <td>
-                            <div className="cluster" style={{ gap: 6, alignItems: 'center' }}>
-                              <strong className="mono table-code">{d.deviceCode}</strong>
-                              <Badge tone={d.simulated ? 'warning' : 'neutral'}>
-                                {d.simulated ? 'Sim' : 'HW'}
-                              </Badge>
-                            </div>
-                            <div className="text-muted" style={{ fontSize: '0.74rem' }}>
-                              {DEVICE_KIND_LABEL[d.kind]} · {d.protocol}
-                            </div>
-                          </td>
-                          <td>
-                            {v ? (
-                              <Link href={`/vehicles/${v.id}`}>
-                                <span className="reg-plate-inline">{v.registrationNumber}</span>
-                              </Link>
-                            ) : (
-                              <span className="text-muted" style={{ fontSize: '0.82rem' }}>— Unbound</span>
-                            )}
-                          </td>
-                          <td>
-                            <StatusDot tone={deviceStatusTone(d.status)} label={d.status} />
-                          </td>
-                          <td>
-                            <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: d.batteryPct != null && d.batteryPct < 20 ? 'var(--color-danger)' : 'inherit' }}>
-                              {d.batteryPct == null ? '—' : `${d.batteryPct}%`}
-                            </span>
-                          </td>
-                          <td><SignalBars dbm={d.signalDbm} /></td>
-                          <td>
-                            <span className="text-muted mono" style={{ fontSize: '0.78rem' }}>{d.firmware ?? 'v1.0'}</span>
-                          </td>
-                          <td>
-                            <span className="text-muted" style={{ fontSize: '0.78rem' }}>{fmtRelative(d.lastSeenAt)}</span>
-                          </td>
-                          {canManage && (
-                            <td style={{ textAlign: 'right' }}>
-                              <div className="cluster" style={{ gap: 4, justifyContent: 'flex-end' }}>
+          {filteredDevices.length === 0 ? (
+            <EmptyState icon={<Cpu size={26} />} title="No devices match" description="Adjust search filters or provision a new tracker." />
+          ) : (
+            <div className="table-wrap iot-registry">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Device Code</th>
+                    <th>Bound Vehicle</th>
+                    <th>Status</th>
+                    <th>Battery</th>
+                    <th>Signal</th>
+                    <th>Firmware</th>
+                    <th>Last Heartbeat</th>
+                    {canManage && <th aria-label="Actions" style={{ textAlign: 'right' }}>Actions</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDevices.map((d) => {
+                    const v = d.vehicleId ? vehicleById(d.vehicleId) : undefined;
+                    return (
+                      <tr key={d.id}>
+                        <td>
+                          <div className="cluster" style={{ gap: 6, alignItems: 'center' }}>
+                            <strong className="mono table-code">{d.deviceCode}</strong>
+                            <Badge tone={d.simulated ? 'warning' : 'neutral'}>
+                              {d.simulated ? 'Sim' : 'HW'}
+                            </Badge>
+                          </div>
+                          <div className="text-muted" style={{ fontSize: '0.74rem' }}>
+                            {DEVICE_KIND_LABEL[d.kind]} · {d.protocol}
+                          </div>
+                        </td>
+                        <td>
+                          {v ? (
+                            <Link href={`/vehicles/${v.id}`}>
+                              <span className="reg-plate-inline">{v.registrationNumber}</span>
+                            </Link>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: '0.82rem' }}>— Unbound</span>
+                          )}
+                        </td>
+                        <td>
+                          <StatusDot tone={deviceStatusTone(d.status)} label={d.status} />
+                        </td>
+                        <td>
+                          <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 600, color: d.batteryPct != null && d.batteryPct < 20 ? 'var(--color-danger)' : 'inherit' }}>
+                            {d.batteryPct == null ? '—' : `${d.batteryPct}%`}
+                          </span>
+                        </td>
+                        <td><SignalBars dbm={d.signalDbm} /></td>
+                        <td>
+                          <span className="text-muted mono" style={{ fontSize: '0.78rem' }}>{d.firmware ?? 'v1.0'}</span>
+                        </td>
+                        <td>
+                          <span className="text-muted" style={{ fontSize: '0.78rem' }}>{fmtRelative(d.lastSeenAt)}</span>
+                        </td>
+                        {canManage && (
+                          <td style={{ textAlign: 'right' }}>
+                            <div className="cluster" style={{ gap: 4, justifyContent: 'flex-end' }}>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                icon={d.simulated ? <Zap size={13} /> : <Cpu size={13} />}
+                                loading={busyId === d.id}
+                                onClick={() => deviceAction(d.id, { type: 'setSimulated', simulated: !d.simulated }, d.simulated ? 'Set as physical hardware' : 'Set as simulated testbed')}
+                                title={d.simulated ? 'Switch to real hardware mode' : 'Switch to simulated testbed mode'}
+                              >
+                                {d.simulated ? 'To Real' : 'To Sim'}
+                              </Button>
+                              {d.vehicleId ? (
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  icon={d.simulated ? <Zap size={13} /> : <Cpu size={13} />}
+                                  icon={<Unplug size={13} />}
                                   loading={busyId === d.id}
-                                  onClick={() => deviceAction(d.id, { type: 'setSimulated', simulated: !d.simulated }, d.simulated ? 'Set as physical hardware' : 'Set as simulated testbed')}
-                                  title={d.simulated ? 'Switch to real hardware mode' : 'Switch to simulated testbed mode'}
+                                  onClick={() => deviceAction(d.id, { type: 'bind', vehicleId: null }, 'Device unbound')}
+                                  title="Unbind from vehicle"
                                 >
-                                  {d.simulated ? 'To Real' : 'To Sim'}
+                                  Unbind
                                 </Button>
-                                {d.vehicleId ? (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    icon={<Unplug size={13} />}
-                                    loading={busyId === d.id}
-                                    onClick={() => deviceAction(d.id, { type: 'bind', vehicleId: null }, 'Device unbound')}
-                                    title="Unbind from vehicle"
-                                  >
-                                    Unbind
-                                  </Button>
-                                ) : null}
-                                <Button
-                                  size="sm"
-                                  variant="danger"
-                                  icon={<Link2 size={13} />}
-                                  loading={busyId === d.id}
-                                  onClick={() => deviceAction(d.id, { type: 'decommission' }, 'Device decommissioned')}
-                                  title="Decommission this device"
-                                >
-                                  Retire
-                                </Button>
-                              </div>
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </Panel>
-
-        <Panel
-          title="Live telemetry feed"
-          subtitle="Real-time vehicle position and speed deltas"
-          icon={<Activity size={16} />}
-        >
-          {stream.length === 0 ? (
-            <EmptyState title="Waiting for telemetry events" description="Live deltas from provisioned devices will appear here." />
-          ) : (
-            <div className="ops-stream" aria-live="polite" style={{ maxHeight: 420 }}>
-              {stream.map((s) => (
-                <div key={s.key} className="ops-stream-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.5rem 0.65rem' }}>
-                  <div className="cluster" style={{ gap: 8, alignItems: 'center' }}>
-                    <Badge tone={s.simulated ? 'neutral' : 'success'}>
-                      {s.simulated ? 'Sim' : 'Live'}
-                    </Badge>
-                    <Link href={`/vehicles/${s.vehicleId}`} className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)', textDecoration: 'none', fontSize: '0.82rem' }}>
-                      {s.reg}
-                    </Link>
-                  </div>
-                  <div className="cluster" style={{ gap: 8, alignItems: 'center' }}>
-                    <span className="mono" style={{ fontSize: '0.82rem', fontWeight: 600 }}>
-                      {Math.round(s.speed)} km/h
-                    </span>
-                    <span className="text-muted" style={{ fontSize: '0.74rem' }}>
-                      {fmtRelative(s.at)}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                icon={<Link2 size={13} />}
+                                loading={busyId === d.id}
+                                onClick={() => deviceAction(d.id, { type: 'decommission' }, 'Device decommissioned')}
+                                title="Decommission this device"
+                              >
+                                Retire
+                              </Button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
-        </Panel>
-      </div>
+        </div>
+      </Panel>
 
-      <Panel title="Connect physical telemetry hardware" subtitle="Direct ingestion endpoint for AIS-140 GPS trackers and on-board units" icon={<Satellite size={16} />}>
+      {/* Expandable Hardware Telemetry Endpoints Card */}
+      <ExpandableCard
+        icon={<Satellite size={18} />}
+        iconTone="brand"
+        title="Connect Physical Telemetry Hardware"
+        subtitle="Direct ingestion endpoint and curl commands for AIS-140 GPS trackers and on-board units."
+        expandLabel="Show endpoint instructions"
+        collapseLabel="Hide instructions"
+        expanded={showHardwareEndpoint}
+        onToggle={setShowHardwareEndpoint}
+      >
         <div className="stack" style={{ gap: 'var(--space-3)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-3)' }}>
             <div style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)' }}>
@@ -445,13 +518,13 @@ export default function IotPage() {
             </div>
           </div>
         </div>
-      </Panel>
+      </ExpandableCard>
 
-      {provisionOpen && (
+      {provisionModalOpen && (
         <ProvisionModal
           vehicles={vehicles}
-          onClose={() => setProvisionOpen(false)}
-          onDone={async () => { setProvisionOpen(false); await refresh(); }}
+          onClose={() => setProvisionModalOpen(false)}
+          onDone={async () => { setProvisionModalOpen(false); await refresh(); }}
           toast={toast}
         />
       )}

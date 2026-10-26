@@ -126,3 +126,104 @@ export function ProvisionModal({
     </Modal>
   );
 }
+
+export function InlineProvisionForm({
+  vehicles,
+  onCancel,
+  onDone,
+  toast,
+}: {
+  vehicles: VehicleView[];
+  onCancel: () => void;
+  onDone: () => void;
+  toast: ToastFn;
+}) {
+  const [deviceCode, setDeviceCode] = useState('');
+  const [kind, setKind] = useState<DeviceKind>('GPS_TRACKER');
+  const [protocol, setProtocol] = useState<DeviceView['protocol']>('AIS_140');
+  const [vehicleId, setVehicleId] = useState('');
+  const [firmware, setFirmware] = useState('');
+  const [simulated, setSimulated] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const valid = deviceCode.trim().length >= 1;
+
+  async function submit() {
+    if (!valid) return;
+    setSaving(true);
+    try {
+      await api.post('/api/cloud/devices', {
+        deviceCode: deviceCode.trim(),
+        kind,
+        protocol,
+        vehicleId: vehicleId || undefined,
+        firmware: firmware.trim() || undefined,
+        simulated,
+      });
+      toast('Device provisioned successfully', 'success');
+      onDone();
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : 'Could not provision device', 'danger');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+      className="stack"
+      style={{ gap: 'var(--space-4)' }}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--space-3)' }}>
+        <Field label="Device code" required hint="IMEI, serial, or hardware ID">
+          <input
+            className="input"
+            value={deviceCode}
+            onChange={(e) => setDeviceCode(e.target.value)}
+            placeholder="e.g. 356938035643809"
+          />
+        </Field>
+        <Field label="Device kind" required>
+          <Select ariaLabel="Device kind" value={kind} onChange={(v) => setKind(v as DeviceKind)} options={DEVICE_KINDS} />
+        </Field>
+        <Field label="Protocol" required>
+          <Select ariaLabel="Protocol" value={protocol} onChange={(v) => setProtocol(v as DeviceView['protocol'])} options={DEVICE_PROTOCOLS} />
+        </Field>
+        <Field label="Bind to vehicle">
+          <Select
+            ariaLabel="Bind vehicle"
+            value={vehicleId}
+            onChange={setVehicleId}
+            placeholder="Unbound"
+            options={[
+              { value: '', label: 'Unbound' },
+              ...vehicles.map((v) => ({ value: v.id, label: `${v.registrationNumber} — ${v.displayName}` })),
+            ]}
+          />
+        </Field>
+        <Field label="Firmware version">
+          <input className="input" value={firmware} onChange={(e) => setFirmware(e.target.value)} placeholder="e.g. v2.4.1" />
+        </Field>
+      </div>
+
+      <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <label className="cluster" style={{ gap: 8, cursor: 'pointer', fontSize: '0.88rem' }}>
+          <input type="checkbox" checked={simulated} onChange={(e) => setSimulated(e.target.checked)} />
+          <span>Simulated testbed device (virtual GPS and telemetry loop)</span>
+        </label>
+        <div className="cluster" style={{ gap: 'var(--space-2)' }}>
+          <Button variant="ghost" type="button" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" loading={saving} disabled={!valid}>
+            Provision device
+          </Button>
+        </div>
+      </div>
+    </form>
+  );
+}

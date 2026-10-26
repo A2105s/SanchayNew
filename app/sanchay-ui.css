@@ -1776,6 +1776,145 @@ td {
   }
 }
 
+/* ============================================================
+   MODERN FLEET MAP TELEMATICS & TRACE LINE STYLES
+   ============================================================ */
+.fleet-marker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  pointer-events: auto;
+  z-index: 5;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fleet-marker:hover {
+  z-index: 20;
+}
+
+.fleet-marker--selected {
+  z-index: 30;
+}
+
+.fleet-marker__rotator {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  transition: transform 0.35s ease-out;
+}
+
+.fleet-marker--selected .fleet-marker__rotator {
+  transform-origin: center center;
+  filter: drop-shadow(0 0 10px rgba(10, 127, 140, 0.75));
+}
+
+.fleet-marker__radar {
+  position: absolute;
+  bottom: 50%;
+  left: -6px;
+  right: -6px;
+  height: 34px;
+  pointer-events: none;
+  border-radius: 50% 50% 0 0;
+  opacity: 0.8;
+  transform-origin: center bottom;
+  animation: radarBeamPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes radarBeamPulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.06);
+  }
+}
+
+.fleet-marker__halo {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(2px);
+  box-sizing: border-box;
+}
+
+.fleet-marker__halo--pulse {
+  animation: fleetHaloPulse 2s ease-out infinite;
+}
+
+@keyframes fleetHaloPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+.fleet-marker__icon-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fleet-marker__pill {
+  position: absolute;
+  top: 100%;
+  margin-top: 4px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.fleet-marker:hover .fleet-marker__pill,
+.fleet-marker--selected .fleet-marker__pill {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.fleet-marker__reg {
+  color: #38bdf8;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.fleet-marker__speed {
+  color: #a7f3d0;
+  font-size: 9.5px;
+}
+
 
 
 

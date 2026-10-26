@@ -27,7 +27,7 @@ import type {
 // Poll cadences (ms).
 const HEALTH_INTERVAL = 30_000;
 const TELEMETRY_INTERVAL = 5_000;
-const SIM_INTERVAL = 5_000;
+const SIM_INTERVAL = 2_500;
 
 interface CloudHealth {
   resetEpoch?: number | null;

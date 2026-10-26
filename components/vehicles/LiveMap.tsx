@@ -12,25 +12,28 @@ import {
   Radio,
   X,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { ButtonLink } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { SearchField } from '@/components/ui/SearchField';
 import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useFleet } from '@/lib/client/useFleet';
 import { loadMapLibre } from '@/lib/client/maplibre';
-import { baseStyle, MAP_FONT_STACK } from '@/lib/client/map-config';
+import { baseStyle } from '@/lib/client/map-config';
 import { SECTOR_LABEL, STATUS_LABEL } from '@/lib/fleet/format';
-import { StatusBadge } from '@/components/vehicles/shared';
-import { worstCompliance } from '@/components/vehicles/shared';
+import { StatusBadge, worstCompliance } from '@/components/vehicles/shared';
 import { OperationalBadge, EligibilityBadge } from '@/components/ui/StatusBadges';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
+import {
+  createFleetMarkerElement,
+  updateFleetMarkerElement,
+  STATUS_GLOW,
+} from '@/components/vehicles/FleetIcons';
+import { getVehicleSimState } from '@/lib/client/telemetry-sim';
 import type { Sector, VehicleStatus, VehicleView } from '@/types';
 
 const GWALIOR_CENTER: [number, number] = [78.1828, 26.2183];
-const GWALIOR_ZOOM = 11.5;
+const GWALIOR_ZOOM = 12;
 
 const STATUS_COLORS: Record<VehicleStatus, string> = {
   MOVING: '#16a34a',
@@ -39,29 +42,8 @@ const STATUS_COLORS: Record<VehicleStatus, string> = {
   OFFLINE: '#64748b',
 };
 
-
 type MlNs = typeof import('maplibre-gl');
-// Loosely typed to avoid friction with the maplibre runtime types.
 type MlMap = any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-function vehicleFeatures(vehicles: VehicleView[]) {
-  return {
-    type: 'FeatureCollection' as const,
-    features: vehicles
-      .filter((v) => v.lat != null && v.lng != null)
-      .map((v) => ({
-        type: 'Feature' as const,
-        properties: {
-          id: v.id,
-          status: v.status,
-          color: STATUS_COLORS[v.status],
-          reg: v.registrationNumber,
-          stale: v.telemetryFreshness !== 'FRESH' ? 1 : 0
-        },
-        geometry: { type: 'Point' as const, coordinates: [v.lng as number, v.lat as number] },
-      })),
-  };
-}
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
@@ -77,11 +59,11 @@ export function LiveMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const mlRef = useRef<MlNs | null>(null);
+  const vehicleMarkersRef = useRef<Map<string, any>>(new Map());
   const stationMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const incidentMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const trailRef = useRef<Record<string, [number, number][]>>({});
   const readyRef = useRef(false);
-  const latestVehiclesRef = useRef<VehicleView[]>([]);
 
   const [failed, setFailed] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -97,9 +79,6 @@ export function LiveMap() {
   const [layersOpen, setLayersOpen] = useState(false);
 
   const liveVehicles = fleet.liveVehicles;
-  useEffect(() => {
-    latestVehiclesRef.current = liveVehicles;
-  }, [liveVehicles]);
   const stations = fleet.snapshot?.stations ?? [];
   const openIncidents = (fleet.snapshot?.incidents ?? []).filter((i) => i.status !== 'RESOLVED');
 
@@ -114,9 +93,19 @@ export function LiveMap() {
   }, [liveVehicles, search, statusFilter, sectorFilter]);
 
   const selected = selectedId ? liveVehicles.find((v) => v.id === selectedId) ?? null : null;
+  const simState = selectedId ? getVehicleSimState(selectedId) : undefined;
 
   const simCount = useMemo(() => Object.values(fleet.live).filter((d) => d.simulated).length, [fleet.live]);
   const realCount = useMemo(() => Object.values(fleet.live).filter((d) => !d.simulated).length, [fleet.live]);
+
+  // Center & smooth fly to vehicle
+  const flyTo = useCallback((v: VehicleView) => {
+    setSelectedId(v.id);
+    const map = mapRef.current;
+    if (map && v.lat != null && v.lng != null) {
+      map.flyTo({ center: [v.lng, v.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
+    }
+  }, []);
 
   // ---- Initialise the map once ----
   useEffect(() => {
@@ -138,85 +127,80 @@ export function LiveMap() {
         mapRef.current = map;
         map.on('error', (e: { error?: Error }) => console.warn('[live-map]', e.error?.message ?? e));
 
-        let interactionsBound = false;
-        // Runs on first style load AND after every theme-driven style swap (a new style drops custom sources/layers).
         const initLayers = () => {
-          if (cancelled || map.getSource('vehicles')) return;
-          // vehicles source (clustered)
-          map.addSource('vehicles', {
-            type: 'geojson',
-            data: vehicleFeatures(latestVehiclesRef.current),
-            cluster: true,
-            clusterRadius: 45,
-            clusterMaxZoom: 13,
-          });
-          map.addLayer({
-            id: 'veh-clusters',
-            type: 'circle',
-            source: 'vehicles',
-            filter: ['has', 'point_count'],
-            paint: {
-              'circle-color': '#0a7f8c',
-              'circle-opacity': 0.85,
-              'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 30],
-            },
-          });
-          map.addLayer({
-            id: 'veh-cluster-count',
-            type: 'symbol',
-            source: 'vehicles',
-            filter: ['has', 'point_count'],
-            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': [MAP_FONT_STACK], 'text-size': 12 },
-            paint: { 'text-color': '#ffffff' },
-          });
-          map.addLayer({
-            id: 'veh-points',
-            type: 'circle',
-            source: 'vehicles',
-            filter: ['!', ['has', 'point_count']],
-            paint: {
-              // Stale telemetry renders hollow/dimmed; fresh renders solid.
-              'circle-color': ['case', ['==', ['get', 'stale'], 1], 'rgba(255,255,255,0.15)', ['get', 'color']],
-              'circle-opacity': ['case', ['==', ['get', 'stale'], 1], 0.55, 1],
-              'circle-radius': 7,
-              'circle-stroke-width': ['case', ['==', ['get', 'stale'], 1], 2.5, 2],
-              'circle-stroke-color': ['case', ['==', ['get', 'stale'], 1], ['get', 'color'], '#ffffff'],
-            },
-          });
-          // trail source
-          map.addSource('trail', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } } });
-          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#0a7f8c', 'line-width': 3, 'line-opacity': 0.7 } });
+          if (cancelled || !mapRef.current) return;
+          if (map.getSource('route')) return;
 
-          // interactions (bound once; layer-scoped listeners survive style swaps)
-          if (!interactionsBound) {
-            interactionsBound = true;
-            map.on('click', 'veh-points', (e: { features?: Array<{ properties?: { id?: string } }> }) => {
-              const id = e.features?.[0]?.properties?.id;
-              if (id) setSelectedId(id);
-            });
-            map.on('click', 'veh-clusters', (e: { point: unknown }) => {
-              const features = map.queryRenderedFeatures(e.point, { layers: ['veh-clusters'] });
-              const clusterId = features[0]?.properties?.cluster_id;
-              const src = map.getSource('vehicles');
-              if (clusterId != null && src?.getClusterExpansionZoom) {
-                src.getClusterExpansionZoom(clusterId).then((zoom: number) => {
-                  map.easeTo({ center: features[0].geometry.coordinates, zoom });
-                });
-              }
-            });
-            const setPointer = (v: boolean) => () => { map.getCanvas().style.cursor = v ? 'pointer' : ''; };
-            map.on('mouseenter', 'veh-points', setPointer(true));
-            map.on('mouseleave', 'veh-points', setPointer(false));
-            map.on('mouseenter', 'veh-clusters', setPointer(true));
-            map.on('mouseleave', 'veh-clusters', setPointer(false));
-          }
+          // 1. Trail Source & Glow Layers (Zomato-style emerald trailing path)
+          map.addSource('trail', {
+            type: 'geojson',
+            data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
+          });
+
+          map.addLayer({
+            id: 'trail-glow',
+            type: 'line',
+            source: 'trail',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#10b981',
+              'line-width': 7,
+              'line-opacity': 0.35,
+              'line-blur': 2,
+            },
+          });
+
+          map.addLayer({
+            id: 'trail-core',
+            type: 'line',
+            source: 'trail',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#34d399',
+              'line-width': 3.5,
+              'line-opacity': 0.95,
+            },
+          });
+
+          // 2. Route Corridor Source & Glow Layers (Uber/Zomato style planned route ahead)
+          map.addSource('route', {
+            type: 'geojson',
+            data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
+          });
+
+          map.addLayer({
+            id: 'route-glow',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#0284c7',
+              'line-width': 6,
+              'line-opacity': 0.3,
+              'line-blur': 1.5,
+            },
+          });
+
+          map.addLayer({
+            id: 'route-core',
+            type: 'line',
+            source: 'route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#38bdf8',
+              'line-width': 2.5,
+              'line-opacity': 0.9,
+              'line-dasharray': [2, 2],
+            },
+          });
 
           readyRef.current = true;
           setMapReady(true);
         };
+
         map.on('style.load', initLayers);
 
-        // Follow the app theme (EasyLife toggles data-theme on <html>): swap the basemap style, layers are re-added in initLayers.
+        // Follow the app theme: swap the basemap style
         let lastDark = dark;
         themeObserver = new MutationObserver(() => {
           const nowDark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -237,6 +221,8 @@ export function LiveMap() {
       readyRef.current = false;
       stationMarkersRef.current.forEach((m) => m.remove());
       incidentMarkersRef.current.forEach((m) => m.remove());
+      vehicleMarkersRef.current.forEach((m) => m.remove());
+      vehicleMarkersRef.current.clear();
       try {
         mapRef.current?.remove();
       } catch {
@@ -247,28 +233,70 @@ export function LiveMap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- Update vehicle GeoJSON source when live data changes (no map recreation) ----
+  // ---- Update & sync vehicle HTML DOM markers (rotations, radar beams, plate pills) ----
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !readyRef.current) return;
-    const src = map.getSource('vehicles');
-    if (src?.setData) src.setData(vehicleFeatures(showVehicles ? liveVehicles : []));
-  }, [liveVehicles, showVehicles, mapReady]);
+    const ml = mlRef.current;
+    if (!map || !ml || !readyRef.current) return;
 
-  // ---- Toggle vehicle layer visibility ----
+    const currentMarkers = vehicleMarkersRef.current;
+
+    if (!showVehicles) {
+      for (const marker of currentMarkers.values()) {
+        marker.remove();
+      }
+      currentMarkers.clear();
+      return;
+    }
+
+    const activeIds = new Set<string>();
+
+    for (const v of filtered) {
+      if (v.lat == null || v.lng == null) continue;
+      activeIds.add(v.id);
+
+      const isSelected = v.id === selectedId;
+      const existing = currentMarkers.get(v.id);
+
+      if (existing) {
+        existing.setLngLat([v.lng, v.lat]);
+        updateFleetMarkerElement(existing.getElement(), v, {
+          heading: v.heading,
+          isSelected,
+        });
+      } else {
+        const el = createFleetMarkerElement(v, {
+          heading: v.heading,
+          isSelected,
+          onClick: () => {
+            setSelectedId(v.id);
+            flyTo(v);
+          },
+        });
+        const marker = new ml.Marker({ element: el, anchor: 'center' })
+          .setLngLat([v.lng, v.lat])
+          .addTo(map);
+        currentMarkers.set(v.id, marker);
+      }
+    }
+
+    // Remove markers for filtered-out vehicles
+    for (const [id, marker] of currentMarkers.entries()) {
+      if (!activeIds.has(id)) {
+        marker.remove();
+        currentMarkers.delete(id);
+      }
+    }
+  }, [filtered, selectedId, showVehicles, mapReady, flyTo]);
+
+  // ---- Toggle trail & route line visibility ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
-    const vis = showVehicles ? 'visible' : 'none';
-    for (const id of ['veh-clusters', 'veh-cluster-count', 'veh-points']) {
+    const vis = showTrail ? 'visible' : 'none';
+    for (const id of ['trail-glow', 'trail-core', 'route-glow', 'route-core']) {
       if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis);
     }
-  }, [showVehicles, mapReady]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !readyRef.current) return;
-    if (map.getLayer('trail-line')) map.setLayoutProperty('trail-line', 'visibility', showTrail ? 'visible' : 'none');
   }, [showTrail, mapReady]);
 
   // ---- Station markers (sized by fleet count) ----
@@ -325,29 +353,58 @@ export function LiveMap() {
     }
   }, [openIncidents, mapReady]);
 
-  // ---- Maintain + render trail for selected vehicle ----
+  // ---- Maintain + render Zomato/Uber style trail & planned corridor for selected vehicle ----
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
+
     if (!selectedId) {
-      const src = map.getSource('trail');
-      if (src?.setData) src.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } });
+      const trailSrc = map.getSource('trail');
+      if (trailSrc?.setData) trailSrc.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } });
+      const routeSrc = map.getSource('route');
+      if (routeSrc?.setData) routeSrc.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } });
       return;
     }
+
     const v = liveVehicles.find((x) => x.id === selectedId);
-    if (v?.lat != null && v?.lng != null) {
+    const sim = getVehicleSimState(selectedId);
+
+    let trailCoords: [number, number][] = [];
+    let routeCoords: [number, number][] = [];
+
+    if (sim && sim.recentTrail.length > 0) {
+      trailCoords = sim.recentTrail;
+      routeCoords = sim.activeRouteRemaining;
+    } else if (v?.lat != null && v?.lng != null) {
       const arr = trailRef.current[selectedId] ?? [];
       const last = arr[arr.length - 1];
       const point: [number, number] = [v.lng, v.lat];
       if (!last || last[0] !== point[0] || last[1] !== point[1]) {
         arr.push(point);
-        if (arr.length > 20) arr.shift();
+        if (arr.length > 25) arr.shift();
         trailRef.current[selectedId] = arr;
       }
-      const src = map.getSource('trail');
-      if (src?.setData) src.setData({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: trailRef.current[selectedId] ?? [] } });
+      trailCoords = trailRef.current[selectedId] ?? [];
     }
-  }, [selectedId, liveVehicles]);
+
+    const trailSrc = map.getSource('trail');
+    if (trailSrc?.setData) {
+      trailSrc.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: showTrail ? trailCoords : [] },
+      });
+    }
+
+    const routeSrc = map.getSource('route');
+    if (routeSrc?.setData) {
+      routeSrc.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: showTrail ? routeCoords : [] },
+      });
+    }
+  }, [selectedId, liveVehicles, showTrail, mapReady]);
 
   // ---- Resize on fullscreen toggle ----
   useEffect(() => {
@@ -356,14 +413,6 @@ export function LiveMap() {
     const t = setTimeout(() => map.resize(), 120);
     return () => clearTimeout(t);
   }, [fullscreen, panelCollapsed]);
-
-  const flyTo = useCallback((v: VehicleView) => {
-    setSelectedId(v.id);
-    const map = mapRef.current;
-    if (map && v.lat != null && v.lng != null) {
-      map.flyTo({ center: [v.lng, v.lat], zoom: Math.max(map.getZoom(), 14), duration: 800 });
-    }
-  }, []);
 
   const locateMe = useCallback(() => {
     if (!navigator.geolocation) return;
@@ -421,7 +470,7 @@ export function LiveMap() {
               placeholders={[
                 'Search registration (e.g. "MP-07-")…',
                 'Search station (e.g. "Kotwali")…',
-                'Search driver or asset code…'
+                'Search driver or asset code…',
               ]}
               ariaLabel="Search vehicles"
             />
@@ -453,6 +502,50 @@ export function LiveMap() {
             <EligibilityBadge state={selected.eligibilityState} />
           </div>
           <FreshnessBadge freshness={selected.telemetryFreshness} lastSeenAt={selected.lastSeenAt} />
+
+          {/* Modern Route Corridor Status Card (Zomato / Swiggy / Uber style) */}
+          {simState ? (
+            <div
+              style={{
+                margin: '0.4rem 0',
+                padding: '0.55rem 0.7rem',
+                borderRadius: '8px',
+                background: 'var(--color-bg-secondary)',
+                border: '1px solid var(--color-border)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 750, fontSize: '0.78rem', color: 'var(--color-brand)' }}>
+                  🛣️ {simState.routeName}
+                </span>
+                <span className="badge badge--brand" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                  {simState.direction === 1 ? 'A → B' : 'B → A'}
+                </span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: 'var(--color-text-secondary)' }}>
+                <span>{simState.fromName} ⇄ {simState.toName}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                <div style={{ flex: 1, height: '4px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${Math.min(100, Math.round((simState.currentDist / simState.totalDist) * 100))}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #10b981, #0ea5e9)',
+                      transition: 'width 0.4s ease',
+                    }}
+                  />
+                </div>
+                <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                  {(simState.totalDist / 1000).toFixed(1)} km
+                </span>
+              </div>
+            </div>
+          ) : null}
+
           {selected.telemetryFreshness !== 'FRESH' ? (
             <p className="text-muted" style={{ fontSize: '0.75rem', margin: 0 }}>
               Last position may be stale. This does not mean the vehicle is inactive or unavailable.
@@ -463,6 +556,8 @@ export function LiveMap() {
             <span>{SECTOR_LABEL[selected.sector]}</span>
             <span>Speed</span>
             <span className="mono">{Math.round(selected.speedKmph)} km/h</span>
+            <span>Heading</span>
+            <span className="mono">{selected.heading ? `${selected.heading}°` : '—'}</span>
             <span>Driver</span>
             <span>{selected.driverName ?? '—'}</span>
             <span>Compliance</span>
@@ -496,7 +591,7 @@ export function LiveMap() {
                 <input type="checkbox" checked={showStations} onChange={(e) => setShowStations(e.target.checked)} /> Stations
               </label>
               <label className="cluster" style={{ gap: '0.5rem', padding: '0.4rem 0.6rem' }}>
-                <input type="checkbox" checked={showTrail} onChange={(e) => setShowTrail(e.target.checked)} /> Trail
+                <input type="checkbox" checked={showTrail} onChange={(e) => setShowTrail(e.target.checked)} /> Trail & Routes
               </label>
             </div>
           ) : null}
@@ -516,8 +611,12 @@ export function LiveMap() {
           <span>Incident</span>
         </div>
         <div className="veh-legend-row">
-          <span className="veh-legend-dot" style={{ background: 'transparent', border: '2px solid #64748b' }} aria-hidden="true" />
-          <span>Stale</span>
+          <span style={{ width: 14, height: 3, background: '#38bdf8', borderRadius: 2 }} aria-hidden="true" />
+          <span>Planned Route</span>
+        </div>
+        <div className="veh-legend-row">
+          <span style={{ width: 14, height: 3, background: '#10b981', borderRadius: 2 }} aria-hidden="true" />
+          <span>Breadcrumb Trail</span>
         </div>
       </div>
     </div>
@@ -568,4 +667,3 @@ function VehicleList({
     </div>
   );
 }
-

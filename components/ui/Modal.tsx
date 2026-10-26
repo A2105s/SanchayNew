@@ -6,14 +6,15 @@ import { X } from 'lucide-react';
 
 interface ModalProps {
   title: string;
+  subtitle?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
-  size?: 'default' | 'small' | 'large';
+  size?: 'default' | 'small' | 'medium' | 'large';
   closeDisabled?: boolean;
 }
 
-export function Modal({ title, children, footer, onClose, size = 'default', closeDisabled = false }: ModalProps) {
+export function Modal({ title, subtitle, children, footer, onClose, size = 'default', closeDisabled = false }: ModalProps) {
   const [mounted, setMounted] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
@@ -100,7 +101,7 @@ export function Modal({ title, children, footer, onClose, size = 'default', clos
     >
       <div
         ref={dialogRef}
-        className={`modal${size === 'small' ? ' modal--small' : size === 'large' ? ' modal--large' : ''}`}
+        className={`modal${size === 'small' ? ' modal--small' : size === 'medium' ? ' modal--medium' : size === 'large' ? ' modal--large' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -113,7 +114,10 @@ export function Modal({ title, children, footer, onClose, size = 'default', clos
         }}
       >
         <div className="modal__header">
-          <h2 className="modal__title" id={titleId}>{title}</h2>
+          <div style={{ minWidth: 0 }}>
+            <h2 className="modal__title" id={titleId}>{title}</h2>
+            {subtitle ? <div className="modal__subtitle" style={{ marginTop: 3 }}>{subtitle}</div> : null}
+          </div>
           <button className="icon-button" type="button" aria-label="Close dialog" disabled={closeDisabled} onClick={onClose}><X size={18} /></button>
         </div>
         <div className="modal__body">{children}</div>

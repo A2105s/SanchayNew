@@ -3722,6 +3722,11 @@ tr:last-child td {
   max-width: 520px;
 }
 
+.modal--medium {
+  max-width: 720px;
+  max-height: calc(100vh - 48px);
+}
+
 .modal--large {
   max-width: 860px;
   max-height: calc(100vh - 48px);

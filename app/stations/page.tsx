@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ButtonLink } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { SearchField } from '@/components/ui/SearchField';
-import { Drawer } from '@/components/ui/Drawer';
+import { Modal } from '@/components/ui/Modal';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusDot } from '@/components/ui/StatusDot';
@@ -264,7 +264,7 @@ export default function StationsPage() {
       )}
 
       {detail && (
-        <StationDrawer
+        <StationModal
           station={detail}
           vehicles={vehicles.filter((v) => v.stationId === detail.id)}
           incoming={transfers.filter((t) => t.destinationStationId === detail.id && t.status !== 'REJECTED' && t.status !== 'CANCELLED')}
@@ -276,7 +276,7 @@ export default function StationsPage() {
   );
 }
 
-function StationDrawer({
+function StationModal({
   station,
   vehicles,
   incoming,
@@ -290,93 +290,148 @@ function StationDrawer({
   onClose: () => void;
 }) {
   return (
-    <Drawer title={station.name} onClose={onClose} width={460}>
+    <Modal
+      title={station.name}
+      subtitle={
+        <div className="cluster" style={{ gap: 8, alignItems: 'center' }}>
+          <span className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)', fontSize: '0.85rem' }}>{station.code}</span>
+          <Badge tone="neutral">{station.zone} Zone</Badge>
+          <span className="text-muted" style={{ fontSize: '0.82rem' }}>&bull; {station.district} District</span>
+        </div>
+      }
+      onClose={onClose}
+      size="medium"
+      footer={
+        <div className="cluster" style={{ width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Button variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <ButtonLink href={`/transfers?source=${station.id}`} variant="primary" icon={<ArrowRight size={15} />}>
+            Request vehicles from this station
+          </ButtonLink>
+        </div>
+      }
+    >
       <div className="stack" style={{ gap: 'var(--space-4)' }}>
-        {/* Station identity badge strip */}
-        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-          <div className="cluster" style={{ gap: 6 }}>
-            <span className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>{station.code}</span>
-            <Badge tone="neutral">{station.zone} Zone</Badge>
+        {/* Top 2-Column Grid: In-Charge Info + Fleet Pool Matrix */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 'var(--space-3)' }}>
+          {/* Station in-charge & contact */}
+          <div
+            style={{
+              padding: 'var(--space-4)',
+              background: 'var(--color-bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-3)'
+            }}
+          >
+            <div className="cluster" style={{ gap: 8, alignItems: 'center', color: 'var(--color-brand)', fontWeight: 700, fontSize: '0.85rem' }}>
+              <User size={15} />
+              <span>Station In-charge & Contact</span>
+            </div>
+            <div className="stack" style={{ gap: 'var(--space-2)' }}>
+              <div className="cluster" style={{ justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                <span className="text-muted">Officer In-charge</span>
+                <strong>{station.inchargeName ?? 'Unassigned'}</strong>
+              </div>
+              <div className="cluster" style={{ justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                <span className="text-muted">Official Phone</span>
+                {station.phone ? (
+                  <a href={`tel:${station.phone}`} className="cluster mono" style={{ gap: 5, color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 700 }}>
+                    <Phone size={12} /> {station.phone}
+                  </a>
+                ) : (
+                  <span className="text-muted">—</span>
+                )}
+              </div>
+              <div className="cluster" style={{ justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                <span className="text-muted">Coordinates</span>
+                <span className="mono" style={{ fontSize: '0.8rem' }}>{station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E</span>
+              </div>
+            </div>
           </div>
-          <span className="text-muted" style={{ fontSize: '0.8rem' }}>{station.district}</span>
+
+          {/* Available fleet pool */}
+          <div
+            style={{
+              padding: 'var(--space-4)',
+              background: 'var(--color-bg-secondary)',
+              borderRadius: 'var(--radius-md)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 'var(--space-3)'
+            }}
+          >
+            <div className="cluster" style={{ gap: 8, alignItems: 'center', color: 'var(--color-brand)', fontWeight: 700, fontSize: '0.85rem' }}>
+              <CarFront size={15} />
+              <span>Available Fleet Pool</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+              {VEHICLE_CLASSES.map((c) => {
+                const count = station.inventory?.[c] ?? 0;
+                return (
+                  <div
+                    key={c}
+                    style={{
+                      padding: '0.55rem 0.75rem',
+                      borderRadius: 'var(--radius-sm)',
+                      background: count > 0 ? 'var(--color-brand-subtle)' : 'var(--color-bg-tertiary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <span style={{ fontSize: '0.8rem', color: count > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: 500 }}>
+                      {CLASS_LABEL_LOCAL[c]}
+                    </span>
+                    <span className="mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: count > 0 ? 'var(--color-brand)' : 'var(--color-text-muted)' }}>
+                      {count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        <Panel title="Station in-charge & contact" icon={<User size={16} />}>
-          <div className="stack" style={{ gap: 'var(--space-2)' }}>
-            <div className="cluster" style={{ justifyContent: 'space-between' }}>
-              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Officer In-charge</span>
-              <strong>{station.inchargeName ?? 'Unassigned'}</strong>
-            </div>
-            <div className="cluster" style={{ justifyContent: 'space-between' }}>
-              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Official Phone</span>
-              {station.phone ? (
-                <a href={`tel:${station.phone}`} className="cluster mono" style={{ gap: 6, color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>
-                  <Phone size={13} /> {station.phone}
-                </a>
-              ) : (
-                <span className="text-muted">—</span>
-              )}
-            </div>
-            <div className="cluster" style={{ justifyContent: 'space-between' }}>
-              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Coordinates</span>
-              <span className="mono" style={{ fontSize: '0.8rem' }}>{station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E</span>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Available fleet pool" subtitle="Allocatable vehicles by class" icon={<CarFront size={16} />}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
-            {VEHICLE_CLASSES.map((c) => {
-              const count = station.inventory?.[c] ?? 0;
-              return (
-                <div
-                  key={c}
-                  style={{
-                    padding: '0.6rem 0.8rem',
-                    borderRadius: 'var(--radius-md)',
-                    background: count > 0 ? 'var(--color-brand-subtle)' : 'var(--color-bg-secondary)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <span style={{ fontSize: '0.82rem', color: count > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: 500 }}>
-                    {CLASS_LABEL_LOCAL[c]}
-                  </span>
-                  <span className="mono" style={{ fontSize: '1.15rem', fontWeight: 800, color: count > 0 ? 'var(--color-brand)' : 'var(--color-text-muted)' }}>
-                    {count}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-
-        <Panel
-          title={`Vehicles on roster (${vehicles.length})`}
-          subtitle="Assigned fleet in this station's pool"
-          action={
-            vehicles.length > 0 ? (
-              <ButtonLink href={`/vehicles?station=${station.id}`} variant="ghost" size="sm">
-                View all
-              </ButtonLink>
-            ) : undefined
-          }
+        {/* Assigned Fleet on Roster */}
+        <div
+          style={{
+            padding: 'var(--space-4)',
+            background: 'var(--color-bg-secondary)',
+            borderRadius: 'var(--radius-md)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--space-3)'
+          }}
         >
+          <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong style={{ fontSize: '0.92rem' }}>Vehicles on roster ({vehicles.length})</strong>
+              <p className="text-muted" style={{ margin: '2px 0 0', fontSize: '0.78rem' }}>Assigned fleet currently in this station's jurisdiction</p>
+            </div>
+            {vehicles.length > 0 ? (
+              <ButtonLink href={`/vehicles?station=${station.id}`} variant="ghost" size="sm">
+                View all ({vehicles.length})
+              </ButtonLink>
+            ) : null}
+          </div>
+
           {vehicles.length === 0 ? (
             <EmptyState title="No vehicles assigned" description="Assign vehicles via fleet edit or transfer approval." />
           ) : (
-            <div className="stack" style={{ gap: 6 }}>
-              {vehicles.slice(0, 8).map((v) => (
+            <div className="stack" style={{ gap: 6, maxHeight: 220, overflowY: 'auto', paddingRight: 4 }}>
+              {vehicles.map((v) => (
                 <Link
                   key={v.id}
                   href={`/vehicles/${v.id}`}
                   className="ops-attn-row"
-                  style={{ textDecoration: 'none' }}
+                  style={{ textDecoration: 'none', background: 'var(--color-bg-primary)', borderRadius: 'var(--radius-sm)' }}
                 >
                   <StatusDot tone={vehicleStatusTone(v.status)} />
                   <div className="ops-attn-body">
-                    <span className="ops-attn-title mono">{v.registrationNumber}</span>
+                    <span className="ops-attn-title mono" style={{ fontWeight: 700 }}>{v.registrationNumber}</span>
                     <span className="ops-attn-detail">{v.displayName}</span>
                   </div>
                   <Badge tone={v.status === 'MOVING' ? 'success' : 'neutral'}>
@@ -387,43 +442,53 @@ function StationDrawer({
               ))}
             </div>
           )}
-        </Panel>
+        </div>
 
-        <div className="grid-2">
-          <Panel title="Incoming transfers">
+        {/* Transfers Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--space-3)' }}>
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--color-bg-secondary)',
+              borderRadius: 'var(--radius-md)'
+            }}
+          >
+            <strong style={{ fontSize: '0.84rem', display: 'block', marginBottom: 6 }}>Incoming transfers</strong>
             {incoming.length === 0 ? (
-              <span className="text-muted" style={{ fontSize: '0.82rem' }}>No active inbound</span>
+              <span className="text-muted" style={{ fontSize: '0.8rem' }}>No active inbound</span>
             ) : (
               <div className="stack" style={{ gap: 6 }}>
                 {incoming.map((t) => (
-                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)' }}>
+                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)', fontWeight: 600 }}>
                     {t.transferCode}
                   </Link>
                 ))}
               </div>
             )}
-          </Panel>
-          <Panel title="Outgoing transfers">
+          </div>
+
+          <div
+            style={{
+              padding: 'var(--space-3) var(--space-4)',
+              background: 'var(--color-bg-secondary)',
+              borderRadius: 'var(--radius-md)'
+            }}
+          >
+            <strong style={{ fontSize: '0.84rem', display: 'block', marginBottom: 6 }}>Outgoing transfers</strong>
             {outgoing.length === 0 ? (
-              <span className="text-muted" style={{ fontSize: '0.82rem' }}>No active outbound</span>
+              <span className="text-muted" style={{ fontSize: '0.8rem' }}>No active outbound</span>
             ) : (
               <div className="stack" style={{ gap: 6 }}>
                 {outgoing.map((t) => (
-                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)' }}>
+                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)', fontWeight: 600 }}>
                     {t.transferCode}
                   </Link>
                 ))}
               </div>
             )}
-          </Panel>
-        </div>
-
-        <div style={{ paddingTop: 'var(--space-2)' }}>
-          <ButtonLink href={`/transfers?source=${station.id}`} variant="primary" icon={<ArrowRight size={15} />} style={{ width: '100%', justifyContent: 'center' }}>
-            Request vehicles from this station
-          </ButtonLink>
+          </div>
         </div>
       </div>
-    </Drawer>
+    </Modal>
   );
 }

@@ -1813,57 +1813,29 @@ td {
 
 .fleet-marker--selected .fleet-marker__rotator {
   transform-origin: center center;
-  filter: drop-shadow(0 0 10px rgba(10, 127, 140, 0.75));
 }
 
 .fleet-marker__radar {
   position: absolute;
   bottom: 50%;
-  left: -6px;
-  right: -6px;
-  height: 34px;
+  left: 2px;
+  right: 2px;
+  height: 28px;
   pointer-events: none;
   border-radius: 50% 50% 0 0;
-  opacity: 0.8;
+  opacity: 0.55;
   transform-origin: center bottom;
   animation: radarBeamPulse 2.4s ease-in-out infinite;
 }
 
 @keyframes radarBeamPulse {
   0%, 100% {
-    opacity: 0.45;
+    opacity: 0.35;
     transform: scale(0.95);
   }
   50% {
-    opacity: 0.85;
-    transform: scale(1.06);
-  }
-}
-
-.fleet-marker__halo {
-  position: absolute;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 1.5px solid;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(2px);
-  box-sizing: border-box;
-}
-
-.fleet-marker__halo--pulse {
-  animation: fleetHaloPulse 2s ease-out infinite;
-}
-
-@keyframes fleetHaloPulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
-  }
-  70% {
-    box-shadow: 0 0 0 9px rgba(16, 185, 129, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    opacity: 0.7;
+    transform: scale(1.05);
   }
 }
 
@@ -1873,6 +1845,18 @@ td {
   display: flex;
   align-items: center;
   justify-content: center;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  transition: filter 0.2s ease, transform 0.2s ease;
+}
+
+.fleet-marker:hover .fleet-marker__icon-wrap {
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.8));
+  transform: scale(1.1);
+}
+
+.fleet-marker--selected .fleet-marker__icon-wrap {
+  filter: drop-shadow(0 0 6px #38bdf8) drop-shadow(0 0 12px rgba(56, 189, 248, 0.7));
+  transform: scale(1.18);
 }
 
 .fleet-marker__pill {

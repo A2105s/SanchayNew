@@ -135,12 +135,10 @@ export function isSimulated(vehicle: VehicleView, devices: DeviceView[]): boolea
   );
 }
 
-/** Select the best matched route for a vehicle based on sector and seed */
+/** Evenly distribute all fleet vehicles across the entire arterial road network */
 function chooseRoute(vehicle: VehicleView, routeList: RouteCorridor[]): RouteCorridor {
-  const matched = routeList.filter((r) => r.sectorHint === vehicle.sector);
-  const pool = matched.length > 0 ? matched : routeList;
-  const idx = hashString(vehicle.id + (vehicle.registrationNumber || '')) % pool.length;
-  return pool[idx]!;
+  const idx = hashString(vehicle.id + (vehicle.registrationNumber || '')) % routeList.length;
+  return routeList[idx]!;
 }
 
 /** Produce the next LiveDelta for a simulated vehicle along its A ⇄ B ⇄ A route */
@@ -164,8 +162,10 @@ export function tickVehicle(
   const targetSpeed = baseTargetSpeed + ((hashString(vehicle.id) % 9) - 4); // +/- 4 km/h natural variance
 
   if (!sim) {
-    const seed = hashString(vehicle.id);
-    const initialDist = (seed % 85) * (totalDist / 100); // Spread swarm along route
+    const seed = hashString(vehicle.id + (vehicle.registrationNumber || ''));
+    // Stagger vehicle along the road corridor uniformly (5% to 95%) so vehicles are dispersed evenly
+    const progressFrac = 0.05 + (((seed * 7919 + 1013904223) >>> 0) % 1000) / 1000 * 0.90;
+    const initialDist = progressFrac * totalDist;
     const direction: 1 | -1 = seed % 2 === 0 ? 1 : -1;
 
     sim = {

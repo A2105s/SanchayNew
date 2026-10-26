@@ -310,8 +310,7 @@ export function createFleetMarkerElement(
 
   el.innerHTML = `
     <div class="fleet-marker__rotator" style="transform: rotate(${heading}deg);">
-      <div class="fleet-marker__radar" style="background: radial-gradient(circle at 50% 100%, ${statusColor}55 0%, transparent 70%); display: ${isMoving ? 'block' : 'none'};"></div>
-      <div class="fleet-marker__halo ${isMoving ? 'fleet-marker__halo--pulse' : ''}" style="border-color: ${statusColor}; box-shadow: 0 0 10px ${statusColor}66;"></div>
+      <div class="fleet-marker__radar" style="background: radial-gradient(circle at 50% 100%, ${statusColor}44 0%, transparent 70%); display: ${isMoving ? 'block' : 'none'};"></div>
       <div class="fleet-marker__icon-wrap">
         ${getFleetIconSvg(vehicle.sector, vehicle.vehicleClass)}
       </div>
@@ -364,14 +363,7 @@ export function updateFleetMarkerElement(
   const radar = el.querySelector<HTMLElement>('.fleet-marker__radar');
   if (radar) {
     radar.style.display = isMoving ? 'block' : 'none';
-    radar.style.background = `radial-gradient(circle at 50% 100%, ${statusColor}55 0%, transparent 70%)`;
-  }
-
-  const halo = el.querySelector<HTMLElement>('.fleet-marker__halo');
-  if (halo) {
-    halo.className = `fleet-marker__halo ${isMoving ? 'fleet-marker__halo--pulse' : ''}`;
-    halo.style.borderColor = statusColor;
-    halo.style.boxShadow = `0 0 10px ${statusColor}66`;
+    radar.style.background = `radial-gradient(circle at 50% 100%, ${statusColor}44 0%, transparent 70%)`;
   }
 
   const speedEl = el.querySelector<HTMLElement>('.fleet-marker__speed');
@@ -416,17 +408,10 @@ export function FleetVehicleMarker({
           <div
             className="fleet-marker__radar"
             style={{
-              background: `radial-gradient(circle at 50% 100%, ${glowColor}55 0%, transparent 70%)`,
+              background: `radial-gradient(circle at 50% 100%, ${glowColor}44 0%, transparent 70%)`,
             }}
           />
         )}
-        <div
-          className={`fleet-marker__halo ${isMoving ? 'fleet-marker__halo--pulse' : ''}`}
-          style={{
-            borderColor: glowColor,
-            boxShadow: `0 0 10px ${glowColor}66`,
-          }}
-        />
         <div className="fleet-marker__icon-wrap">
           {getFleetIcon(sector, vehicleClass)}
         </div>

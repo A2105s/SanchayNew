@@ -311,8 +311,8 @@ export function LiveMap() {
       const count = Object.values(s.inventory ?? {}).reduce((a, b) => a + (b ?? 0), 0);
       const size = Math.max(22, Math.min(44, 20 + count));
       const el = document.createElement('div');
-      el.style.cssText = `width:${size}px;height:${size}px;border-radius:8px;background:#1e293b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer`;
-      el.textContent = String(count);
+      el.style.cssText = `padding: 2px 7px; border-radius: 6px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; border: 1px solid rgba(255,255,255,0.22); box-shadow: 0 2px 6px rgba(0,0,0,0.45); cursor: pointer; white-space: nowrap; backdrop-filter: blur(4px);`;
+      el.innerHTML = `<span style="font-size:10px;">🏢</span><span style="color:#38bdf8;">${count}</span>`;
 
       const inchargeInfo = s.inchargeName ? `\nIn-charge: ${s.inchargeName}` : '';
       const phoneInfo = s.phone ? `\nCUG: ${s.phone}` : '';

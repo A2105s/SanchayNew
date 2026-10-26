@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth/session';
 import { fail, handleRouteError } from '@/lib/cloud/http';
-import { reverseGeocode } from '@/lib/integrations/mapbox/client';
+import { reverseGeocode as reverseGeocodeMapbox, isMapboxConfigured } from '@/lib/integrations/mapbox/client';
+import { reverseGeocodeNominatim, NOMINATIM_ATTRIBUTION } from '@/lib/integrations/nominatim/client';
 import { GEO_ATTRIBUTION } from '@/lib/integrations/mapbox/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/integrations/geo/reverse?lat=…&lng=…
+ * GET /api/integrations/geo/reverse?lat=…&lng=…&provider=nominatim
  *
  * Turns a captured coordinate into a readable label (incident locations, device check-ins).
- * Never used to overwrite an address a human already entered or verified.
+ * Supports both Nominatim (OpenStreetMap) with rate-limiting & caching, and Mapbox.
  */
 export async function GET(request: Request) {
   const auth = await requireSession(request);
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const lat = Number(searchParams.get('lat'));
     const lng = Number(searchParams.get('lng'));
+    const preferredProvider = searchParams.get('provider');
 
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return fail('Provide a numeric lat and lng.', 400);
@@ -29,10 +31,23 @@ export async function GET(request: Request) {
       return fail('Coordinates are out of range.', 400);
     }
 
-    const result = await reverseGeocode(lat, lng);
+    let result;
+    let attribution = GEO_ATTRIBUTION;
+
+    if (preferredProvider === 'nominatim' || !isMapboxConfigured()) {
+      result = await reverseGeocodeNominatim(lat, lng);
+      attribution = NOMINATIM_ATTRIBUTION;
+    } else {
+      result = await reverseGeocodeMapbox(lat, lng);
+      attribution = GEO_ATTRIBUTION;
+      if (result.status === 'unauthorized' || result.status === 'provider_error') {
+        result = await reverseGeocodeNominatim(lat, lng);
+        attribution = NOMINATIM_ATTRIBUTION;
+      }
+    }
 
     if (result.status === 'ok' || result.status === 'not_configured' || result.status === 'invalid_request') {
-      return NextResponse.json({ success: true, data: { ...result, attribution: GEO_ATTRIBUTION } });
+      return NextResponse.json({ success: true, data: { ...result, attribution } });
     }
 
     switch (result.status) {

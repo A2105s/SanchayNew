@@ -23,7 +23,7 @@ import { GEO_ATTRIBUTION, type GeoPlace, type GeoSearchResult } from '@/lib/inte
 type LookupState =
   | { kind: 'idle' }
   | { kind: 'loading' }
-  | { kind: 'results'; places: GeoPlace[] }
+  | { kind: 'results'; places: GeoPlace[]; attribution?: string }
   | { kind: 'empty' }
   | { kind: 'error'; message: string }
   | { kind: 'disabled'; message: string };
@@ -99,7 +99,11 @@ export function AddressSearch({
           });
           return;
         }
-        setState(data.places.length > 0 ? { kind: 'results', places: data.places } : { kind: 'empty' });
+        setState(
+          data.places.length > 0
+            ? { kind: 'results', places: data.places, attribution: data.attribution }
+            : { kind: 'empty' }
+        );
       } catch (lookupError) {
         if (cancelled) return;
         const message =
@@ -256,7 +260,7 @@ export function AddressSearch({
           ) : null}
 
           {state.kind === 'results' ? (
-            <p className="address-search__attribution">{GEO_ATTRIBUTION}</p>
+            <p className="address-search__attribution">{state.attribution || GEO_ATTRIBUTION}</p>
           ) : null}
         </div>
       ) : null}

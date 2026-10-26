@@ -16,9 +16,10 @@ import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { BarList } from '@/components/ui/BarList';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
+import { BarList } from '@/components/ui/BarList';
+import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import type { MaintenanceSeverity, MaintenanceStatus, MaintenanceView, VehicleView } from '@/types';
 
 const SEV_TONE: Record<MaintenanceSeverity, 'info' | 'warning' | 'danger' | 'neutral'> = {
@@ -110,48 +111,60 @@ export default function MaintenancePage() {
         }
       />
 
-      <div className="metric-grid">
-        <div className="metric-tile"><span className="text-muted">Open tickets</span><strong style={{ fontSize: '1.6rem' }}>{stats.open}</strong></div>
-        <div className="metric-tile"><span className="text-muted">Overdue</span><strong style={{ fontSize: '1.6rem' }}>{stats.overdue}</strong></div>
-        <div className="metric-tile"><span className="text-muted">Upcoming</span><strong style={{ fontSize: '1.6rem' }}>{stats.upcoming}</strong></div>
-        <div className="metric-tile"><span className="text-muted">Total cost</span><strong style={{ fontSize: '1.4rem' }}>{fmtInr(stats.totalCost)}</strong></div>
-      </div>
+      <section className="an-kpis" aria-label="Maintenance overview metrics">
+        <KpiCard label="Open tickets" value={stats.open.toLocaleString('en-IN')} tone={stats.open ? 'warning' : 'success'} hint="Active maintenance cases" />
+        <KpiCard label="Overdue" value={stats.overdue.toLocaleString('en-IN')} tone={stats.overdue ? 'danger' : 'success'} hint="Past scheduled service date" />
+        <KpiCard label="Upcoming" value={stats.upcoming.toLocaleString('en-IN')} tone="info" hint="Due for service soon" />
+        <KpiCard label="Total cost" value={fmtInr(stats.totalCost)} tone="brand" hint="Cumulative repair expenditures" />
+      </section>
 
       <div className="grid-2">
         <Panel title="Service tickets" action={<ViewToggle value={viewMode} onChange={setViewMode} />}>
-          <div className="toolbar">
-            <SearchField value={query} onChange={setQuery} ariaLabel="Search tickets" placeholder="Search ticket, vehicle, title" />
-            <Select
-              ariaLabel="Status filter"
-              value={statusFilter}
-              onChange={(v) => setStatusFilter(v as MaintenanceStatus | 'ALL')}
-              options={[
-                { value: 'ALL', label: 'All statuses' },
-                { value: 'SCHEDULED', label: 'Scheduled' },
-                { value: 'IN_PROGRESS', label: 'In progress' },
-                { value: 'OVERDUE', label: 'Overdue' },
-                { value: 'COMPLETED', label: 'Completed' },
-                { value: 'CANCELLED', label: 'Cancelled' },
-              ]}
-            />
-            <Select
-              ariaLabel="Severity filter"
-              value={sevFilter}
-              onChange={(v) => setSevFilter(v as MaintenanceSeverity | 'ALL')}
-              options={[
-                { value: 'ALL', label: 'All severities' },
-                { value: 'CRITICAL', label: 'Critical' },
-                { value: 'HIGH', label: 'High' },
-                { value: 'MEDIUM', label: 'Medium' },
-                { value: 'LOW', label: 'Low' },
-              ]}
-            />
-          </div>
+          <div className="stack" style={{ gap: 'var(--space-4)' }}>
+            <div className="toolbar" style={{ margin: 0, gap: 'var(--space-2)' }}>
+              <SearchField
+                value={query}
+                onChange={setQuery}
+                ariaLabel="Search tickets"
+                placeholder="Search ticket, vehicle, title"
+                placeholders={[
+                  'Search maintenance tickets (e.g. "TCK-")…',
+                  'Search by vehicle (e.g. "MP-07-")…',
+                  'Search issue title or workshop…',
+                  'Search by severity or vendor…'
+                ]}
+              />
+              <Select
+                ariaLabel="Status filter"
+                value={statusFilter}
+                onChange={(v) => setStatusFilter(v as MaintenanceStatus | 'ALL')}
+                options={[
+                  { value: 'ALL', label: 'All statuses' },
+                  { value: 'SCHEDULED', label: 'Scheduled' },
+                  { value: 'IN_PROGRESS', label: 'In progress' },
+                  { value: 'OVERDUE', label: 'Overdue' },
+                  { value: 'COMPLETED', label: 'Completed' },
+                  { value: 'CANCELLED', label: 'Cancelled' },
+                ]}
+              />
+              <Select
+                ariaLabel="Severity filter"
+                value={sevFilter}
+                onChange={(v) => setSevFilter(v as MaintenanceSeverity | 'ALL')}
+                options={[
+                  { value: 'ALL', label: 'All severities' },
+                  { value: 'CRITICAL', label: 'Critical' },
+                  { value: 'HIGH', label: 'High' },
+                  { value: 'MEDIUM', label: 'Medium' },
+                  { value: 'LOW', label: 'Low' },
+                ]}
+              />
+            </div>
 
-          {filtered.length === 0 ? (
-            <EmptyState icon={<Wrench size={28} />} title="No tickets" description="No maintenance tickets match the filters." />
-          ) : viewMode === 'table' ? (
-            <div className="table-wrap">
+            {filtered.length === 0 ? (
+              <EmptyState icon={<Wrench size={28} />} title="No tickets" description="No maintenance tickets match the filters." />
+            ) : viewMode === 'table' ? (
+              <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
@@ -170,17 +183,25 @@ export default function MaintenancePage() {
                     return (
                       <tr key={t.id}>
                         <td>
-                          <div style={{ fontWeight: 540 }} className="mono">{t.ticketCode}</div>
+                          <div><strong className="mono table-code">{t.ticketCode}</strong></div>
                           <div className="text-muted" style={{ fontSize: '0.8rem' }}>{t.title}</div>
                         </td>
-                        <td className="mono">{v?.registrationNumber ?? '-'}</td>
+                        <td>
+                          {v?.registrationNumber ? (
+                            <span className="reg-plate-inline">{v.registrationNumber}</span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
                         <td><Badge tone={SEV_TONE[t.severity]}>{t.severity}</Badge></td>
                         <td><Badge tone={STATUS_TONE[t.status]}>{t.status.replace('_', ' ')}</Badge></td>
-                        <td>{t.dueDate ? fmtDate(t.dueDate) : '-'}</td>
-                        <td className="mono">{t.costInr ? fmtInr(t.costInr) : '-'}</td>
-                        <td>
+                        <td className="mono" style={{ fontSize: '0.84rem' }}>{t.dueDate ? fmtDate(t.dueDate) : '—'}</td>
+                        <td className="mono">{t.costInr ? fmtInr(t.costInr) : '—'}</td>
+                        <td style={{ textAlign: 'right' }}>
                           {can('maintenance.write') && t.status !== 'COMPLETED' && t.status !== 'CANCELLED' && (
-                            <Button size="sm" variant="secondary" onClick={() => setUpdate(t)}>Update</Button>
+                            <button type="button" className="table-action" onClick={() => setUpdate(t)}>
+                              Update
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -222,6 +243,7 @@ export default function MaintenancePage() {
               })}
             </div>
           )}
+          </div>
         </Panel>
 
         <Panel title="Predicted risk" subtitle="Top vehicles by maintenance risk" icon={<AlertTriangle size={16} />}>

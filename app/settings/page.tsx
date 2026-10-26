@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { Info, Moon, Palette, ShieldCheck, Sliders, Sun, User } from 'lucide-react';
+import { Info, Moon, Palette, ShieldCheck, Sliders, Sun, User, Sparkles, KeyRound, Database } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
@@ -65,26 +65,38 @@ export default function SettingsPage() {
   if (!snapshot || !me) return null;
 
   const tabs = [
-    { id: 'profile', label: 'Profile' },
-    { id: 'appearance', label: 'Appearance' },
-    ...(canSettings ? [{ id: 'policy', label: 'Fleet policy' }, { id: 'ai', label: 'AI' }] : []),
-    ...(canOperators ? [{ id: 'operators', label: 'Operators' }] : []),
-    { id: 'data', label: 'Data & cloud' },
-    { id: 'about', label: 'About' },
+    { id: 'profile', label: 'Profile', icon: <User size={16} /> },
+    { id: 'appearance', label: 'Appearance', icon: <Palette size={16} /> },
+    ...(canSettings ? [
+      { id: 'policy', label: 'Fleet policy', icon: <Sliders size={16} /> },
+      { id: 'ai', label: 'AI Engine', icon: <Sparkles size={16} /> }
+    ] : []),
+    ...(canOperators ? [{ id: 'operators', label: 'Operators', icon: <KeyRound size={16} /> }] : []),
+    { id: 'data', label: 'Data & cloud', icon: <Database size={16} /> },
+    { id: 'about', label: 'System Info', icon: <Info size={16} /> },
   ];
 
   return (
     <div className="page stack">
-      <PageTitle eyebrow="Account" title="Settings" description="Your profile, appearance, fleet policy and system controls." />
-      <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      <PageTitle title="Settings" description="Your profile, appearance, fleet policy and system controls." />
+      <Tabs
+        tabs={tabs}
+        active={tab}
+        onChange={(id) => setTab(id as TabId)}
+        layoutId="settingsActiveTab"
+        toolbar
+        toolbarEyebrow="Settings"
+      />
 
-      {tab === 'profile' && <ProfileTab me={me} />}
-      {tab === 'appearance' && <AppearanceTab />}
-      {tab === 'policy' && canSettings && <PolicyTab settings={snapshot.settings} toast={toast} onSaved={refresh} />}
-      {tab === 'ai' && canSettings && <AiSettingsSection />}
-      {tab === 'operators' && canOperators && <OperatorsPanel stations={snapshot.stations} toast={toast} />}
-      {tab === 'data' && <DataCloudPanel isAdmin={isAdmin} toast={toast} />}
-      {tab === 'about' && <AboutTab />}
+      <div id={`settings-panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {tab === 'profile' && <ProfileTab me={me} />}
+        {tab === 'appearance' && <AppearanceTab />}
+        {tab === 'policy' && canSettings && <PolicyTab settings={snapshot.settings} toast={toast} onSaved={refresh} />}
+        {tab === 'ai' && canSettings && <AiSettingsSection />}
+        {tab === 'operators' && canOperators && <OperatorsPanel stations={snapshot.stations} toast={toast} />}
+        {tab === 'data' && <DataCloudPanel isAdmin={isAdmin} toast={toast} />}
+        {tab === 'about' && <AboutTab />}
+      </div>
     </div>
   );
 }

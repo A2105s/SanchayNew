@@ -156,7 +156,7 @@ export function LiveMap() {
             source: 'vehicles',
             filter: ['has', 'point_count'],
             paint: {
-              'circle-color': '#2f6fed',
+              'circle-color': '#0a7f8c',
               'circle-opacity': 0.85,
               'circle-radius': ['step', ['get', 'point_count'], 16, 10, 22, 50, 30],
             },
@@ -185,7 +185,7 @@ export function LiveMap() {
           });
           // trail source
           map.addSource('trail', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } } });
-          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#2f6fed', 'line-width': 3, 'line-opacity': 0.7 } });
+          map.addLayer({ id: 'trail-line', type: 'line', source: 'trail', paint: { 'line-color': '#0a7f8c', 'line-width': 3, 'line-opacity': 0.7 } });
 
           // interactions (bound once; layer-scoped listeners survive style swaps)
           if (!interactionsBound) {
@@ -414,7 +414,17 @@ export function LiveMap() {
         </div>
         {!panelCollapsed ? (
           <div className="veh-map-panel-body">
-            <SearchField value={search} onChange={setSearch} placeholder="Search registration…" ariaLabel="Search vehicles" />
+            <SearchField
+              value={search}
+              onChange={setSearch}
+              placeholder="Search registration, code or station…"
+              placeholders={[
+                'Search registration (e.g. "MP-07-")…',
+                'Search station (e.g. "Kotwali")…',
+                'Search driver or asset code…'
+              ]}
+              ariaLabel="Search vehicles"
+            />
             <div className="cluster" style={{ gap: '0.4rem' }}>
               <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} ariaLabel="Filter by status" />
               <Select value={sectorFilter} onChange={setSectorFilter} options={SECTOR_OPTIONS} ariaLabel="Filter by sector" />
@@ -494,18 +504,20 @@ export function LiveMap() {
       </div>
 
       {/* Legend */}
-      <div className="veh-map-legend">
+      <div className={`veh-map-legend${panelCollapsed ? ' veh-map-legend--shifted' : ''}`} aria-label="Map status legend">
         {(Object.keys(STATUS_COLORS) as VehicleStatus[]).map((s) => (
           <div key={s} className="veh-legend-row">
-            <span className="veh-legend-dot" style={{ background: STATUS_COLORS[s] }} />
-            {STATUS_LABEL[s]}
+            <span className="veh-legend-dot" style={{ background: STATUS_COLORS[s] }} aria-hidden="true" />
+            <span>{STATUS_LABEL[s]}</span>
           </div>
         ))}
         <div className="veh-legend-row">
-          <span className="veh-pulse-dot" style={{ width: 10, height: 10 }} /> Open incident
+          <span className="veh-pulse-dot" style={{ width: 8, height: 8 }} aria-hidden="true" />
+          <span>Incident</span>
         </div>
         <div className="veh-legend-row">
-          <span className="veh-legend-dot" style={{ background: 'transparent', border: '2px solid #64748b' }} /> Stale telemetry (hollow)
+          <span className="veh-legend-dot" style={{ background: 'transparent', border: '2px solid #64748b' }} aria-hidden="true" />
+          <span>Stale</span>
         </div>
       </div>
     </div>
@@ -556,3 +568,4 @@ function VehicleList({
     </div>
   );
 }
+

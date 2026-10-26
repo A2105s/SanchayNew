@@ -48,7 +48,7 @@ export function MiniMap({
         m.on('load', () => {
           const el = document.createElement('div');
           el.style.cssText =
-            'width:16px;height:16px;border-radius:50% 50% 50% 0;background:#2f6fed;border:2px solid #fff;transform:rotate(' +
+            'width:16px;height:16px;border-radius:50% 50% 50% 0;background:#0a7f8c;border:2px solid #fff;transform:rotate(' +
             (heading - 45) +
             'deg);box-shadow:0 1px 4px rgba(0,0,0,0.4)';
           new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(map as never);
@@ -61,7 +61,7 @@ export function MiniMap({
               id: 'trail-line',
               type: 'line',
               source: 'trail',
-              paint: { 'line-color': '#2f6fed', 'line-width': 3, 'line-opacity': 0.6 },
+              paint: { 'line-color': '#0a7f8c', 'line-width': 3, 'line-opacity': 0.6 },
             });
           }
         });
@@ -97,3 +97,4 @@ export function MiniMap({
   }
   return <div className="veh-minimap" ref={ref} aria-label="Vehicle position map" />;
 }
+

@@ -18,6 +18,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
+import { SearchField } from '@/components/ui/SearchField';
+import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import type { IncidentView, VehicleView } from '@/types';
 
 type IncidentStatus = IncidentView['status'];
@@ -31,6 +33,7 @@ export default function IncidentsPage() {
   const { snapshot, loading, error, refresh, can, vehicleById } = useFleet();
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<ViewMode>('table');
+  const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('ALL');
   const [sevFilter, setSevFilter] = useState<string>('ALL');
   const [reportOpen, setReportOpen] = useState(false);
@@ -38,14 +41,35 @@ export default function IncidentsPage() {
 
   const incidents = snapshot?.incidents ?? [];
 
+  const kpis = useMemo(() => {
+    let open = 0;
+    let ack = 0;
+    let resolved = 0;
+    let critical = 0;
+    for (const i of incidents) {
+      if (i.status === 'OPEN') open++;
+      else if (i.status === 'ACKNOWLEDGED') ack++;
+      else if (i.status === 'RESOLVED') resolved++;
+      if (i.severity === 'CRITICAL' || i.type === 'SOS') critical++;
+    }
+    return { open, ack, resolved, critical };
+  }, [incidents]);
+
   const filtered = useMemo(
     () =>
       incidents.filter((i) => {
         if (typeFilter !== 'ALL' && i.type !== typeFilter) return false;
         if (sevFilter !== 'ALL' && i.severity !== sevFilter) return false;
+        if (query.trim()) {
+          const q = query.toLowerCase();
+          const v = vehicleById(i.vehicleId);
+          const matchVeh = v?.registrationNumber?.toLowerCase().includes(q) || v?.makeModel?.toLowerCase().includes(q);
+          const matchText = i.incidentCode?.toLowerCase().includes(q) || i.message?.toLowerCase().includes(q) || i.reporterName?.toLowerCase().includes(q) || i.type?.toLowerCase().includes(q);
+          if (!matchVeh && !matchText) return false;
+        }
         return true;
       }),
-    [incidents, typeFilter, sevFilter]
+    [incidents, typeFilter, sevFilter, query, vehicleById]
   );
 
   const byStatus = useMemo(() => {
@@ -90,6 +114,13 @@ export default function IncidentsPage() {
         }
       />
 
+      <section className="an-kpis" aria-label="Incident summary metrics">
+        <KpiCard label="Open incidents" value={kpis.open.toLocaleString('en-IN')} tone={kpis.open > 0 ? 'danger' : 'success'} hint="Awaiting field or triage response" />
+        <KpiCard label="In triage" value={kpis.ack.toLocaleString('en-IN')} tone={kpis.ack > 0 ? 'warning' : 'neutral'} hint="Acknowledged and being addressed" />
+        <KpiCard label="Critical / SOS" value={kpis.critical.toLocaleString('en-IN')} tone={kpis.critical > 0 ? 'danger' : 'success'} hint="High severity or emergency signals" />
+        <KpiCard label="Resolved" value={kpis.resolved.toLocaleString('en-IN')} tone="success" hint="Closed incident reports" />
+      </section>
+
       {sosOpen > 0 && (
         <div className="ops-card ops-card--sos" role="alert">
           <div className="cluster" style={{ alignItems: 'center' }}>
@@ -100,6 +131,17 @@ export default function IncidentsPage() {
       )}
 
       <div className="toolbar">
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          placeholder="Search incidents by vehicle, title or details…"
+          placeholders={[
+            'Search by vehicle (e.g. "MP-07-")…',
+            'Search incident title or description…',
+            'Search location or notes…'
+          ]}
+          ariaLabel="Search incidents"
+        />
         <Select
           ariaLabel="Type filter"
           value={typeFilter}
@@ -150,12 +192,18 @@ export default function IncidentsPage() {
                   const canAct = can('incident.write');
                   return (
                     <tr key={i.id} className="veh-row">
-                      <td className="mono">
-                        <strong>{i.incidentCode}</strong>
+                      <td>
+                        <strong className="mono table-code">{i.incidentCode}</strong>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 540 }} className="mono">{v?.registrationNumber ?? '-'}</div>
-                        <div className="text-muted" style={{ fontSize: '0.78rem' }}>{v?.displayName}</div>
+                        <div>
+                          {v?.registrationNumber ? (
+                            <span className="reg-plate-inline">{v.registrationNumber}</span>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </div>
+                        <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: 3 }}>{v?.displayName}</div>
                       </td>
                       <td>
                         <span className="chip" style={{ fontSize: '0.78rem' }}>{i.type}</span>

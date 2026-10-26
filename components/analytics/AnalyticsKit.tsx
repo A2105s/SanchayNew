@@ -10,7 +10,7 @@ import { PanelHeader } from '@/components/shared/PanelHeader';
  * Styles live in app/analytics.css under the `an-` prefix.
  */
 
-export type KpiTone = 'brand' | 'success' | 'info' | 'warning' | 'danger';
+export type KpiTone = 'brand' | 'success' | 'info' | 'warning' | 'danger' | 'neutral';
 
 /* ──────────────────────────────────────────────────────────────
    Period-over-period delta
@@ -61,6 +61,7 @@ export function KpiCard({
   hint,
   detail,
   meta,
+  icon,
   href,
   delta,
   deltaCaption
@@ -74,6 +75,8 @@ export function KpiCard({
   detail?: string;
   /** Small status chip shown opposite the label. */
   meta?: string;
+  /** Optional leading or trailing icon */
+  icon?: ReactNode;
   /** Makes the whole card a link. */
   href?: string;
   delta?: DeltaInfo;
@@ -83,7 +86,10 @@ export function KpiCard({
     <>
       <header className="an-kpi__head">
         <span className="an-kpi__label">{label}</span>
-        {meta ? <span className="an-kpi__meta">{meta}</span> : null}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginLeft: 'auto' }}>
+          {meta ? <span className="an-kpi__meta">{meta}</span> : null}
+          {icon ? <span className="an-kpi__icon" style={{ opacity: 0.85, display: 'inline-flex' }}>{icon}</span> : null}
+        </div>
       </header>
       <strong className="an-kpi__value">{value}</strong>
       {hint ? <span className="an-kpi__hint">{hint}</span> : null}

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, LoaderCircle, EyeOff, RefreshCw } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, LoaderCircle, EyeOff, RefreshCw, FileText, Building2, ShieldCheck, Sliders, FileCheck, Wrench, Calendar, Radio, History } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
@@ -47,16 +48,16 @@ type TabId =
   | 'telemetry'
   | 'audit';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'ownership', label: 'Ownership & control' },
-  { id: 'eligibility', label: 'Eligibility & restrictions' },
-  { id: 'specs', label: 'Specifications' },
-  { id: 'compliance', label: 'Compliance & documents' },
-  { id: 'operations', label: 'Operations' },
-  { id: 'reservations', label: 'Reservations & allocations' },
-  { id: 'telemetry', label: 'Telemetry' },
-  { id: 'audit', label: 'Audit history' }
+const TABS: { id: TabId; label: string; icon: ReactNode }[] = [
+  { id: 'overview', label: 'Overview', icon: <FileText size={14} /> },
+  { id: 'ownership', label: 'Ownership & control', icon: <Building2 size={14} /> },
+  { id: 'eligibility', label: 'Eligibility & restrictions', icon: <ShieldCheck size={14} /> },
+  { id: 'specs', label: 'Specifications', icon: <Sliders size={14} /> },
+  { id: 'compliance', label: 'Compliance & documents', icon: <FileCheck size={14} /> },
+  { id: 'operations', label: 'Operations', icon: <Wrench size={14} /> },
+  { id: 'reservations', label: 'Reservations & allocations', icon: <Calendar size={14} /> },
+  { id: 'telemetry', label: 'Telemetry', icon: <Radio size={14} /> },
+  { id: 'audit', label: 'Audit history', icon: <History size={14} /> }
 ];
 
 export function VehicleDetail({ id }: { id: string }) {
@@ -172,7 +173,14 @@ export function VehicleDetail({ id }: { id: string }) {
         </div>
       ) : null}
 
-      <Tabs tabs={visibleTabs} active={tab} onChange={(t) => setTab(t as TabId)} />
+      <Tabs
+        tabs={visibleTabs}
+        active={tab}
+        onChange={(t) => setTab(t as TabId)}
+        layoutId="vehicleDetailActiveTab"
+        toolbar
+        toolbarEyebrow="Vehicle profile"
+      />
 
       {tab === 'overview' ? (
         <Panel title="Overview">

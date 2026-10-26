@@ -17,6 +17,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import type { VehicleView } from '@/types';
 
 type Severity = 'EXPIRED' | 'CRITICAL' | 'WARNING' | 'OK';
@@ -160,15 +161,26 @@ export default function CompliancePage() {
         }
       />
 
-      <div className="metric-grid">
-        <SummaryTile label="Expired" value={counts.EXPIRED} tone="danger" />
-        <SummaryTile label="Critical (<=7d)" value={counts.CRITICAL} tone="danger" />
-        <SummaryTile label="Warning (<=30d)" value={counts.WARNING} tone="warning" />
-        <SummaryTile label="OK" value={counts.OK} tone="success" />
-      </div>
+      <section className="an-kpis" aria-label="Compliance health metrics">
+        <KpiCard label="Expired" value={counts.EXPIRED.toLocaleString('en-IN')} tone="danger" hint="Immediate renewal required" />
+        <KpiCard label="Critical (<=7d)" value={counts.CRITICAL.toLocaleString('en-IN')} tone="danger" hint="Expiring within 7 days" />
+        <KpiCard label="Warning (<=30d)" value={counts.WARNING.toLocaleString('en-IN')} tone="warning" hint="Expiring within 30 days" />
+        <KpiCard label="Healthy" value={counts.OK.toLocaleString('en-IN')} tone="success" hint="All documents valid" />
+      </section>
 
       <div className="toolbar">
-        <SearchField value={query} onChange={setQuery} ariaLabel="Search vehicles" placeholder="Search registration or name" />
+        <SearchField
+          value={query}
+          onChange={setQuery}
+          ariaLabel="Search vehicles"
+          placeholder="Search registration or name"
+          placeholders={[
+            'Search registration (e.g. "MP-07-")…',
+            'Search vehicle make or model…',
+            'Search by document reference…',
+            'Search expiring PUC, insurance, fitness…'
+          ]}
+        />
         <Select
           ariaLabel="Severity filter"
           value={sevFilter}
@@ -216,10 +228,10 @@ export default function CompliancePage() {
                     {grouped[doc].map((r) => (
                       <tr key={`${r.vehicle.id}-${r.document}`}>
                         <td>
-                          <div style={{ fontWeight: 540 }}>{r.vehicle.registrationNumber}</div>
-                          <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.vehicle.displayName}</div>
+                          <div><span className="reg-plate-inline">{r.vehicle.registrationNumber}</span></div>
+                          <div className="text-muted" style={{ fontSize: '0.8rem', marginTop: 3 }}>{r.vehicle.displayName}</div>
                         </td>
-                        <td>{r.expiry ? fmtDate(r.expiry) : <span className="text-muted">Not set</span>}</td>
+                        <td className="mono" style={{ fontSize: '0.84rem' }}>{r.expiry ? fmtDate(r.expiry) : <span className="text-muted">—</span>}</td>
                         <td className="mono">{r.days == null ? '-' : r.days < 0 ? `${Math.abs(r.days)}d ago` : `${r.days}d`}</td>
                         <td>
                           <Badge tone={SEV_TONE[r.severity]}>{r.severity}</Badge>
@@ -287,15 +299,6 @@ export default function CompliancePage() {
   );
 }
 
-function SummaryTile({ label, value, tone }: { label: string; value: number; tone: 'danger' | 'warning' | 'success' }) {
-  return (
-    <div className="metric-tile">
-      <span className="text-muted">{label}</span>
-      <strong style={{ fontSize: '1.6rem' }}>{value}</strong>
-      <Badge tone={tone}>{tone === 'success' ? 'healthy' : tone === 'warning' ? 'attention' : 'urgent'}</Badge>
-    </div>
-  );
-}
 
 function sevFromDays(expiry: string | null, warn: number, critical: number): Severity {
   if (!expiry) return 'OK';

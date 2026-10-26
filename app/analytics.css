@@ -191,10 +191,12 @@
   transform: translateY(-1px);
 }
 
+.an-kpi--brand { --an-tone: var(--color-brand); }
 .an-kpi--success { --an-tone: var(--color-success); }
 .an-kpi--info { --an-tone: var(--color-info); }
 .an-kpi--warning { --an-tone: var(--color-warning); }
 .an-kpi--danger { --an-tone: var(--color-danger); }
+.an-kpi--neutral { --an-tone: var(--color-text-muted); }
 
 .an-kpi__head {
   display: flex;

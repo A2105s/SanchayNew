@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Download, Info, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Download, Info, RefreshCw, CarFront, Wrench, ShieldAlert, FileCheck, KeyRound, Timer, ClipboardCheck, Radio } from 'lucide-react';
 import { api } from '@/lib/client/api';
 import { useFleet } from '@/lib/client/useFleet';
-import { formatCell } from '@/components/ops/shared';
+import { formatCell, renderReportCell } from '@/components/ops/shared';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Tabs } from '@/components/ui/Tabs';
 import { Button } from '@/components/ui/Button';
@@ -12,15 +12,15 @@ import { AnalyticsSkeleton, ChartCard, EmptyState, KpiCard, SectionHeading } fro
 import type { ReportKind, ReportResult } from '@/types';
 
 /** Spec file 18 operational views. Each is backed by a report with a stated definition, window and scope. */
-const VIEWS: { kind: ReportKind; label: string; help: string }[] = [
-  { kind: 'fleet-composition', label: 'Fleet composition', help: 'How the fleet in your scope splits by class, ownership and eligibility.' },
-  { kind: 'maintenance', label: 'In maintenance', help: 'Vehicles with open maintenance or a maintenance window.' },
-  { kind: 'restricted-unverified', label: 'Restricted and unverified', help: 'Vehicles that cannot be allocated, with the reason.' },
-  { kind: 'compliance-due', label: 'Compliance due', help: 'Documents expired or expiring within the warning window.' },
-  { kind: 'active-allocations', label: 'Active allocations', help: 'Vehicles currently handed over and in use.' },
-  { kind: 'overdue-returns', label: 'Overdue returns', help: 'Active allocations past their end time plus the grace period.' },
-  { kind: 'pending-approvals', label: 'Pending approvals', help: 'Requests waiting for a decision.' },
-  { kind: 'stale-telemetry', label: 'Stale telemetry', help: 'Vehicles whose last location is older than the freshness window. Stale does not mean inactive.' }
+const VIEWS: { kind: ReportKind; label: string; icon: ReactNode; help: string }[] = [
+  { kind: 'fleet-composition', label: 'Fleet composition', icon: <CarFront size={14} />, help: 'How the fleet in your scope splits by class, ownership and eligibility.' },
+  { kind: 'maintenance', label: 'In maintenance', icon: <Wrench size={14} />, help: 'Vehicles with open maintenance or a maintenance window.' },
+  { kind: 'restricted-unverified', label: 'Restricted and unverified', icon: <ShieldAlert size={14} />, help: 'Vehicles that cannot be allocated, with the reason.' },
+  { kind: 'compliance-due', label: 'Compliance due', icon: <FileCheck size={14} />, help: 'Documents expired or expiring within the warning window.' },
+  { kind: 'active-allocations', label: 'Active allocations', icon: <KeyRound size={14} />, help: 'Vehicles currently handed over and in use.' },
+  { kind: 'overdue-returns', label: 'Overdue returns', icon: <Timer size={14} />, help: 'Active allocations past their end time plus the grace period.' },
+  { kind: 'pending-approvals', label: 'Pending approvals', icon: <ClipboardCheck size={14} />, help: 'Requests waiting for a decision.' },
+  { kind: 'stale-telemetry', label: 'Stale telemetry', icon: <Radio size={14} />, help: 'Vehicles whose last location is older than the freshness window. Stale does not mean inactive.' }
 ];
 
 export default function OperationsPage() {
@@ -68,7 +68,14 @@ export default function OperationsPage() {
           </div>
         }
       />
-      <Tabs tabs={VIEWS.map((v) => ({ id: v.kind, label: v.label }))} active={kind} onChange={(id) => setKind(id as ReportKind)} />
+      <Tabs
+        tabs={VIEWS.map((v) => ({ id: v.kind, label: v.label, icon: v.icon }))}
+        active={kind}
+        onChange={(id) => setKind(id as ReportKind)}
+        layoutId="operationsActiveTab"
+        toolbar
+        toolbarEyebrow="Operational view"
+      />
       <p className="text-muted" style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>{current?.help}</p>
 
       <div className="an-dashboard">
@@ -111,7 +118,7 @@ export default function OperationsPage() {
                         <tr key={i}>
                           {report.columns.map((c) => (
                             <td key={c.key} className={typeof r[c.key] === 'number' ? 'mono' : undefined}>
-                              {formatCell(r[c.key])}
+                              {renderReportCell(r[c.key], c.key)}
                             </td>
                           ))}
                         </tr>

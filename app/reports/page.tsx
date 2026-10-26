@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, Info, Printer, RefreshCw } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
-import { formatCell } from '@/components/ops/shared';
+import { formatCell, renderReportCell } from '@/components/ops/shared';
 import { api } from '@/lib/client/api';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Button } from '@/components/ui/Button';
@@ -40,7 +40,7 @@ const REPORTS: { kind: ReportKind; label: string; group: string }[] = [
   { kind: 'audit-events', label: 'Audit events', group: 'Governance' }
 ];
 
-const PALETTE = ['#2563eb', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0d9488', '#64748b', '#0ea5e9'];
+const PALETTE = ['#0a7f8c', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0284c7', '#64748b', '#0d9488'];
 
 export default function ReportsPage() {
   const { snapshot, can } = useFleet();
@@ -231,7 +231,7 @@ export default function ReportsPage() {
                         <tr key={i}>
                           {report.columns.map((c) => (
                             <td key={c.key} className={typeof r[c.key] === 'number' ? 'mono' : undefined}>
-                              {formatCell(r[c.key])}
+                              {renderReportCell(r[c.key], c.key)}
                             </td>
                           ))}
                         </tr>

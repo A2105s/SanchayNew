@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Plus, AlertCircle, User, Layers } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { useToast } from '@/lib/client/useToast';
 import { fmtDateTime } from '@/lib/fleet/format';
@@ -92,12 +92,15 @@ export default function TransfersPage() {
 
       <Tabs
         tabs={[
-          { id: 'ACTION', label: 'Needs my action', count: needsAction.length },
-          { id: 'MINE', label: 'My requests', count: mine.length },
-          { id: 'ALL', label: 'All', count: transfers.length },
+          { id: 'ACTION', label: 'Needs my action', count: needsAction.length, icon: <AlertCircle size={15} /> },
+          { id: 'MINE', label: 'My requests', count: mine.length, icon: <User size={15} /> },
+          { id: 'ALL', label: 'All transfers', count: transfers.length, icon: <Layers size={15} /> },
         ]}
         active={tab}
         onChange={(id) => setTab(id as TabId)}
+        layoutId="transfersActiveTab"
+        toolbar
+        toolbarEyebrow="Transfer queue"
       />
 
       <div className="toolbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -135,13 +138,15 @@ export default function TransfersPage() {
                   <th>Vehicles</th>
                   <th>Window</th>
                   <th>Status</th>
-                  <th aria-label="Open" />
+                  <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((t) => (
                   <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => setDetail(t)}>
-                    <td className="mono">{t.transferCode}</td>
+                    <td>
+                      <strong className="mono table-code">{t.transferCode}</strong>
+                    </td>
                     <td>
                       <span className="cluster" style={{ gap: 4, fontSize: '0.85rem' }}>
                         {stationName(t.sourceStationId)} <ArrowRight size={12} /> {stationName(t.destinationStationId)}
@@ -156,7 +161,9 @@ export default function TransfersPage() {
                     </td>
                     <td style={{ fontSize: '0.82rem' }}>{fmtDateTime(t.startAt)}</td>
                     <td><Badge tone={transferStatusTone(t.status)}>{t.status}</Badge></td>
-                    <td><ArrowRight size={14} /></td>
+                    <td style={{ textAlign: 'right' }}>
+                      <span className="table-action">View <ArrowRight size={13} /></span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

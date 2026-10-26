@@ -1,0 +1,171 @@
+/* ============================================================
+   REGISTER PAGES (Customers, Machines)
+   Layout: collapsible horizontal form card on top, full-width
+   table below — same structure as the other list pages.
+   ============================================================ */
+
+.register-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* ── Collapsible form card ───────────────────────────────── */
+
+.form-card {
+  padding: 0;
+  scroll-margin-top: calc(var(--top-nav-height) + var(--space-4));
+}
+
+.form-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.form-card__header:hover {
+  background: var(--color-bg-secondary);
+}
+
+.form-card.is-open .form-card__header {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.form-card__title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.form-card__title strong {
+  color: var(--color-text-primary);
+  font-size: 0.96rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.form-card__title small {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.form-card__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.form-card__toggle svg {
+  transition: transform var(--transition-normal);
+}
+
+.form-card.is-open .form-card__toggle svg {
+  transform: rotate(180deg);
+}
+
+.form-card__notice {
+  padding: var(--space-3) var(--space-5) 0;
+}
+
+.form-card__notice .toast-inline {
+  margin: 0;
+}
+
+.form-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+/* Horizontal field grid — fields flow across the card */
+.form-card .form-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+}
+
+.form-card .form-grid--cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.form-card .field--full {
+  grid-column: span 2;
+}
+
+.form-card .form-card__wide {
+  grid-column: 1 / -1;
+}
+
+.form-card .panel-actions {
+  position: static;
+  justify-content: flex-end;
+  margin-top: 0;
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+}
+
+@media (max-width: 1100px) {
+  .form-card .form-grid,
+  .form-card .form-grid--cols-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .form-card__header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .form-card__toggle span {
+    display: none;
+  }
+
+  .form-card__notice {
+    padding: var(--space-3) var(--space-4) 0;
+  }
+
+  .form-card__body {
+    padding: var(--space-4);
+  }
+
+  .form-card .form-grid,
+  .form-card .form-grid--cols-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .form-card .field--full {
+    grid-column: auto;
+  }
+
+  .form-card .panel-actions {
+    flex-direction: row;
+  }
+
+  .form-card .panel-actions .button {
+    flex: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .form-card__toggle svg {
+    transition: none;
+  }
+}

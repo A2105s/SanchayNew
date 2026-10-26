@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Plus, AlertTriangle, LoaderCircle, ClipboardList } from 'lucide-react';
+import { Plus, AlertTriangle, LoaderCircle, ClipboardList, User, CheckCircle2, Layers } from 'lucide-react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
@@ -84,9 +84,9 @@ export function RequestList() {
   const canReview = can('request.review');
 
   const tabs = [
-    { id: 'mine', label: 'Mine' },
-    ...(canReview ? [{ id: 'needs', label: 'Needs my decision' }] : []),
-    { id: 'all', label: 'All in scope' }
+    { id: 'mine', label: 'Mine', icon: <User size={14} /> },
+    ...(canReview ? [{ id: 'needs', label: 'Needs my decision', icon: <CheckCircle2 size={14} /> }] : []),
+    { id: 'all', label: 'All in scope', icon: <Layers size={14} /> }
   ];
 
   return (
@@ -103,14 +103,30 @@ export function RequestList() {
         }
       />
 
-      <Tabs tabs={tabs} active={tab} onChange={(id) => setTab(id as TabId)} />
+      <Tabs
+        tabs={tabs}
+        active={tab}
+        onChange={(id) => setTab(id as TabId)}
+        layoutId="requestsListTab"
+        toolbar
+        toolbarEyebrow="Request queue"
+      />
 
       <Panel>
         <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="veh-toolbar-row" style={{ flex: '1 1 auto' }}>
-            <div className="veh-search">
-              <SearchField value={q} onChange={setQ} placeholder="Search by code, purpose, vehicle" ariaLabel="Search requests" />
-            </div>
+              <SearchField
+                value={q}
+                onChange={setQ}
+                placeholder="Search by code, purpose, vehicle"
+                placeholders={[
+                  'Search by request code (e.g. "REQ-2026-")…',
+                  'Search by purpose or project…',
+                  'Search by requester or station…',
+                  'Search by vehicle registration…'
+                ]}
+                ariaLabel="Search requests"
+              />
             <Select
               value={stateFilter}
               onChange={setStateFilter}

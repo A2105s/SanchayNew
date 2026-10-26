@@ -7,7 +7,7 @@ export default function Loading() {
         <Skeleton height={32} width={240} />
         <Skeleton height={36} width={140} />
       </div>
-      <div className="metric-grid">
+      <div className="an-kpis">
         <Skeleton height={96} />
         <Skeleton height={96} />
         <Skeleton height={96} />

@@ -102,7 +102,7 @@ export default function IdleReusePage() {
                     <tr key={r.vehicle.id}>
                       <td>
                         <Link href={`/vehicles/${r.vehicle.id}`}>
-                          <strong className="mono">{r.vehicle.registrationNumber}</strong>
+                          <span className="reg-plate-inline">{r.vehicle.registrationNumber}</span>
                         </Link>
                         <div className="text-muted" style={{ fontSize: '0.8rem' }}>{r.vehicle.displayName}</div>
                       </td>
@@ -144,7 +144,7 @@ export default function IdleReusePage() {
                     <tr key={v.id}>
                       <td>
                         <Link href={`/vehicles/${v.id}`}>
-                          <strong className="mono">{v.registrationNumber}</strong>
+                          <span className="reg-plate-inline">{v.registrationNumber}</span>
                         </Link>
                         <div className="text-muted" style={{ fontSize: '0.8rem' }}>Last seen {fmtRelative(v.lastSeenAt)}</div>
                       </td>

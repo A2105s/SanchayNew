@@ -377,7 +377,7 @@ export function RegisterWizard({
                 className={`veh-gps-option ${form.gpsSource === o.value ? 'veh-gps-option--active' : ''}`}
                 onClick={() => set('gpsSource', o.value)}
               >
-                <span style={{ color: 'var(--brand, #2f6fed)' }}>{o.icon}</span>
+                <span style={{ color: 'var(--brand, #0a7f8c)' }}>{o.icon}</span>
                 <span>
                   <h4>{o.title}</h4>
                   <p>{o.desc}</p>
@@ -437,3 +437,4 @@ export function RegisterWizard({
     </Modal>
   );
 }
+

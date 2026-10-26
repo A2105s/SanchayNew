@@ -2,10 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Building, MapPin, ArrowRight, Phone } from 'lucide-react';
+import { Building, MapPin, ArrowRight, Phone, User, CarFront } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { VEHICLE_CLASSES, CLASS_LABEL_LOCAL, vehicleStatusTone } from '@/components/ops/shared';
-import { KvRow } from '@/components/ops/primitives';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
@@ -18,6 +17,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusDot } from '@/components/ui/StatusDot';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
+import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import type { StationView, VehicleView } from '@/types';
 
 export default function StationsPage() {
@@ -44,6 +44,23 @@ export default function StationsPage() {
     }
     return m;
   }, [vehicles]);
+
+  const kpis = useMemo(() => {
+    let stationedCount = 0;
+    let movingCount = 0;
+    for (const v of vehicles) {
+      if (v.stationId) {
+        stationedCount++;
+        if (v.status === 'MOVING') movingCount++;
+      }
+    }
+    return {
+      totalStations: stations.length,
+      stationedCount,
+      movingCount,
+      zonesCount: zones.length
+    };
+  }, [stations, vehicles, zones]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -77,10 +94,27 @@ export default function StationsPage() {
     <div className="page stack">
       <PageTitle eyebrow="Fleet" title="Stations" description="Police station fleet pools, inventory and live counts." />
 
-      <div className="toolbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="cluster" style={{ flex: '1 1 auto', alignItems: 'center' }}>
-          <div style={{ flex: '1 1 260px', maxWidth: '380px' }}>
-            <SearchField value={query} onChange={setQuery} ariaLabel="Search stations" placeholder="Search name, code, district" />
+      <section className="an-kpis" aria-label="Police station overview">
+        <KpiCard label="Police stations" value={kpis.totalStations.toLocaleString('en-IN')} tone="brand" hint="Jurisdictional station units" />
+        <KpiCard label="Stationed fleet" value={kpis.stationedCount.toLocaleString('en-IN')} tone="brand" hint="Vehicles assigned to station pools" />
+        <KpiCard label="Active on patrol" value={kpis.movingCount.toLocaleString('en-IN')} tone="success" hint="Currently moving in jurisdiction" />
+        <KpiCard label="Zones covered" value={kpis.zonesCount.toLocaleString('en-IN')} tone="neutral" hint="Administrative police zones" />
+      </section>
+
+      <div className="an-toolbar" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="veh-toolbar-row" style={{ flex: '1 1 auto', alignItems: 'center' }}>
+          <div className="veh-search" style={{ flex: '1 1 280px', maxWidth: '420px', margin: 0 }}>
+            <SearchField
+              value={query}
+              onChange={setQuery}
+              ariaLabel="Search stations"
+              placeholder="Search name, code, district"
+              placeholders={[
+                'Search station name (e.g. "Kotwali")…',
+                'Search station code (e.g. "STN-GWL-01")…',
+                'Search district or jurisdiction…'
+              ]}
+            />
           </div>
           <Select
             ariaLabel="Zone filter"
@@ -96,84 +130,95 @@ export default function StationsPage() {
       {filtered.length === 0 ? (
         <EmptyState icon={<Building size={28} />} title="No stations" description="No stations match your filters." />
       ) : viewMode === 'table' ? (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Station</th>
-                <th>Zone</th>
-                <th>In-Charge & Contact</th>
-                <th>Fleet Pool</th>
-                <th>Live Status</th>
-                <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((s) => {
-                const live = liveCounts.get(s.id) ?? { total: 0, moving: 0 };
-                return (
-                  <tr
-                    key={s.id}
-                    className="veh-row"
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setDetail(s)}
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') setDetail(s);
-                    }}
-                  >
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{s.name}</div>
-                      <div className="text-muted mono" style={{ fontSize: '0.78rem' }}>{s.code}</div>
-                    </td>
-                    <td>
-                      <Badge tone="neutral">{s.zone}</Badge>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{s.inchargeName ?? 'Station In-Charge'}</div>
-                      {s.phone ? (
-                        <a
-                          href={`tel:${s.phone}`}
-                          className="text-muted mono cluster"
-                          style={{ fontSize: '0.78rem', gap: 4, textDecoration: 'none' }}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Phone size={11} /> {s.phone}
-                        </a>
-                      ) : (
-                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>-</span>
-                      )}
-                    </td>
-                    <td>
-                      <div className="cluster" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
-                        {VEHICLE_CLASSES.map((c) => {
-                          const count = s.inventory?.[c] ?? 0;
-                          if (count === 0) return null;
-                          return (
-                            <span key={c} className="chip" style={{ fontSize: '0.75rem' }}>
-                              {CLASS_LABEL_LOCAL[c].slice(0, 3)}: <strong className="mono">{count}</strong>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="cluster" style={{ gap: '0.75rem' }}>
-                        <StatusDot tone={live.moving > 0 ? 'success' : 'neutral'} label={`${live.total} vehicles`} />
-                        <span className="text-muted mono" style={{ fontSize: '0.8rem' }}>{live.moving} moving</span>
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                      <Button size="sm" variant="secondary" onClick={() => setDetail(s)}>
-                        View details
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Panel title={`Station registry (${filtered.length})`} subtitle="Jurisdiction and available vehicle inventory">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Station</th>
+                  <th>Zone</th>
+                  <th>District</th>
+                  <th>In-Charge & Contact</th>
+                  <th>Fleet Pool</th>
+                  <th>Live Status</th>
+                  <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((s) => {
+                  const live = liveCounts.get(s.id) ?? { total: 0, moving: 0 };
+                  return (
+                    <tr
+                      key={s.id}
+                      className="veh-row"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setDetail(s)}
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setDetail(s);
+                        }
+                      }}
+                    >
+                      <td>
+                        <div style={{ fontWeight: 600 }}>{s.name}</div>
+                        <div className="text-muted mono" style={{ fontSize: '0.78rem' }}>{s.code}</div>
+                      </td>
+                      <td>
+                        <Badge tone="neutral">{s.zone}</Badge>
+                      </td>
+                      <td>
+                        <span className="cluster" style={{ gap: 4, fontSize: '0.85rem' }}>
+                          <MapPin size={13} className="text-muted" /> {s.district}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{s.inchargeName ?? 'Station In-Charge'}</div>
+                        {s.phone ? (
+                          <a
+                            href={`tel:${s.phone}`}
+                            className="text-muted mono cluster"
+                            style={{ fontSize: '0.78rem', gap: 4, textDecoration: 'none' }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Phone size={11} /> {s.phone}
+                          </a>
+                        ) : (
+                          <span className="text-muted" style={{ fontSize: '0.78rem' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        <div className="cluster" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
+                          {VEHICLE_CLASSES.map((c) => {
+                            const count = s.inventory?.[c] ?? 0;
+                            if (count === 0) return null;
+                            return (
+                              <span key={c} className="chip" style={{ fontSize: '0.75rem' }}>
+                                {CLASS_LABEL_LOCAL[c].slice(0, 3)}: <strong className="mono">{count}</strong>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cluster" style={{ gap: '0.75rem' }}>
+                          <StatusDot tone={live.moving > 0 ? 'success' : 'neutral'} label={`${live.total} vehicles`} />
+                          <span className="text-muted mono" style={{ fontSize: '0.8rem' }}>{live.moving} moving</span>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                        <button type="button" className="table-action" onClick={() => setDetail(s)}>
+                          View <ArrowRight size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
       ) : (
         <div className="ops-grid-cards">
           {filtered.map((s) => {
@@ -245,43 +290,100 @@ function StationDrawer({
   onClose: () => void;
 }) {
   return (
-    <Drawer title={station.name} onClose={onClose} width={440}>
-      <div className="stack">
-        <Panel title="Details">
-          <div className="stack" style={{ gap: 4 }}>
-            <KvRow k="Code" v={<span className="mono">{station.code}</span>} />
-            <KvRow k="Zone" v={station.zone} />
-            <KvRow k="District" v={station.district} />
-            <KvRow k="In-charge" v={<strong>{station.inchargeName ?? '-'}</strong>} />
-            <KvRow k="CUG Contact" v={station.phone ? <a href={`tel:${station.phone}`} className="cluster" style={{ gap: 4 }}><Phone size={13} /> {station.phone}</a> : '-'} />
-            <KvRow k="Coordinates" v={<span className="mono">{station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E</span>} />
+    <Drawer title={station.name} onClose={onClose} width={460}>
+      <div className="stack" style={{ gap: 'var(--space-4)' }}>
+        {/* Station identity badge strip */}
+        <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+          <div className="cluster" style={{ gap: 6 }}>
+            <span className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>{station.code}</span>
+            <Badge tone="neutral">{station.zone} Zone</Badge>
+          </div>
+          <span className="text-muted" style={{ fontSize: '0.8rem' }}>{station.district}</span>
+        </div>
+
+        <Panel title="Station in-charge & contact" icon={<User size={16} />}>
+          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+            <div className="cluster" style={{ justifyContent: 'space-between' }}>
+              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Officer In-charge</span>
+              <strong>{station.inchargeName ?? 'Unassigned'}</strong>
+            </div>
+            <div className="cluster" style={{ justifyContent: 'space-between' }}>
+              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Official Phone</span>
+              {station.phone ? (
+                <a href={`tel:${station.phone}`} className="cluster mono" style={{ gap: 6, color: 'var(--color-brand)', textDecoration: 'none', fontWeight: 600 }}>
+                  <Phone size={13} /> {station.phone}
+                </a>
+              ) : (
+                <span className="text-muted">—</span>
+              )}
+            </div>
+            <div className="cluster" style={{ justifyContent: 'space-between' }}>
+              <span className="text-muted" style={{ fontSize: '0.85rem' }}>Coordinates</span>
+              <span className="mono" style={{ fontSize: '0.8rem' }}>{station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E</span>
+            </div>
           </div>
         </Panel>
 
-        <Panel title="Inventory (available pool)">
-          <div className="ops-inv">
-            {VEHICLE_CLASSES.map((c) => (
-              <div className="ops-inv-cell" key={c}>
-                <span>{CLASS_LABEL_LOCAL[c]}</span>
-                <b>{station.inventory?.[c] ?? 0}</b>
-              </div>
-            ))}
+        <Panel title="Available fleet pool" subtitle="Allocatable vehicles by class" icon={<CarFront size={16} />}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+            {VEHICLE_CLASSES.map((c) => {
+              const count = station.inventory?.[c] ?? 0;
+              return (
+                <div
+                  key={c}
+                  style={{
+                    padding: '0.6rem 0.8rem',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-border)',
+                    background: count > 0 ? 'var(--color-brand-subtle)' : 'var(--color-bg-secondary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <span style={{ fontSize: '0.82rem', color: count > 0 ? 'var(--color-text-primary)' : 'var(--color-text-muted)', fontWeight: 500 }}>
+                    {CLASS_LABEL_LOCAL[c]}
+                  </span>
+                  <span className="mono" style={{ fontSize: '1.15rem', fontWeight: 800, color: count > 0 ? 'var(--color-brand)' : 'var(--color-text-muted)' }}>
+                    {count}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </Panel>
 
-        <Panel title={`Vehicles (${vehicles.length})`} action={<ButtonLink href={`/vehicles?station=${station.id}`} variant="ghost" size="sm">View all</ButtonLink>}>
+        <Panel
+          title={`Vehicles on roster (${vehicles.length})`}
+          subtitle="Assigned fleet in this station's pool"
+          action={
+            vehicles.length > 0 ? (
+              <ButtonLink href={`/vehicles?station=${station.id}`} variant="ghost" size="sm">
+                View all
+              </ButtonLink>
+            ) : undefined
+          }
+        >
           {vehicles.length === 0 ? (
-            <EmptyState title="No vehicles assigned" />
+            <EmptyState title="No vehicles assigned" description="Assign vehicles via fleet edit or transfer approval." />
           ) : (
             <div className="stack" style={{ gap: 6 }}>
               {vehicles.slice(0, 8).map((v) => (
-                <Link key={v.id} href={`/vehicles/${v.id}`} className="ops-attn-row">
+                <Link
+                  key={v.id}
+                  href={`/vehicles/${v.id}`}
+                  className="ops-attn-row"
+                  style={{ textDecoration: 'none' }}
+                >
                   <StatusDot tone={vehicleStatusTone(v.status)} />
                   <div className="ops-attn-body">
-                    <span className="ops-attn-title">{v.registrationNumber}</span>
+                    <span className="ops-attn-title mono">{v.registrationNumber}</span>
                     <span className="ops-attn-detail">{v.displayName}</span>
                   </div>
-                  <ArrowRight size={14} />
+                  <Badge tone={v.status === 'MOVING' ? 'success' : 'neutral'}>
+                    {v.status === 'MOVING' ? 'On patrol' : v.status.toLowerCase()}
+                  </Badge>
+                  <ArrowRight size={14} style={{ color: 'var(--color-text-muted)' }} />
                 </Link>
               ))}
             </div>
@@ -290,28 +392,38 @@ function StationDrawer({
 
         <div className="grid-2">
           <Panel title="Incoming transfers">
-            {incoming.length === 0 ? <span className="text-muted" style={{ fontSize: '0.82rem' }}>None</span> : (
-              <div className="stack" style={{ gap: 4 }}>
+            {incoming.length === 0 ? (
+              <span className="text-muted" style={{ fontSize: '0.82rem' }}>No active inbound</span>
+            ) : (
+              <div className="stack" style={{ gap: 6 }}>
                 {incoming.map((t) => (
-                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem' }}>{t.transferCode}</Link>
+                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)' }}>
+                    {t.transferCode}
+                  </Link>
                 ))}
               </div>
             )}
           </Panel>
           <Panel title="Outgoing transfers">
-            {outgoing.length === 0 ? <span className="text-muted" style={{ fontSize: '0.82rem' }}>None</span> : (
-              <div className="stack" style={{ gap: 4 }}>
+            {outgoing.length === 0 ? (
+              <span className="text-muted" style={{ fontSize: '0.82rem' }}>No active outbound</span>
+            ) : (
+              <div className="stack" style={{ gap: 6 }}>
                 {outgoing.map((t) => (
-                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem' }}>{t.transferCode}</Link>
+                  <Link key={t.id} href="/transfers" className="mono" style={{ fontSize: '0.82rem', color: 'var(--color-brand)' }}>
+                    {t.transferCode}
+                  </Link>
                 ))}
               </div>
             )}
           </Panel>
         </div>
 
-        <ButtonLink href={`/transfers?source=${station.id}`} variant="primary" icon={<ArrowRight size={15} />}>
-          Request vehicles from this station
-        </ButtonLink>
+        <div style={{ paddingTop: 'var(--space-2)' }}>
+          <ButtonLink href={`/transfers?source=${station.id}`} variant="primary" icon={<ArrowRight size={15} />} style={{ width: '100%', justifyContent: 'center' }}>
+            Request vehicles from this station
+          </ButtonLink>
+        </div>
       </div>
     </Drawer>
   );

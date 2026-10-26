@@ -287,14 +287,14 @@ export function VehicleRegistry() {
       />
 
       {metrics ? (
-        <div className="metric-grid">
-          <MetricTile label="Total" value={metrics.total} icon={<CarFront size={18} />} />
-          <MetricTile label="Active" value={metrics.active} tone="success" />
-          <MetricTile label="In maintenance" value={metrics.maintenance} tone="warning" />
-          <MetricTile label="Restricted / ineligible" value={metrics.restricted} tone="danger" />
-          <MetricTile label="Pending verification" value={metrics.pending} tone="brand" />
-          <MetricTile label="Stale telemetry" value={metrics.stale} tone="neutral" />
-        </div>
+        <section className="an-kpis" aria-label="Fleet registry metrics">
+          <MetricTile label="Total" value={metrics.total.toLocaleString('en-IN')} tone="brand" icon={<CarFront size={17} />} hint="In your organization scope" />
+          <MetricTile label="Active" value={metrics.active.toLocaleString('en-IN')} tone="success" hint="Operational and available" />
+          <MetricTile label="In maintenance" value={metrics.maintenance.toLocaleString('en-IN')} tone="warning" hint="Under service or repair" />
+          <MetricTile label="Restricted / ineligible" value={metrics.restricted.toLocaleString('en-IN')} tone="danger" hint="Not allocatable" />
+          <MetricTile label="Pending verification" value={metrics.pending.toLocaleString('en-IN')} tone="warning" hint="Awaiting ownership check" />
+          <MetricTile label="Stale telemetry" value={metrics.stale.toLocaleString('en-IN')} tone="info" hint="Signal stale" />
+        </section>
       ) : null}
 
       <Panel>
@@ -450,8 +450,12 @@ export function VehicleRegistry() {
                         ) : null}
                       </td>
                     ) : null}
-                    <td className="mono">{v.assetCode}</td>
-                    <td className="mono">{registrationLabel(v)}</td>
+                    <td>
+                      <strong className="mono table-code">{v.assetCode}</strong>
+                    </td>
+                    <td>
+                      <span className="reg-plate-inline">{registrationLabel(v)}</span>
+                    </td>
                     <td>
                       <div>{CLASS_LABEL[v.vehicleClass]}</div>
                       <div className="text-muted" style={{ fontSize: '0.75rem' }}>{v.vehicleType}</div>

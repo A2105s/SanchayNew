@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Search, AlertTriangle, LoaderCircle, Info, CalendarClock } from 'lucide-react';
+import { Search, AlertTriangle, LoaderCircle, Info, CalendarClock, ShieldCheck } from 'lucide-react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
@@ -102,24 +102,33 @@ export function VehicleDiscover() {
   return (
     <div className="page stack">
       <PageTitle
+        eyebrow="Fleet discovery"
         title="Discover vehicles"
         description="Cross-organization discovery of eligible government-fleet vehicles you can request."
       />
 
-      <div className="toast-inline" role="note" style={{ background: 'var(--color-surface-2, transparent)' }}>
-        <Info size={16} className="toast-inline__icon" aria-hidden="true" />
-        <span className="toast-inline__message">
-          Only <strong>eligible government-fleet</strong> vehicles from other organizations appear here. Registration
-          is masked and driver/odometer/exact position are hidden until a request is approved and handed over.
-        </span>
-      </div>
-
       <Panel>
+        <div className="discover-banner">
+          <ShieldCheck size={16} className="discover-banner__icon" aria-hidden="true" />
+          <span>
+            Only <strong>eligible government-fleet</strong> vehicles from other organizations appear here. Registration numbers, driver details, and live telemetry are privacy-masked until your request is approved.
+          </span>
+        </div>
         <div className="stack">
           <div className="grid-2">
             <div className="field">
-              <span>Search query</span>
-              <SearchField value={q} onChange={setQ} placeholder="Search asset code or name" ariaLabel="Search vehicles" />
+              <SearchField
+                value={q}
+                onChange={setQ}
+                placeholder="Search asset code, registration or make"
+                placeholders={[
+                  'Search asset code (e.g. "MP-07-GA-1024")…',
+                  'Search make or model (e.g. "Bolero", "Tata 407")…',
+                  'Search by station or sector…',
+                  'Search by category or fuel type…'
+                ]}
+                ariaLabel="Search vehicles"
+              />
             </div>
             <div className="field">
               <span>Vehicle class</span>

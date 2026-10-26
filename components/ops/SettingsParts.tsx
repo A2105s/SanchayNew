@@ -13,6 +13,7 @@ import { Field } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { KpiCard } from '@/components/analytics/AnalyticsKit';
 import type { OperatorView, Role, StationView } from '@/types';
 
 type ToastFn = (m: string, v?: 'success' | 'warning' | 'danger' | 'info') => void;
@@ -372,12 +373,12 @@ export function DataCloudPanel({ isAdmin, toast }: { isAdmin: boolean; toast: To
           <Skeleton height={80} />
         ) : (
           <>
-            <div className="metric-grid" style={{ marginBottom: 12 }}>
-              <div className="metric-tile"><span className="text-muted">Pending</span><strong style={{ fontSize: '1.4rem' }}>{summary.pending}</strong></div>
-              <div className="metric-tile"><span className="text-muted">Processing</span><strong style={{ fontSize: '1.4rem' }}>{summary.processing}</strong></div>
-              <div className="metric-tile"><span className="text-muted">Failed</span><strong style={{ fontSize: '1.4rem' }}>{summary.failed}</strong></div>
-              <div className="metric-tile"><span className="text-muted">Completed</span><strong style={{ fontSize: '1.4rem' }}>{summary.completed}</strong></div>
-            </div>
+            <section className="an-kpis settings-kpis" style={{ marginBottom: 'var(--space-4)' }} aria-label="Sync jobs summary">
+              <KpiCard label="Pending" value={summary.pending.toLocaleString('en-IN')} tone={summary.pending ? 'warning' : 'neutral'} hint="Queued for processing" />
+              <KpiCard label="Processing" value={summary.processing.toLocaleString('en-IN')} tone={summary.processing ? 'info' : 'neutral'} hint="Currently executing" />
+              <KpiCard label="Failed" value={summary.failed.toLocaleString('en-IN')} tone={summary.failed ? 'danger' : 'success'} hint="Requires review" />
+              <KpiCard label="Completed" value={summary.completed.toLocaleString('en-IN')} tone="success" hint="Successfully processed" />
+            </section>
             {summary.recent.length === 0 ? (
               <EmptyState title="No sync jobs" description="Background jobs will appear here." />
             ) : (

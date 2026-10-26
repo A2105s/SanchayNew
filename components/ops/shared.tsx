@@ -1,6 +1,8 @@
 // Shared pure helpers for OPS pages. Kept here (not in lib/fleet) per contract:
 // anything OPS-specific that is not in the shared format lib lives under components/ops/.
 // Aligned with the NEW model in types/index.ts (no lifecycle, no GeM/auction for seized vehicles).
+import React, { type ReactNode } from 'react';
+import { Badge } from '@/components/ui/Badge';
 import type {
   AllocationView,
   AssetRequestView,
@@ -231,5 +233,198 @@ export function formatCell(v: string | number | boolean | null | undefined): str
     const d = new Date(`${v}T00:00:00`);
     if (!Number.isNaN(d.getTime())) return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   }
-  return v;
+  return String(v);
+}
+
+/**
+ * Renders an operational or report cell with EasyLife-grade typography and badge styling.
+ * Maps raw database enums (ELIGIBLE, ACTIVE, GOVERNMENT_FLEET, etc.) into high-contrast,
+ * branded badge pills, registration plate chips, and JetBrains Mono codes.
+ */
+export function renderReportCell(
+  v: unknown,
+  columnKey?: string
+): ReactNode {
+  if (v === null || v === undefined || v === '') {
+    return <span className="text-muted">—</span>;
+  }
+
+  // Boolean values
+  if (typeof v === 'boolean') {
+    return <Badge tone={v ? 'success' : 'neutral'}>{v ? 'Yes' : 'No'}</Badge>;
+  }
+
+  // Numeric values
+  if (typeof v === 'number') {
+    return <span className="mono">{v.toLocaleString('en-IN')}</span>;
+  }
+
+  if (typeof v === 'string') {
+    const trimmed = v.trim();
+
+    // 1. Exact enum mappings to Badges
+    switch (trimmed) {
+      // Eligibility states
+      case 'ELIGIBLE':
+        return <Badge tone="success">Eligible</Badge>;
+      case 'RESTRICTED':
+        return <Badge tone="danger">Restricted</Badge>;
+      case 'PENDING_VERIFICATION':
+        return <Badge tone="warning">Pending verification</Badge>;
+      case 'INELIGIBLE':
+        return <Badge tone="neutral">Ineligible</Badge>;
+
+      // Operational & motion statuses
+      case 'ACTIVE':
+        return <Badge tone="success">Active</Badge>;
+      case 'MOVING':
+        return (
+          <span className="badge badge--success" style={{ gap: 6 }}>
+            <span className="status-dot status-dot--success status-dot--pulse" style={{ width: 6, height: 6 }} />
+            <span>Moving</span>
+          </span>
+        );
+      case 'IDLE':
+        return <Badge tone="warning">Idle</Badge>;
+      case 'BREAKDOWN':
+        return <Badge tone="danger">Breakdown</Badge>;
+      case 'MAINTENANCE':
+        return <Badge tone="warning">Maintenance</Badge>;
+      case 'INCIDENT_HOLD':
+        return <Badge tone="danger">Incident hold</Badge>;
+      case 'RETIRED':
+        return <Badge tone="neutral">Retired</Badge>;
+      case 'DECOMMISSIONED':
+        return <Badge tone="neutral">Decommissioned</Badge>;
+
+      // Ownership categories
+      case 'GOVERNMENT_FLEET':
+        return <Badge tone="brand">Gov Fleet</Badge>;
+      case 'HIRED_PRIVATE':
+        return <Badge tone="neutral">Hired Private</Badge>;
+      case 'SEIZED_DISPUTED':
+        return <Badge tone="warning">Seized / Disputed</Badge>;
+
+      // Vehicle classes
+      case 'PATROL_CAR':
+        return <span style={{ fontWeight: 600 }}>Patrol car</span>;
+      case 'MOTORCYCLE':
+        return <span style={{ fontWeight: 600 }}>Motorcycle</span>;
+      case 'VAN':
+        return <span style={{ fontWeight: 600 }}>Van</span>;
+      case 'HEAVY':
+        return <span style={{ fontWeight: 600 }}>Heavy</span>;
+
+      // Telemetry / Device statuses
+      case 'ONLINE':
+        return <Badge tone="success">Online</Badge>;
+      case 'STALE':
+        return <Badge tone="warning">Stale</Badge>;
+      case 'OFFLINE':
+        return <Badge tone="danger">Offline</Badge>;
+      case 'UNPROVISIONED':
+        return <Badge tone="neutral">Unprovisioned</Badge>;
+
+      // Incident severity
+      case 'CRITICAL':
+        return <Badge tone="danger">Critical</Badge>;
+      case 'WARNING':
+        return <Badge tone="warning">Warning</Badge>;
+      case 'INFO':
+        return <Badge tone="info">Info</Badge>;
+
+      // Lifecycle / Request / Transfer / Ticket states
+      case 'SUBMITTED':
+        return <Badge tone="info">Submitted</Badge>;
+      case 'UNDER_REVIEW':
+        return <Badge tone="warning">Under review</Badge>;
+      case 'APPROVED':
+        return <Badge tone="success">Approved</Badge>;
+      case 'ALLOCATED':
+        return <Badge tone="brand">Allocated</Badge>;
+      case 'REJECTED':
+        return <Badge tone="danger">Rejected</Badge>;
+      case 'COMPLETED':
+        return <Badge tone="success">Completed</Badge>;
+      case 'CANCELLED':
+        return <Badge tone="neutral">Cancelled</Badge>;
+      case 'OPEN':
+        return <Badge tone="warning">Open</Badge>;
+      case 'IN_PROGRESS':
+        return <Badge tone="brand">In progress</Badge>;
+      case 'RESOLVED':
+        return <Badge tone="success">Resolved</Badge>;
+      case 'CLOSED':
+        return <Badge tone="neutral">Closed</Badge>;
+      case 'RESERVED':
+        return <Badge tone="info">Reserved</Badge>;
+      case 'AWAITING_HANDOVER':
+        return <Badge tone="warning">Awaiting handover</Badge>;
+      case 'RETURNED_PENDING_INSPECTION':
+        return <Badge tone="warning">Pending inspection</Badge>;
+      case 'VALID':
+        return <Badge tone="success">Valid</Badge>;
+      case 'EXPIRING_SOON':
+        return <Badge tone="warning">Expiring soon</Badge>;
+      case 'EXPIRED':
+        return <Badge tone="danger">Expired</Badge>;
+      default:
+        break;
+    }
+
+    // 2. License plate registration numbers (e.g. MP07-**-6386 or MP07AB1234)
+    if (
+      columnKey === 'registration' ||
+      columnKey === 'registrationNumber' ||
+      /^[A-Z]{2}\d{2}[-*A-Z0-9]{2,10}$/i.test(trimmed)
+    ) {
+      return <span className="reg-plate-inline">{trimmed}</span>;
+    }
+
+    // 3. Asset codes (e.g. SCH-V-0001, SCH-M-0012)
+    if (
+      columnKey === 'asset' ||
+      columnKey === 'assetCode' ||
+      /^SCH-[A-Z]-\d+$/i.test(trimmed)
+    ) {
+      return <strong className="mono table-code">{trimmed}</strong>;
+    }
+
+    // 4. Ticket, Transfer, Request, Incident, Audit codes (e.g. TKT-2026-..., TRF-...)
+    if (/^[A-Z]{3,4}-\d{4}-[A-Z0-9]+$/i.test(trimmed)) {
+      return <strong className="mono table-code">{trimmed}</strong>;
+    }
+
+    // 5. ISO timestamps (e.g. 2026-10-18T10:30:00.000Z)
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) {
+      const d = new Date(trimmed);
+      if (!Number.isNaN(d.getTime())) {
+        const dateStr = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+        return (
+          <span className="table-date-cell">
+            <strong className="mono" style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>{dateStr}</strong>
+            <span className="mono text-muted" style={{ fontSize: '0.76rem', display: 'block' }}>{timeStr}</span>
+          </span>
+        );
+      }
+    }
+
+    // 6. ISO Date only (e.g. 2026-10-18)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const d = new Date(`${trimmed}T00:00:00`);
+      if (!Number.isNaN(d.getTime())) {
+        return (
+          <span className="mono" style={{ fontSize: '0.86rem' }}>
+            {d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </span>
+        );
+      }
+    }
+
+    // Fallback: regular string
+    return trimmed;
+  }
+
+  return String(v);
 }

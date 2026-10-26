@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, LoaderCircle, PackageCheck } from 'lucide-react';
+import { AlertTriangle, LoaderCircle, PackageCheck, Activity, Calendar, ClipboardCheck, Timer, History } from 'lucide-react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
@@ -17,12 +17,12 @@ import type { AllocationView, AllocationLifecycle } from '@/types';
 
 type TabId = 'active' | 'upcoming' | 'awaiting' | 'overdue' | 'history';
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'active', label: 'Active' },
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'awaiting', label: 'Awaiting inspection' },
-  { id: 'overdue', label: 'Overdue' },
-  { id: 'history', label: 'History' }
+const TABS = [
+  { id: 'active', label: 'Active', icon: <Activity size={14} /> },
+  { id: 'upcoming', label: 'Upcoming', icon: <Calendar size={14} /> },
+  { id: 'awaiting', label: 'Awaiting inspection', icon: <ClipboardCheck size={14} /> },
+  { id: 'overdue', label: 'Overdue', icon: <Timer size={14} /> },
+  { id: 'history', label: 'History', icon: <History size={14} /> }
 ];
 
 function matchesTab(a: AllocationView, tab: TabId): boolean {
@@ -66,12 +66,30 @@ export function AllocationList() {
     <div className="page stack">
       <PageTitle title="Allocations" description="Reservations and active vehicle allocations across their lifecycle." />
 
-      <Tabs tabs={TABS} active={tab} onChange={(id) => setTab(id as TabId)} />
+      <Tabs
+        tabs={TABS}
+        active={tab}
+        onChange={(id) => setTab(id as TabId)}
+        layoutId="allocationsListTab"
+        toolbar
+        toolbarEyebrow="Allocation phase"
+      />
 
       <Panel>
         <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="veh-search" style={{ flex: '1 1 320px', maxWidth: '420px', margin: 0 }}>
-            <SearchField value={q} onChange={setQ} placeholder="Search by code or vehicle" ariaLabel="Search allocations" />
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder="Search by code or vehicle"
+              placeholders={[
+                'Search by allocation code (e.g. "ALL-2026-")…',
+                'Search by vehicle (e.g. "MP-07-")…',
+                'Search by driver or officer…',
+                'Search by station or duty…'
+              ]}
+              ariaLabel="Search allocations"
+            />
           </div>
           <ViewToggle value={viewMode} onChange={setViewMode} />
         </div>

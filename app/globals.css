@@ -824,59 +824,46 @@ main {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-primary);
 }
 
 .metric-tile {
+  --an-tone: var(--color-brand);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  min-height: 116px;
-  padding: var(--space-5);
-  overflow: hidden;
-  border: 1px solid var(--brand-border);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--color-bg-primary);
-  box-shadow: none;
-  color: var(--color-text-primary);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  background: var(--color-bg-secondary);
+  color: inherit;
+  transition: transform var(--transition-fast);
 }
 
 .metric-tile:hover,
 .metric-tile:focus-visible {
-  border-color: var(--color-brand);
+  border-color: transparent;
   box-shadow: none;
   transform: translateY(-1px);
 }
 
 .metric-tile__rail {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 5px;
-  background: var(--color-brand);
-}
-
-.metric-tile__rail--success {
-  background: var(--color-success);
-}
-
-.metric-tile__rail--warning {
-  background: var(--color-warning);
-}
-
-.metric-tile__rail--danger {
-  background: var(--color-danger);
-}
-
-.metric-tile__rail--neutral {
-  background: var(--color-text-muted);
+  display: none !important;
 }
 
 .metric-tile__label {
-  color: var(--color-text-muted);
+  color: var(--an-tone, var(--color-brand));
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .metric-tile__value {
@@ -1028,63 +1015,46 @@ main {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-primary);
 }
 
 .metric-tile {
+  --an-tone: var(--color-brand);
   position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  min-height: 116px;
-  padding: var(--space-5);
-  overflow: hidden;
-  border: 1px solid var(--brand-border);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--color-bg-primary);
-  box-shadow: none;
-  color: var(--color-text-primary);
-  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  background: var(--color-bg-secondary);
+  color: inherit;
+  transition: transform var(--transition-fast);
 }
 
 .metric-tile:hover,
 .metric-tile:focus-visible {
-  border-color: var(--color-brand);
+  border-color: transparent;
   box-shadow: none;
   transform: translateY(-1px);
 }
 
 .metric-tile__rail {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 5px;
-  background: var(--color-brand);
-}
-
-.metric-tile__rail--open {
-  background: var(--color-text-muted);
-}
-
-.metric-tile__rail--success {
-  background: var(--color-success);
-}
-
-.metric-tile__rail--warning {
-  background: var(--color-warning);
-}
-
-.metric-tile__rail--danger {
-  background: var(--color-danger);
-}
-
-.metric-tile__rail--neutral {
-  background: var(--color-text-muted);
+  display: none !important;
 }
 
 .metric-tile__label {
-  color: var(--color-text-muted);
+  color: var(--an-tone, var(--color-brand));
+  font-size: 0.78rem;
   font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .metric-tile__value {

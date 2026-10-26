@@ -7,7 +7,7 @@ export default function VehiclesLoading() {
         <Skeleton height="2.2rem" width="280px" />
         <Skeleton height="2.2rem" width="340px" />
       </div>
-      <div className="metric-grid">
+      <div className="an-kpis">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} height="88px" />
         ))}

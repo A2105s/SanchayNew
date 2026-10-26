@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, Fragment } from 'react';
-import { ChevronDown, ChevronRight, Download, ShieldCheck, ShieldAlert, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, Download, ShieldCheck, ShieldAlert, History, ScrollText, Terminal } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { api } from '@/lib/client/api';
 import { fmtDateTime } from '@/lib/fleet/format';
@@ -169,17 +169,31 @@ export default function AuditPage() {
 
       <Tabs
         tabs={[
-          { id: 'LEDGER', label: 'Ledger', count: audit.length },
-          { id: 'SYSTEM', label: 'System events', count: data?.events.length ?? 0 },
+          { id: 'LEDGER', label: 'Ledger', count: audit.length, icon: <ScrollText size={15} /> },
+          { id: 'SYSTEM', label: 'System events', count: data?.events.length ?? 0, icon: <Terminal size={15} /> },
         ]}
         active={tab}
         onChange={(id) => setTab(id as 'LEDGER' | 'SYSTEM')}
+        layoutId="auditActiveTab"
+        toolbar
+        toolbarEyebrow="Audit record"
       />
 
       {tab === 'LEDGER' ? (
         <>
           <div className="toolbar cluster" style={{ gap: 10, flexWrap: 'wrap' }}>
-            <SearchField value={query} onChange={setQuery} ariaLabel="Search ledger" placeholder="Search entries…" />
+            <SearchField
+              value={query}
+              onChange={setQuery}
+              ariaLabel="Search ledger"
+              placeholder="Search entries…"
+              placeholders={[
+                'Search ledger entries…',
+                'Search by actor or username…',
+                'Search action (e.g. "VEHICLE_DISPATCH")…',
+                'Search by entity ID or hash…'
+              ]}
+            />
             <Select ariaLabel="Entity" width="150px" value={entity} onChange={setEntity} options={[{ value: 'ALL', label: 'All entities' }, ...entities.map((e) => ({ value: e, label: e }))]} />
             <Select ariaLabel="Action" width="160px" value={action} onChange={setAction} options={[{ value: 'ALL', label: 'All actions' }, ...actions.map((a) => ({ value: a, label: a }))]} />
             <Select ariaLabel="Actor" width="150px" value={actor} onChange={setActor} options={[{ value: 'ALL', label: 'All actors' }, ...actors.map((a) => ({ value: a, label: a }))]} />

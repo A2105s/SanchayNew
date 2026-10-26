@@ -8,6 +8,8 @@ import './globals.css';
 import './analytics.css';
 import './controls.css';
 import './imports.css';
+import './settings.css';
+import './register.css';
 import './cloud-status.css';
 import './sanchay-ui.css';
 import './vehicles.css';

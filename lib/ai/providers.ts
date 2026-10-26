@@ -78,8 +78,8 @@ export const PROVIDERS: Record<AiProviderId, ProviderDef> = {
   }
 };
 
-// Fastest-first. Gemini 3.x flash is currently slow/overloaded for short tasks; it remains the second choice.
-export const DEFAULT_ORDER: AiProviderId[] = ['nvidia', 'gemini', 'openrouter', 'groq', 'mistral'];
+// Fastest-first: Groq (ultra-fast) -> NVIDIA NIM -> Mistral -> OpenRouter -> Gemini
+export const DEFAULT_ORDER: AiProviderId[] = ['groq', 'nvidia', 'mistral', 'openrouter', 'gemini'];
 
 export function isConfigured(id: AiProviderId): boolean {
   return PROVIDERS[id].key().length > 0;

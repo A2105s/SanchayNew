@@ -63,11 +63,14 @@ Scroll down to **Connection string**:
    ```
    *This becomes your `DIRECT_URL` (used for `prisma db push` schema migrations).*
 
-#### API Keys (Project Settings → API)
-1. **Project URL**: `https://[YOUR-PROJECT-REF].supabase.co` (`NEXT_PUBLIC_SUPABASE_URL`)
+#### API Keys (Project Settings → API Keys)
+1. **Project URL**: `https://[YOUR-PROJECT-REF].supabase.co` (`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_URL`)
 2. **Project API Keys**:
-   - `anon` `public` key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`)
-   - `service_role` `secret` key (`SUPABASE_SERVICE_ROLE_KEY`) — *Never expose to client*
+   - `publishable` key `sb_publishable_...` (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`)
+   - `secret` key `sb_secret_...` (`SUPABASE_SECRET_KEY`) — *Never expose to client*
+   - **JWKS URL**: `https://[YOUR-PROJECT-REF].supabase.co/auth/v1/.well-known/jwks.json` (`SUPABASE_JWKS_URL`)
+
+   The legacy `anon` / `service_role` JWT keys are still accepted as fallbacks (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`).
 
 ---
 
@@ -148,8 +151,11 @@ In the Vercel **Environment Variables** section, add the following keys for **Pr
 | `DATABASE_URL` | **Yes** | `postgresql://postgres.[ref]:[password]@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1` |
 | `DIRECT_URL` | **Yes** | `postgresql://postgres.[ref]:[password]@aws-0-ap-south-1.pooler.supabase.com:5432/postgres` |
 | `NEXT_PUBLIC_SUPABASE_URL` | **Yes** | `https://[ref].supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | **Yes** | `eyJhbGciOi...` (Supabase Anon Key) |
-| `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | `eyJhbGciOi...` (Supabase Service Role Key) |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **Yes** | `sb_publishable_...` (browser + SSR clients) |
+| `SUPABASE_URL` | **Yes** | Same project URL, read by `@supabase/server` |
+| `SUPABASE_PUBLISHABLE_KEY` | **Yes** | `sb_publishable_...` (server-side publishable key) |
+| `SUPABASE_SECRET_KEY` | **Yes** | `sb_secret_...` (Storage + admin clients; never expose) |
+| `SUPABASE_JWKS_URL` | **Yes** | `https://[ref].supabase.co/auth/v1/.well-known/jwks.json` |
 | `SUPABASE_STORAGE_BUCKET` | **Yes** | `sanchay-files` |
 | `SANCHAY_AUTH_SECRET` | **Yes** | 64-character random hex string (`openssl rand -hex 32`) |
 | `SANCHAY_ADMIN_USERNAME` | **Yes** | `admin` |

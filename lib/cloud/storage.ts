@@ -85,10 +85,10 @@ class LocalStorageDriver implements StorageDriver {
 }
 
 // ---------------------------------------------------------------------------
-// Supabase Storage driver (server-side only, service-role key)
+// Supabase Storage driver (server-side only, secret key)
 // ---------------------------------------------------------------------------
 
-const SUPABASE_BUCKET = 'vehicle-documents';
+const SUPABASE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'vehicle-documents';
 
 class SupabaseStorageDriver implements StorageDriver {
   readonly kind = 'supabase' as const;
@@ -180,7 +180,8 @@ let cachedDriver: StorageDriver | null = null;
 export function getStorageDriver(): StorageDriver {
   if (cachedDriver) return cachedDriver;
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // New-style sb_secret_... key, with the legacy service-role JWT as a fallback.
+  const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (url && serviceKey) {
     cachedDriver = new SupabaseStorageDriver(url, serviceKey);
   } else {

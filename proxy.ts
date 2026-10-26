@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { SESSION_COOKIE_NAME, verifySessionToken } from '@/lib/auth/session';
+import { applySupabaseSession } from '@/lib/supabase/middleware';
 
 /** Origins the basemap needs: the configured style endpoints plus the CARTO tile/font/sprite hosts their styles reference. */
 function originOf(value: string | undefined, fallback: string): string {
@@ -19,20 +20,20 @@ const MAP_ORIGINS = [
   .join(' ');
 
 export async function proxy(request: NextRequest) {
+  const response = await handleRequest(request);
+
+  // Refresh an adopted Supabase Auth session. This is a no-op unless Supabase
+  // Auth cookies exist, and static assets skip it entirely.
+  if (isStaticAssetPath(request.nextUrl.pathname)) return response;
+  return applySupabaseSession(request, response);
+}
+
+async function handleRequest(request: NextRequest) {
   const session = request.cookies.get(SESSION_COOKIE_NAME);
   const { pathname } = request.nextUrl;
 
   // Static assets and framework internals pass through.
-  if (
-    pathname.startsWith('/_next') ||
-    pathname === '/favicon.ico' ||
-    pathname === '/icon.png' ||
-    pathname === '/logo.png' ||
-    pathname === '/manifest.json' ||
-    pathname === '/robots.txt' ||
-    pathname.startsWith('/assets') ||
-    /\.(?:png|jpg|jpeg|svg|gif|webp|ico|css|js|map|woff2?|ttf)$/u.test(pathname)
-  ) {
+  if (isStaticAssetPath(pathname)) {
     return withSecurityHeaders(NextResponse.next());
   }
 
@@ -101,6 +102,19 @@ export async function proxy(request: NextRequest) {
   }
 
   return withClearedInvalidSession(withSecurityHeaders(NextResponse.next()), shouldClearSession);
+}
+
+function isStaticAssetPath(pathname: string): boolean {
+  return (
+    pathname.startsWith('/_next') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/icon.png' ||
+    pathname === '/logo.png' ||
+    pathname === '/manifest.json' ||
+    pathname === '/robots.txt' ||
+    pathname.startsWith('/assets') ||
+    /\.(?:png|jpg|jpeg|svg|gif|webp|ico|css|js|map|woff2?|ttf)$/u.test(pathname)
+  );
 }
 
 function withClearedInvalidSession(response: NextResponse, shouldClear: boolean): NextResponse {

@@ -4,7 +4,7 @@
   "private": true,
   "description": "Sanchay - Public Asset Intelligence. Fleet-first operations platform for Gwalior.",
   "engines": {
-    "node": ">=20.11"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "next dev",
@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@prisma/client": "5.22.0",
+    "@supabase/server": "^1.9.2",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.118.0",
     "framer-motion": "14.6.0",

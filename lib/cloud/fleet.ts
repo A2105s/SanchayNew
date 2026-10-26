@@ -41,6 +41,53 @@ import { evaluateEligibility, computeAvailability } from '@/lib/cloud/eligibilit
 import type { FleetSettings } from '@/types';
 
 export async function getDataVersion(): Promise<string> {
+  try {
+    const raw = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(`
+      SELECT
+        (SELECT count(*) FROM "Organization")::int as org_c,
+        (SELECT max("updatedAt") FROM "Organization") as org_m,
+        (SELECT count(*) FROM "Station")::int as sta_c,
+        (SELECT max("updatedAt") FROM "Station") as sta_m,
+        (SELECT count(*) FROM "Vehicle")::int as veh_c,
+        (SELECT max("updatedAt") FROM "Vehicle") as veh_m,
+        (SELECT count(*) FROM "IotDevice")::int as dev_c,
+        (SELECT max("updatedAt") FROM "IotDevice") as dev_m,
+        (SELECT count(*) FROM "IncidentReport")::int as inc_c,
+        (SELECT max("updatedAt") FROM "IncidentReport") as inc_m,
+        (SELECT count(*) FROM "MaintenanceRecord")::int as mai_c,
+        (SELECT max("updatedAt") FROM "MaintenanceRecord") as mai_m,
+        (SELECT count(*) FROM "AssetRequest")::int as req_c,
+        (SELECT max("updatedAt") FROM "AssetRequest") as req_m,
+        (SELECT count(*) FROM "Allocation")::int as all_c,
+        (SELECT max("updatedAt") FROM "Allocation") as all_m,
+        (SELECT count(*) FROM "TransferRequest")::int as tra_c,
+        (SELECT max("updatedAt") FROM "TransferRequest") as tra_m,
+        (SELECT count(*) FROM "Trip")::int as tri_c,
+        (SELECT max("updatedAt") FROM "Trip") as tri_m,
+        (SELECT count(*) FROM "Notification")::int as not_c,
+        (SELECT max("createdAt") FROM "Notification") as not_m
+    `);
+    if (raw && raw[0]) {
+      const r = raw[0];
+      const p = (c: unknown, m: unknown) => `${Number(c ?? 0)}:${m ? new Date(m as string | number | Date).getTime() : 0}`;
+      return [
+        p(r.org_c, r.org_m),
+        p(r.sta_c, r.sta_m),
+        p(r.veh_c, r.veh_m),
+        p(r.dev_c, r.dev_m),
+        p(r.inc_c, r.inc_m),
+        p(r.mai_c, r.mai_m),
+        p(r.req_c, r.req_m),
+        p(r.all_c, r.all_m),
+        p(r.tra_c, r.tra_m),
+        p(r.tri_c, r.tri_m),
+        p(r.not_c, r.not_m)
+      ].join('|');
+    }
+  } catch (err) {
+    console.warn('[fleet:getDataVersion] raw aggregate failed, falling back:', err);
+  }
+
   const [orgs, stations, vehicles, devices, incidents, maintenance, requests, allocations, transfers, trips, notifications] = await Promise.all([
     prisma.organization.aggregate({ _count: { _all: true }, _max: { updatedAt: true } }),
     prisma.station.aggregate({ _count: { _all: true }, _max: { updatedAt: true } }),

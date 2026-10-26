@@ -754,3 +754,28 @@ model SyncJob {
   @@index([type, createdAt])
   @@index([operationId])
 }
+
+/// Verified external provider payloads kept locally so repeat lookups never re-bill the provider.
+/// Currently: ECOURTS case details (billable per request). Mapbox geocoding is deliberately NOT
+/// persisted here - the Mapbox terms forbid retaining geocoding responses beyond the session.
+model ExternalDataCache {
+  id        String    @id @default(cuid())
+  /// Provider namespace, e.g. ECOURTS_CASE | ECOURTS_ENUMS
+  provider  String
+  /// Provider-specific lookup key, e.g. the normalized CNR
+  cacheKey  String
+  /// Provider response already reduced to the fields Sanchay uses (never the raw document set)
+  payload   Json
+  /// OK | NOT_FOUND | RESTRICTED | PROVIDER_ERROR
+  status    String    @default("OK")
+  fetchedAt DateTime  @default(now())
+  /// Null means the row never expires (reference data such as enum lookups)
+  expiresAt DateTime?
+  /// Read counter - proves cache reuse when reviewing provider spend
+  hits      Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([provider, cacheKey])
+  @@index([provider, expiresAt])
+}

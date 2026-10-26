@@ -1,0 +1,67 @@
+{
+  "district": "Gwalior",
+  "court": "District and Sessions Court Gwalior / High Court of MP Bench Gwalior",
+  "seizureAuthorities": [
+    "Madhya Pradesh Police - Gwalior District",
+    "Regional Transport Office (RTO) Gwalior (MP-07)",
+    "Excise Department Gwalior",
+    "Gwalior Municipal Corporation (GMC) Enforcement Wing"
+  ],
+  "sampleCases": [
+    {
+      "caseNumber": "CR-342/2024",
+      "cnrNumber": "MPGW010045212024",
+      "stationCode": "kotwali-police-station",
+      "policeStation": "Kotwali Police Station",
+      "statute": "Motor Vehicles Act 1988, Section 207",
+      "reason": "Vehicle operated without valid fitness certificate, road permit, and third-party insurance",
+      "courtName": "Court of Chief Judicial Magistrate (CJM), Gwalior",
+      "evidenceRef": "Seizure Memo GD No. 042/24",
+      "status": "IMPOUNDED_PENDING_BOND"
+    },
+    {
+      "caseNumber": "EX-118/2024",
+      "cnrNumber": "MPGW010038922024",
+      "stationCode": "jhansi-road-police-station",
+      "policeStation": "Jhansi Road Police Station",
+      "statute": "Madhya Pradesh Excise Act 1915, Section 34(2)",
+      "reason": "Commercial van intercepted transporting illicit non-duty paid liquor across state boundary",
+      "courtName": "Court of Additional Sessions Judge (Special Excise), Gwalior",
+      "evidenceRef": "Excise FIR Case No. 89/2024",
+      "status": "CONFISCATION_PROCEEDINGS"
+    },
+    {
+      "caseNumber": "CR-512/2024",
+      "cnrNumber": "MPGW010061142024",
+      "stationCode": "bahodapur-police-station",
+      "policeStation": "Bahodapur Police Station",
+      "statute": "Bharatiya Nyaya Sanhita (BNS) Sec 303(2) / CrPC Sec 102",
+      "reason": "Vehicle seized on suspicion of stolen property under highway inter-district check",
+      "courtName": "Judicial Magistrate First Class (JMFC) Court No. 4, Gwalior",
+      "evidenceRef": "Crime No. 512/24 Panchnama",
+      "status": "PROPERTY_SEIZED_POLICE_MALKHANA"
+    },
+    {
+      "caseNumber": "MV-089/2024",
+      "cnrNumber": "MPGW010012452024",
+      "stationCode": "dabra-city-police-station",
+      "policeStation": "Dabra City Police Station",
+      "statute": "Motor Vehicles Act 1988, Section 192A / 207",
+      "reason": "Overloaded multi-axle freight carrier without valid national permit",
+      "courtName": "Court of Judicial Magistrate First Class, Dabra",
+      "evidenceRef": "RTO Gwalior Challan No. GWL/2024/9912",
+      "status": "CHALLAN_PENDING_COMPOUND"
+    },
+    {
+      "caseNumber": "CR-205/2024",
+      "cnrNumber": "MPGW010029312024",
+      "stationCode": "morar-police-station",
+      "policeStation": "Morar Police Station",
+      "statute": "Motor Vehicles Act 1988, Section 185 (Drunken Driving & Dangerous Maneuvering)",
+      "reason": "Reckless driving collision resulting in public property damage, impounded at Morar thana campus",
+      "courtName": "Court of JMFC, Morar Gwalior",
+      "evidenceRef": "FIR 205/2024 & Vehicle Inspection Report",
+      "status": "IMPOUNDED_MVI_INSPECTION"
+    }
+  ]
+}

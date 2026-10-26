@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { DocumentScanPanel } from '@/components/ai/DocumentScanPanel';
 import type { ExtractKind, ExtractedFields } from '@/types/ai';
-import { Check, Cpu, QrCode as QrIcon, FileSpreadsheet, ShieldQuestion } from 'lucide-react';
+import { Check, Cpu, MapPin, QrCode as QrIcon, FileSpreadsheet, ShieldQuestion } from 'lucide-react';
+import { AddressSearch } from '@/components/maps/AddressSearch';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -45,6 +46,10 @@ interface FormState {
   insuranceExpiry: string;
   fitnessExpiry: string;
   gpsSource: GpsSource;
+  /** Free-text last known position; only a confirmed suggestion becomes coordinates. */
+  locationAddress: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const emptyForm: FormState = {
@@ -68,8 +73,14 @@ const emptyForm: FormState = {
   pucExpiry: '',
   insuranceExpiry: '',
   fitnessExpiry: '',
-  gpsSource: 'MANUAL_CSV'
+  gpsSource: 'MANUAL_CSV',
+  locationAddress: '',
+  latitude: null,
+  longitude: null
 };
+
+/** Gwalior city centre - biases address suggestions toward the fleet's operating area. */
+const GWALIOR_PROXIMITY = { lat: 26.2183, lng: 78.1828 };
 
 const GPS_OPTIONS: { value: GpsSource; title: string; desc: string; icon: React.ReactNode }[] = [
   { value: 'AIS_140', title: 'AIS-140 hardware tracker', desc: 'Government-grade GPS device streaming live position, speed and alerts.', icon: <Cpu size={18} /> },
@@ -181,7 +192,9 @@ export function RegisterWizard({
       gpsSource: form.gpsSource,
       pucExpiry: form.pucExpiry || null,
       insuranceExpiry: form.insuranceExpiry || null,
-      fitnessExpiry: form.fitnessExpiry || null
+      fitnessExpiry: form.fitnessExpiry || null,
+      lat: form.latitude,
+      lng: form.longitude
     };
     setSaving(true);
     setServerError(null);
@@ -373,6 +386,33 @@ export function RegisterWizard({
             ))}
           </div>
 
+          <AddressSearch
+            label="Last known position"
+            hint="Optional. Choosing a suggestion stores the coordinates; typed text alone is not geocoded."
+            value={form.locationAddress}
+            onChange={(next) => {
+              set('locationAddress', next);
+              // Editing the label invalidates the coordinate picked from the old suggestion.
+              set('latitude', null);
+              set('longitude', null);
+            }}
+            onPlace={(place) => {
+              set('latitude', place.lat);
+              set('longitude', place.lng);
+            }}
+            proximity={GWALIOR_PROXIMITY}
+            placeholder="Search a landmark, road or police station"
+          />
+          {form.latitude !== null && form.longitude !== null ? (
+            <p className="address-search__readout">
+              <MapPin size={13} aria-hidden="true" />
+              <span className="mono">
+                {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+              </span>
+              <span>— suggested by map search, not yet verified</span>
+            </p>
+          ) : null}
+
           <div className="panel">
             <h4 style={{ margin: '0 0 0.5rem' }}>Review</h4>
             <div className="kv">
@@ -388,6 +428,8 @@ export function RegisterWizard({
               <span>{OWNERSHIP_LABEL[form.claimedOwnership]} (pending verification)</span>
               <span>Tracking</span>
               <span>{GPS_OPTIONS.find((o) => o.value === form.gpsSource)?.title}</span>
+              <span>Last known position</span>
+              <span>{form.locationAddress.trim() || 'Not set'}</span>
             </div>
           </div>
         </div>

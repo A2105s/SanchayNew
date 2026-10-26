@@ -102,7 +102,7 @@ export default function StationsPage() {
               <tr>
                 <th>Station</th>
                 <th>Zone</th>
-                <th>District</th>
+                <th>In-Charge & Contact</th>
                 <th>Fleet Pool</th>
                 <th>Live Status</th>
                 <th aria-label="Action" style={{ textAlign: 'right' }}>Action</th>
@@ -130,9 +130,19 @@ export default function StationsPage() {
                       <Badge tone="neutral">{s.zone}</Badge>
                     </td>
                     <td>
-                      <div className="cluster" style={{ gap: 4, fontSize: '0.85rem' }}>
-                        <MapPin size={13} className="text-muted" /> {s.district}
-                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{s.inchargeName ?? 'Station In-Charge'}</div>
+                      {s.phone ? (
+                        <a
+                          href={`tel:${s.phone}`}
+                          className="text-muted mono cluster"
+                          style={{ fontSize: '0.78rem', gap: 4, textDecoration: 'none' }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Phone size={11} /> {s.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted" style={{ fontSize: '0.78rem' }}>-</span>
+                      )}
                     </td>
                     <td>
                       <div className="cluster" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
@@ -177,8 +187,18 @@ export default function StationsPage() {
                   </div>
                   <Badge tone="neutral">{s.zone}</Badge>
                 </div>
+                {s.inchargeName && (
+                  <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>
+                    {s.inchargeName}
+                  </div>
+                )}
+                {s.phone && (
+                  <div className="text-muted mono cluster" style={{ fontSize: '0.78rem', gap: 4 }}>
+                    <Phone size={12} /> {s.phone}
+                  </div>
+                )}
                 <div className="text-muted cluster" style={{ fontSize: '0.8rem', gap: 4 }}>
-                  <MapPin size={13} /> {s.district}
+                  <MapPin size={13} /> {s.district} &bull; <span className="mono">{s.lat.toFixed(3)}, {s.lng.toFixed(3)}</span>
                 </div>
                 <div className="ops-inv">
                   {VEHICLE_CLASSES.map((c) => (
@@ -232,8 +252,9 @@ function StationDrawer({
             <KvRow k="Code" v={<span className="mono">{station.code}</span>} />
             <KvRow k="Zone" v={station.zone} />
             <KvRow k="District" v={station.district} />
-            <KvRow k="In-charge" v={station.inchargeName ?? '-'} />
-            <KvRow k="Phone" v={station.phone ? <a href={`tel:${station.phone}`} className="cluster" style={{ gap: 4 }}><Phone size={13} /> {station.phone}</a> : '-'} />
+            <KvRow k="In-charge" v={<strong>{station.inchargeName ?? '-'}</strong>} />
+            <KvRow k="CUG Contact" v={station.phone ? <a href={`tel:${station.phone}`} className="cluster" style={{ gap: 4 }}><Phone size={13} /> {station.phone}</a> : '-'} />
+            <KvRow k="Coordinates" v={<span className="mono">{station.lat.toFixed(4)}°N, {station.lng.toFixed(4)}°E</span>} />
           </div>
         </Panel>
 

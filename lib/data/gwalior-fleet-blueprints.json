@@ -1,0 +1,199 @@
+{
+  "district": "Gwalior",
+  "rtoCode": "MP-07",
+  "seriesConventions": {
+    "POLICE": ["MP07-GP", "MP07-GA"],
+    "ADMINISTRATION": ["MP07-GA"],
+    "HEALTH": ["MP07-E", "MP07-EA"],
+    "MUNICIPAL": ["MP07-GV"],
+    "PWD": ["MP07-GV"],
+    "IMPOUNDED": ["MP07-CA", "MP07-CB", "MP07-CC", "MP07-ZA", "MP07-ZX"]
+  },
+  "vehicleCatalog": {
+    "POLICE_PATROL": [
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Mahindra Scorpio Classic S11",
+        "fuelType": "Diesel",
+        "seating": 7,
+        "engineDisplacementCc": 2184,
+        "color": "White/Blue",
+        "usage": "SHO / Town Inspector Interceptor & Escort"
+      },
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Mahindra Bolero Neo",
+        "fuelType": "Diesel",
+        "seating": 7,
+        "engineDisplacementCc": 1493,
+        "color": "White/Blue",
+        "usage": "Dial 100 First Response Vehicle (FRV)"
+      },
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Maruti Suzuki Ertiga VXi",
+        "fuelType": "Petrol",
+        "seating": 7,
+        "engineDisplacementCc": 1462,
+        "color": "White",
+        "usage": "City Patrol & Pilot Car"
+      },
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Tata Safari Storme 4x4",
+        "fuelType": "Diesel",
+        "seating": 7,
+        "engineDisplacementCc": 2179,
+        "color": "White",
+        "usage": "VVIP Convoy & SP Escort"
+      }
+    ],
+    "POLICE_MOTORCYCLE": [
+      {
+        "class": "MOTORCYCLE",
+        "makeModel": "Bajaj Pulsar 150 Neon",
+        "fuelType": "Petrol",
+        "seating": 2,
+        "engineDisplacementCc": 149.5,
+        "color": "Khaki/Blue",
+        "usage": "Cheetah Mobile Rapid Response Beat Patrol"
+      },
+      {
+        "class": "MOTORCYCLE",
+        "makeModel": "TVS Apache RTR 160",
+        "fuelType": "Petrol",
+        "seating": 2,
+        "engineDisplacementCc": 159.7,
+        "color": "White/Blue",
+        "usage": "Traffic Police Interceptor & Enforcement"
+      },
+      {
+        "class": "MOTORCYCLE",
+        "makeModel": "Royal Enfield Bullet 350",
+        "fuelType": "Petrol",
+        "seating": 2,
+        "engineDisplacementCc": 349,
+        "color": "Silver",
+        "usage": "Highway & Ceremonial Convoy Patrol"
+      }
+    ],
+    "POLICE_VAN": [
+      {
+        "class": "VAN",
+        "makeModel": "Force Traveller 3350",
+        "fuelType": "Diesel",
+        "seating": 13,
+        "engineDisplacementCc": 2596,
+        "color": "Khaki/Blue",
+        "usage": "Mobile Crime Scene & Forensic Unit / Prisoner Transport"
+      },
+      {
+        "class": "VAN",
+        "makeModel": "Mahindra Bolero Camper 4WD",
+        "fuelType": "Diesel",
+        "seating": 5,
+        "engineDisplacementCc": 2523,
+        "color": "Khaki",
+        "usage": "Station Tactical & Armed Reserve Transport"
+      },
+      {
+        "class": "VAN",
+        "makeModel": "Tata Winger DICOR",
+        "fuelType": "Diesel",
+        "seating": 9,
+        "engineDisplacementCc": 2179,
+        "color": "White/Blue",
+        "usage": "Quick Response Team (QRT) Tactical Van"
+      }
+    ],
+    "POLICE_HEAVY": [
+      {
+        "class": "HEAVY",
+        "makeModel": "Ashok Leyland Vajra Riot Control",
+        "fuelType": "Diesel",
+        "seating": 10,
+        "engineDisplacementCc": 5660,
+        "color": "Khaki",
+        "usage": "Vajra Anti-Riot & Water Cannon Vehicle"
+      },
+      {
+        "class": "HEAVY",
+        "makeModel": "Tata LPT 1613 Troop Carrier",
+        "fuelType": "Diesel",
+        "seating": 24,
+        "engineDisplacementCc": 5883,
+        "color": "Khaki",
+        "usage": "SAF 14th Battalion Police Force Transport"
+      }
+    ],
+    "HEALTH_AMBULANCE": [
+      {
+        "class": "VAN",
+        "makeModel": "Force Traveller 108 ALS Ambulance",
+        "fuelType": "Diesel",
+        "seating": 5,
+        "engineDisplacementCc": 2596,
+        "color": "White",
+        "usage": "108 Advanced Life Support Emergency Ambulance"
+      },
+      {
+        "class": "VAN",
+        "makeModel": "Maruti Suzuki Eeco Ambulance",
+        "fuelType": "Petrol",
+        "seating": 4,
+        "engineDisplacementCc": 1197,
+        "color": "White",
+        "usage": "Primary Health Centre (PHC) Patient Transport"
+      }
+    ],
+    "MUNICIPAL_GMC": [
+      {
+        "class": "VAN",
+        "makeModel": "Tata Ace Gold Tipper Hopper",
+        "fuelType": "CNG",
+        "seating": 2,
+        "engineDisplacementCc": 694,
+        "color": "White/Green",
+        "usage": "GMC Door-to-Door Solid Waste Collection"
+      },
+      {
+        "class": "HEAVY",
+        "makeModel": "Ashok Leyland Ecomet Water Tanker",
+        "fuelType": "Diesel",
+        "seating": 3,
+        "engineDisplacementCc": 3839,
+        "color": "White/Blue",
+        "usage": "Municipal Potable Water Tanker 9000L"
+      },
+      {
+        "class": "HEAVY",
+        "makeModel": "JCB 3DX Backhoe Loader",
+        "fuelType": "Diesel",
+        "seating": 1,
+        "engineDisplacementCc": 4400,
+        "color": "Yellow",
+        "usage": "Encroachment Clearance & Drain Desilting"
+      }
+    ],
+    "DISTRICT_ADMIN": [
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Toyota Innova Crysta 2.4 VX",
+        "fuelType": "Diesel",
+        "seating": 7,
+        "engineDisplacementCc": 2393,
+        "color": "White",
+        "usage": "District Collector & Magistrate Staff Car"
+      },
+      {
+        "class": "PATROL_CAR",
+        "makeModel": "Maruti Suzuki Ciaz Smart Hybrid",
+        "fuelType": "Petrol",
+        "seating": 5,
+        "engineDisplacementCc": 1462,
+        "color": "White",
+        "usage": "Additional District Magistrate (ADM) Staff Car"
+      }
+    ]
+  }
+}

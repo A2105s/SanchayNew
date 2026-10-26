@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { PolishButton } from '@/components/ai/PolishButton';
 import { Field } from '@/components/ui/Field';
 import { Select } from '@/components/ui/Select';
+import { AddressSearch } from '@/components/maps/AddressSearch';
 import { api } from '@/lib/client/api';
 import { useToast } from '@/lib/client/useToast';
 import type {
@@ -16,6 +17,9 @@ import type {
   VehicleAction,
   VehicleView,
 } from '@/types';
+
+/** Gwalior city centre - biases address suggestions toward the fleet's operating area. */
+const GWALIOR_PROXIMITY = { lat: 26.2183, lng: 78.1828 };
 
 async function runAction(vehicleId: string, action: VehicleAction) {
   return api.post<{ vehicle: VehicleView } & Record<string, unknown>>(`/api/cloud/vehicles/${vehicleId}/actions`, action);
@@ -132,9 +136,14 @@ export function StartTripModal({
         <Field label="Purpose" required>
           <input className="input" value={purpose} onChange={(e) => setPurpose(e.target.value)} />
         </Field>
-        <Field label="Start location" required>
-          <input className="input" value={startAddress} onChange={(e) => setStartAddress(e.target.value)} />
-        </Field>
+        <AddressSearch
+          label="Start location"
+          required
+          value={startAddress}
+          onChange={setStartAddress}
+          proximity={GWALIOR_PROXIMITY}
+          placeholder="Search a landmark, road or police station"
+        />
         <Field label="Start odometer (km)" required>
           <input className="input" inputMode="numeric" value={startOdometer} onChange={(e) => setStartOdometer(e.target.value)} />
         </Field>
@@ -195,9 +204,14 @@ export function EndTripModal({
   return (
     <Modal title="End trip" onClose={onClose} closeDisabled={saving} footer={footer(onClose, submit, saving, 'End trip')}>
       <div className="stack">
-        <Field label="End location" required>
-          <input className="input" value={endAddress} onChange={(e) => setEndAddress(e.target.value)} />
-        </Field>
+        <AddressSearch
+          label="End location"
+          required
+          value={endAddress}
+          onChange={setEndAddress}
+          proximity={GWALIOR_PROXIMITY}
+          placeholder="Search a landmark, road or police station"
+        />
         <Field label="End odometer (km)" required error={odoError}>
           <input className="input" inputMode="numeric" value={endOdometer} onChange={(e) => setEndOdometer(e.target.value)} />
         </Field>

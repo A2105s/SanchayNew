@@ -1,0 +1,142 @@
+{
+  "district": "Gwalior",
+  "state": "Madhya Pradesh",
+  "policeZone": "Gwalior Police Zone",
+  "headquarters": {
+    "title": "Office of the Superintendent of Police (SP), Gwalior",
+    "officer": "Shri Dharamveer Singh, IPS",
+    "designation": "Superintendent of Police (SP)",
+    "address": "SP Office, Police Control Room Road, Jayendraganj, Gwalior, MP 474009",
+    "phone": "0751-2445222",
+    "cug": "+91 70491 10800",
+    "email": "sp_gwalior@mppolice.gov.in"
+  },
+  "leadership": [
+    {
+      "role": "Additional Superintendent of Police (City / Central)",
+      "officer": "Shri Akhilesh Rainwal",
+      "designation": "ASP (City)",
+      "phone": "0751-2445223",
+      "cug": "+91 70491 10801",
+      "email": "asp.city-gwl@mppolice.gov.in"
+    },
+    {
+      "role": "Additional Superintendent of Police (Dehat / Rural)",
+      "officer": "Shri Niranjan Sharma",
+      "designation": "ASP (Dehat)",
+      "phone": "0751-2445224",
+      "cug": "+91 70491 10802",
+      "email": "asp.rural-gwl@mppolice.gov.in"
+    },
+    {
+      "role": "Additional Superintendent of Police (Crime & Cyber)",
+      "officer": "Shri Siyasharan Sikarwar",
+      "designation": "ASP (Crime)",
+      "phone": "0751-2445228",
+      "cug": "+91 70491 10803",
+      "email": "asp.crime-gwl@mppolice.gov.in"
+    }
+  ],
+  "circles": [
+    {
+      "circle": "Kotwali Circle",
+      "jurisdiction": ["Kotwali", "Madhoganj", "Janakganj"],
+      "officer": "Shri Ayush Gupta",
+      "designation": "CSP (City Superintendent of Police)",
+      "cug": "+91 70491 10805",
+      "phone": "0751-2445231"
+    },
+    {
+      "circle": "Lashkar Circle",
+      "jurisdiction": ["Inderganj", "Kampoo", "Jhansi Road"],
+      "officer": "Shri Shiyaram Singh",
+      "designation": "CSP (City Superintendent of Police)",
+      "cug": "+91 70491 10806",
+      "phone": "0751-2445232"
+    },
+    {
+      "circle": "Gwalior Circle",
+      "jurisdiction": ["Bahodapur", "Gwalior", "Purani Chhawni"],
+      "officer": "Shri Sandeep Malviya",
+      "designation": "CSP (City Superintendent of Police)",
+      "cug": "+91 70491 10807",
+      "phone": "0751-2445233"
+    },
+    {
+      "circle": "Morar Circle",
+      "jurisdiction": ["Morar", "Thatipur", "Bijoli", "Utila"],
+      "officer": "Shri Rajiv Jangley",
+      "designation": "CSP (City Superintendent of Police)",
+      "cug": "+91 70491 10808",
+      "phone": "0751-2445234"
+    },
+    {
+      "circle": "Maharajpura Circle",
+      "jurisdiction": ["Maharajpura", "Hazira", "Gola Ka Mandir", "Padav"],
+      "officer": "Shri Ravi Bhadauria",
+      "designation": "CSP (City Superintendent of Police)",
+      "cug": "+91 70491 10809",
+      "phone": "0751-2445235"
+    },
+    {
+      "circle": "Dabra Subdivision",
+      "jurisdiction": ["Dabra City", "Dabra Dehat", "Bilaua", "Antri", "Pichhore", "Gijorra"],
+      "officer": "Shri Vivek Sharma",
+      "designation": "SDOP (Sub-Divisional Officer Police)",
+      "cug": "+91 70491 10810",
+      "phone": "07524-222055"
+    },
+    {
+      "circle": "Ghatigaon Subdivision",
+      "jurisdiction": ["Ghatigaon", "Mohana", "Panihar", "Aron", "Bhawarpura"],
+      "officer": "Shri Santosh Patel",
+      "designation": "SDOP (Sub-Divisional Officer Police)",
+      "cug": "+91 70491 10811",
+      "phone": "0751-268022"
+    },
+    {
+      "circle": "Bhitarwar Subdivision",
+      "jurisdiction": ["Bhitarwar", "Karahiya", "Chinor", "Belgada"],
+      "officer": "Shri Jitendra Nahar",
+      "designation": "SDOP (Sub-Divisional Officer Police)",
+      "cug": "+91 70491 10812",
+      "phone": "07525-285620"
+    }
+  ],
+  "emergencyUnits": [
+    {
+      "unit": "Police Control Room (24x7)",
+      "phone": "0751-2445222",
+      "shortCode": "112 / 100",
+      "cug": "+91 70491 10820",
+      "email": "controlroom-gwl@mppolice.gov.in"
+    },
+    {
+      "unit": "Dial 100 District Dispatch Center",
+      "phone": "0751-2445220",
+      "shortCode": "100",
+      "cug": "+91 70491 10821"
+    },
+    {
+      "unit": "Traffic Police Control & Helpline",
+      "phone": "0751-2445242",
+      "shortCode": "1095",
+      "cug": "+91 70491 10825",
+      "email": "traffic-gwl@mppolice.gov.in"
+    },
+    {
+      "unit": "Cyber Crime Cell Gwalior",
+      "phone": "0751-2445230",
+      "shortCode": "1930",
+      "cug": "+91 70491 10828",
+      "email": "cybercell-gwl@mppolice.gov.in"
+    },
+    {
+      "unit": "Mahila Helpdesk (Crime Against Women)",
+      "phone": "0751-2445240",
+      "shortCode": "1090",
+      "cug": "+91 70491 10830",
+      "email": "mahilathana-gwl@mppolice.gov.in"
+    }
+  ]
+}

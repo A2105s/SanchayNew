@@ -8,18 +8,22 @@ import { reevaluateEligibility } from '@/lib/cloud/eligibility';
 import { recomputeStationInventory } from '@/lib/cloud/ops/transfers';
 import { normalizeRegistration } from '@/lib/cloud/context';
 import type { Role, Sector, VehicleClass } from '@/types';
+import STATIONS_DATA from '@/lib/data/gwalior-police-stations.json';
+import DEPARTMENTS_DATA from '@/lib/data/gwalior-departments.json';
+import FLEET_BLUEPRINTS from '@/lib/data/gwalior-fleet-blueprints.json';
+import LEGAL_CASES_DATA from '@/lib/data/gwalior-legal-cases.json';
 
 export const DEMO_PASSWORD = 'Sanchay@Demo1';
 
-export const DEMO_OPERATORS: Array<{ username: string; displayName: string; role: Role; orgCode: string | null; stationCode: string | null }> = [
+export const DEMO_OPERATORS: Array<{ username: string; displayName: string; role: Role; orgCode: string | null; stationCode: string | null; phone?: string }> = [
   { username: 'admin', displayName: 'Platform Administrator', role: 'ADMIN', orgCode: null, stationCode: null },
-  { username: 'org.police', displayName: 'Police Org Admin', role: 'ORG_ADMIN', orgCode: 'GWL-POLICE', stationCode: null },
-  { username: 'dept.officer', displayName: 'Police Dept Officer', role: 'DEPT_OFFICER', orgCode: 'GWL-POLICE', stationCode: null },
-  { username: 'dept.health', displayName: 'Health Dept Officer', role: 'DEPT_OFFICER', orgCode: 'GWL-HEALTH', stationCode: null },
-  { username: 'org.health', displayName: 'Health Org Admin', role: 'ORG_ADMIN', orgCode: 'GWL-HEALTH', stationCode: null },
-  { username: 'station.kotwali', displayName: 'Kotwali Station Officer', role: 'STATION_OFFICER', orgCode: 'GWL-POLICE', stationCode: 'kotwali-police-station' },
-  { username: 'driver.demo', displayName: 'Demo Field Driver', role: 'FIELD_STAFF', orgCode: 'GWL-POLICE', stationCode: 'kotwali-police-station' },
-  { username: 'auditor.demo', displayName: 'Demo Auditor', role: 'AUDITOR', orgCode: 'GWL-DISTRICT', stationCode: null }
+  { username: 'org.police', displayName: 'SP Gwalior Fleet Desk (Dharamveer Singh, IPS)', role: 'ORG_ADMIN', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10800' },
+  { username: 'dept.officer', displayName: 'ASP City Fleet Control (Akhilesh Rainwal)', role: 'DEPT_OFFICER', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10801' },
+  { username: 'dept.health', displayName: 'CMHO Health Fleet Officer (Dr. Sachin Srivastava)', role: 'DEPT_OFFICER', orgCode: 'GWL-HEALTH', stationCode: null, phone: '+91 75123 68444' },
+  { username: 'org.health', displayName: 'Health Org Admin (CMHO Gwalior)', role: 'ORG_ADMIN', orgCode: 'GWL-HEALTH', stationCode: null, phone: '+91 75123 68444' },
+  { username: 'station.kotwali', displayName: 'Insp. Vinod Vinayak Karkare (TI Kotwali)', role: 'STATION_OFFICER', orgCode: 'GWL-POLICE', stationCode: 'kotwali-police-station', phone: '+91 77010 46916' },
+  { username: 'driver.demo', displayName: 'Head Constable Manoj Tomar (Kotwali FRV Driver)', role: 'FIELD_STAFF', orgCode: 'GWL-POLICE', stationCode: 'kotwali-police-station', phone: '+91 94251 10421' },
+  { username: 'auditor.demo', displayName: 'District Audit Officer (Collectorate Gwalior)', role: 'AUDITOR', orgCode: 'GWL-DISTRICT', stationCode: null, phone: '+91 75124 46200' }
 ];
 
 // ---------------------------------------------------------------------------
@@ -64,52 +68,23 @@ class Rng {
 
 const CITY_CENTER = { lat: 26.2183, lng: 78.1828 };
 
-interface StationSeed {
+export interface StationSeed {
   id: string;
   name: string;
   lat: number;
   lng: number;
+  code?: string;
+  hindiName?: string;
+  zone?: string;
+  district?: string;
+  inchargeName?: string;
+  inchargeDesignation?: string;
+  phone?: string;
+  cugMobile?: string;
+  email?: string;
 }
 
-const STATIONS: StationSeed[] = [
-  { id: 'kotwali-police-station', name: 'Kotwali Police Station', lat: 26.2183, lng: 78.1828 },
-  { id: 'madhoganj-police-station', name: 'Madhoganj Police Station', lat: 26.215, lng: 78.176 },
-  { id: 'janakganj-police-station', name: 'Janakganj Police Station', lat: 26.221, lng: 78.19 },
-  { id: 'university-police-station', name: 'University Police Station', lat: 26.231, lng: 78.168 },
-  { id: 'kampoo-police-station', name: 'Kampoo Police Station', lat: 26.205, lng: 78.195 },
-  { id: 'tighra-police-station', name: 'Tighra Police Station', lat: 26.28, lng: 78.22 },
-  { id: 'inderganj-police-station', name: 'Inderganj Police Station', lat: 26.212, lng: 78.181 },
-  { id: 'jhansi-road-police-station', name: 'Jhansi Road Police Station', lat: 26.195, lng: 78.17 },
-  { id: 'padav-police-station', name: 'Padav Police Station', lat: 26.209, lng: 78.205 },
-  { id: 'gwalior-police-station', name: 'Gwalior Police Station', lat: 26.2183, lng: 78.1828 },
-  { id: 'bahodapur-police-station', name: 'Bahodapur Police Station', lat: 26.19, lng: 78.21 },
-  { id: 'purani-chhawni-police-station', name: 'Purani Chhawni Police Station', lat: 26.23, lng: 78.2 },
-  { id: 'mahila-thana-police-station', name: 'Mahila Thana Police Station', lat: 26.217, lng: 78.185 },
-  { id: 'morar-police-station', name: 'Morar Police Station', lat: 26.24, lng: 78.23 },
-  { id: 'thatipur-police-station', name: 'Thatipur Police Station', lat: 26.2, lng: 78.16 },
-  { id: 'maharajpura-police-station', name: 'Maharajpura Police Station', lat: 26.26, lng: 78.26 },
-  { id: 'hazira-police-station', name: 'Hazira Police Station', lat: 26.18, lng: 78.2 },
-  { id: 'gola-ka-mandir-police-station', name: 'Gola Ka Mandir Police Station', lat: 26.205, lng: 78.19 },
-  { id: 'dabra-city-police-station', name: 'Dabra City Police Station', lat: 25.89, lng: 78.33 },
-  { id: 'dabra-dehat-police-station', name: 'Dabra Dehat Police Station', lat: 25.88, lng: 78.34 },
-  { id: 'antri-police-station', name: 'Antri Police Station', lat: 26.06, lng: 78.07 },
-  { id: 'pichhore-police-station', name: 'Pichhore Police Station', lat: 25.98, lng: 78.38 },
-  { id: 'bilaua-police-station', name: 'Bilaua Police Station', lat: 25.92, lng: 78.4 },
-  { id: 'gijorra-police-station', name: 'Gijorra Police Station', lat: 25.95, lng: 78.36 },
-  { id: 'bhitarwar-police-station', name: 'Bhitarwar Police Station', lat: 25.8, lng: 78.12 },
-  { id: 'karahiya-police-station', name: 'Karahiya Police Station', lat: 25.78, lng: 78.15 },
-  { id: 'chinor-police-station', name: 'Chinor Police Station', lat: 25.76, lng: 78.09 },
-  { id: 'belgada-police-station', name: 'Belgada Police Station', lat: 25.74, lng: 78.06 },
-  { id: 'ghatigaon-police-station', name: 'Ghatigaon Police Station', lat: 26.0, lng: 78.47 },
-  { id: 'panihar-police-station', name: 'Panihar Police Station', lat: 26.03, lng: 78.52 },
-  { id: 'aron-police-station', name: 'Aron Police Station', lat: 25.96, lng: 78.55 },
-  { id: 'mohana-police-station', name: 'Mohana Police Station', lat: 26.01, lng: 78.58 },
-  { id: 'bhawarpura-police-station', name: 'Bhawarpura Police Station', lat: 25.98, lng: 78.51 },
-  { id: 'behat-police-station', name: 'Behat Police Station', lat: 26.27, lng: 78.42 },
-  { id: 'bijoli-police-station', name: 'Bijoli Police Station', lat: 26.3, lng: 78.45 },
-  { id: 'utila-police-station', name: 'Utila Police Station', lat: 26.32, lng: 78.48 },
-  { id: 'hastinapur-police-station', name: 'Hastinapur Police Station', lat: 26.29, lng: 78.4 }
-];
+export const STATIONS: StationSeed[] = STATIONS_DATA as StationSeed[];
 
 function zoneFor(lat: number, lng: number): string {
   const dLat = lat - CITY_CENTER.lat;
@@ -173,27 +148,36 @@ export interface SeedResult {
 export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
   const rng = new Rng(0x53414e43);
 
-  // 1. Organizations (District root with children) -----------------------------
-  const district = await prisma.organization.create({ data: { code: 'GWL-DISTRICT', name: 'District Administration Gwalior', kind: 'DISTRICT', parentId: null } });
-  const police = await prisma.organization.create({ data: { code: 'GWL-POLICE', name: 'Gwalior Police', kind: 'POLICE', parentId: district.id } });
-  const health = await prisma.organization.create({ data: { code: 'GWL-HEALTH', name: 'Health Department', kind: 'HEALTH', parentId: district.id } });
-  const gmc = await prisma.organization.create({ data: { code: 'GWL-GMC', name: 'Municipal Corporation (GMC)', kind: 'MUNICIPAL', parentId: district.id } });
-  const pwd = await prisma.organization.create({ data: { code: 'GWL-PWD', name: 'Public Works Department', kind: 'PWD', parentId: district.id } });
-  const election = await prisma.organization.create({ data: { code: 'GWL-ELECTION', name: 'Election Office', kind: 'ELECTION', parentId: district.id } });
-  const orgByCode = new Map([
-    ['GWL-DISTRICT', district.id],
-    ['GWL-POLICE', police.id],
-    ['GWL-HEALTH', health.id],
-    ['GWL-GMC', gmc.id],
-    ['GWL-PWD', pwd.id],
-    ['GWL-ELECTION', election.id]
-  ]);
+  // 1. Organizations (District root with children from DEPARTMENTS_DATA) -----------
+  const districtData = DEPARTMENTS_DATA.find((d) => d.code === 'GWL-DISTRICT')!;
+  const district = await prisma.organization.create({ data: { code: districtData.code, name: districtData.name, kind: districtData.kind, parentId: null } });
+
+  const orgByCode = new Map<string, string>([['GWL-DISTRICT', district.id]]);
+  for (const dept of DEPARTMENTS_DATA) {
+    if (dept.code === 'GWL-DISTRICT') continue;
+    const org = await prisma.organization.create({ data: { code: dept.code, name: dept.name, kind: dept.kind, parentId: district.id } });
+    orgByCode.set(dept.code, org.id);
+  }
+  const police = { id: orgByCode.get('GWL-POLICE')! };
+  const health = { id: orgByCode.get('GWL-HEALTH')! };
+  const election = { id: orgByCode.get('GWL-ELECTION')! };
 
   // 2. Stations (under Police) + empty inventory ------------------------------
   const stationIdByCode = new Map<string, string>();
   for (const s of STATIONS) {
     const station = await prisma.station.create({
-      data: { code: s.id, name: s.name, organizationId: police.id, zone: zoneFor(s.lat, s.lng), district: 'Gwalior', lat: s.lat, lng: s.lng, inchargeName: fakeName(rng), phone: fakePhone(rng), inventory: { create: { patrolCar: 0, motorcycle: 0, van: 0, heavy: 0 } } }
+      data: {
+        code: s.id,
+        name: s.name,
+        organizationId: police.id,
+        zone: s.zone ?? zoneFor(s.lat, s.lng),
+        district: s.district ?? 'Gwalior',
+        lat: s.lat,
+        lng: s.lng,
+        inchargeName: s.inchargeName ?? fakeName(rng),
+        phone: s.cugMobile ?? s.phone ?? fakePhone(rng),
+        inventory: { create: { patrolCar: 0, motorcycle: 0, van: 0, heavy: 0 } }
+      }
     });
     stationIdByCode.set(s.id, station.id);
   }
@@ -207,8 +191,8 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     const stationId = op.stationCode ? stationIdByCode.get(op.stationCode) ?? null : null;
     await prisma.operator.upsert({
       where: { username: op.username },
-      update: { organizationId, stationId, role: op.role, displayName: op.displayName },
-      create: { username: op.username, displayName: op.displayName, email: `${op.username}@sanchay.demo`, phone: fakePhone(rng), role: op.role, organizationId, stationId, passwordHash, active: true }
+      update: { organizationId, stationId, role: op.role, displayName: op.displayName, phone: op.phone ?? fakePhone(rng) },
+      create: { username: op.username, displayName: op.displayName, email: `${op.username}@sanchay.demo`, phone: op.phone ?? fakePhone(rng), role: op.role, organizationId, stationId, passwordHash, active: true }
     });
     operatorCount += 1;
   }
@@ -217,9 +201,19 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
   const createdVehicles: Array<{ id: string; organizationId: string; stationId: string | null; ownershipCategory: string; operationalStatus: string }> = [];
   let assetSeq = 0;
   const usedRegs = new Set<string>();
-  const makeReg = (): string => {
+  const makeReg = (sector?: Sector, ownership?: string): string => {
     for (;;) {
-      const reg = `MP07-${rng.pick(['AA', 'AB', 'BC', 'CD', 'DG', 'GA', 'HR', 'KL', 'ZA', 'ZX'])}-${String(rng.int(1, 9999)).padStart(4, '0')}`;
+      let prefix = 'MP07-GA';
+      if (ownership === 'SEIZED_IMPOUNDED') {
+        prefix = rng.pick(FLEET_BLUEPRINTS.seriesConventions.IMPOUNDED);
+      } else if (sector === 'POLICE_PATROL') {
+        prefix = rng.pick(FLEET_BLUEPRINTS.seriesConventions.POLICE);
+      } else if (sector === 'AMBULANCE_108' || sector === 'HEALTH_VAN') {
+        prefix = rng.pick(FLEET_BLUEPRINTS.seriesConventions.HEALTH);
+      } else if (sector === 'GMC_WASTE' || sector === 'PWD_HEAVY') {
+        prefix = rng.pick(FLEET_BLUEPRINTS.seriesConventions.MUNICIPAL);
+      }
+      const reg = `${prefix}-${String(rng.int(1001, 9999)).padStart(4, '0')}`;
       if (!usedRegs.has(reg)) {
         usedRegs.add(reg);
         return reg;
@@ -258,11 +252,64 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     const seized = spec.ownershipCategory === 'SEIZED_IMPOUNDED';
     const active = spec.operationalStatus === 'ACTIVE';
     const moving = active && !seized && rng.chance(0.3);
-    const reg = makeReg();
+    const reg = makeReg(spec.sector, spec.ownershipCategory);
 
     const puc = spec.goodCompliance ? daysFromNow(rng.int(90, 540)) : seized ? daysFromNow(-rng.int(30, 500)) : complianceExpiry();
     const ins = spec.goodCompliance ? daysFromNow(rng.int(90, 540)) : seized ? daysFromNow(-rng.int(30, 500)) : complianceExpiry();
     const fit = spec.goodCompliance ? daysFromNow(rng.int(90, 540)) : seized ? daysFromNow(-rng.int(30, 500)) : complianceExpiry();
+
+    let makeModel = rng.pick(MAKE_MODEL_BY_CLASS[spec.vehicleClass]);
+    let color = rng.pick(['White', 'White/Blue', 'Khaki', 'Silver']);
+    let fuelType = rng.pick(['Diesel', 'Petrol', 'CNG']);
+    let seating = spec.vehicleClass === 'MOTORCYCLE' ? 2 : rng.pick([5, 7, 12]);
+    let vehicleType = rng.pick(VEHICLE_TYPE_BY_CLASS[spec.vehicleClass]);
+
+    if (spec.sector === 'POLICE_PATROL') {
+      if (spec.vehicleClass === 'PATROL_CAR') {
+        const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.POLICE_PATROL);
+        makeModel = item.makeModel;
+        color = item.color;
+        fuelType = item.fuelType;
+        seating = item.seating;
+        vehicleType = item.usage.includes('FRV') ? 'First Response Vehicle (FRV)' : 'Interceptor SUV';
+      } else if (spec.vehicleClass === 'MOTORCYCLE') {
+        const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.POLICE_MOTORCYCLE);
+        makeModel = item.makeModel;
+        color = item.color;
+        fuelType = item.fuelType;
+        vehicleType = 'Cheetah Mobile Patrol';
+      } else if (spec.vehicleClass === 'VAN') {
+        const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.POLICE_VAN);
+        makeModel = item.makeModel;
+        color = item.color;
+        fuelType = item.fuelType;
+        vehicleType = 'Tactical Van';
+      } else if (spec.vehicleClass === 'HEAVY') {
+        const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.POLICE_HEAVY);
+        makeModel = item.makeModel;
+        color = item.color;
+        fuelType = item.fuelType;
+        vehicleType = 'Vajra Riot Control';
+      }
+    } else if (spec.sector === 'AMBULANCE_108' || spec.sector === 'HEALTH_VAN') {
+      const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.HEALTH_AMBULANCE);
+      makeModel = item.makeModel;
+      color = item.color;
+      fuelType = item.fuelType;
+      vehicleType = '108 Advanced Life Support Ambulance';
+    } else if (spec.sector === 'GMC_WASTE') {
+      const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.MUNICIPAL_GMC);
+      makeModel = item.makeModel;
+      color = item.color;
+      fuelType = item.fuelType;
+      vehicleType = 'Waste Collection Hopper';
+    } else if (spec.sector === 'ELECTION_REQUISITION') {
+      const item = rng.pick(FLEET_BLUEPRINTS.vehicleCatalog.DISTRICT_ADMIN);
+      makeModel = item.makeModel;
+      color = item.color;
+      fuelType = item.fuelType;
+      vehicleType = 'Election Flying Squad Car';
+    }
 
     const vehicle = await prisma.vehicle.create({
       data: {
@@ -272,7 +319,7 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
         displayName: `${spec.sector.replace(/_/gu, ' ')} ${assetCode}`,
         sector: spec.sector,
         vehicleClass: spec.vehicleClass,
-        vehicleType: rng.pick(VEHICLE_TYPE_BY_CLASS[spec.vehicleClass]),
+        vehicleType,
         organizationId: spec.organizationId,
         stationId: spec.stationId,
         driverName: active && !seized ? fakeName(rng) : null,
@@ -281,11 +328,11 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
         operationalStatus: spec.operationalStatus,
         ownershipCategory: spec.ownershipCategory,
         eligibilityState: 'PENDING_VERIFICATION',
-        makeModel: rng.pick(MAKE_MODEL_BY_CLASS[spec.vehicleClass]),
-        year: rng.int(2012, 2024),
-        fuelType: rng.pick(['Diesel', 'Petrol', 'CNG']),
-        seating: spec.vehicleClass === 'MOTORCYCLE' ? 2 : rng.pick([5, 7, 12]),
-        color: rng.pick(['White', 'White/Blue', 'Khaki', 'Silver']),
+        makeModel,
+        year: rng.int(2014, 2024),
+        fuelType,
+        seating,
+        color,
         chassisNumber: `CH${rng.int(100000, 999999)}${rng.int(100, 999)}`,
         engineNumber: `EN${rng.int(100000, 999999)}${rng.int(100, 999)}`,
         odometerKm: rng.int(2000, 180000),
@@ -306,13 +353,15 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
       }
     });
 
+    const sampleCase = rng.pick(LEGAL_CASES_DATA.sampleCases);
+
     // Ownership verification record (verified when requested, through the service semantics).
     await prisma.vehicleOwnershipVerification.create({
       data: {
         vehicleId: vehicle.id,
         category: spec.ownershipCategory,
         status: spec.verifyOwnership ? 'VERIFIED' : 'PENDING',
-        evidenceRef: seized ? 'FIR custody record' : 'RTO registration record',
+        evidenceRef: seized ? `${sampleCase.policeStation} - ${sampleCase.evidenceRef}` : 'RTO Gwalior (MP-07) registration record',
         submittedBy: 'seed',
         verifiedBy: spec.verifyOwnership ? 'org.police' : null,
         verifiedAt: spec.verifyOwnership ? daysFromNow(-rng.int(10, 200)) : null
@@ -331,7 +380,16 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     }
     if (seized) {
       await prisma.legalRecord.create({
-        data: { vehicleId: vehicle.id, type: 'SEIZURE', referenceNo: `FIR/${rng.int(100, 999)}/${new Date().getFullYear() - rng.int(0, 3)}`, date: daysFromNow(-rng.int(30, 800)), description: 'Seized pending investigation', status: 'ACTIVE', authority: 'District Court Gwalior', nextActionAt: daysFromNow(rng.int(5, 120)) }
+        data: {
+          vehicleId: vehicle.id,
+          type: 'SEIZURE',
+          referenceNo: `${sampleCase.caseNumber} (${sampleCase.cnrNumber})`,
+          date: daysFromNow(-rng.int(30, 800)),
+          description: `${sampleCase.statute}: ${sampleCase.reason}`,
+          status: 'ACTIVE',
+          authority: sampleCase.courtName,
+          nextActionAt: daysFromNow(rng.int(5, 120))
+        }
       });
     }
 

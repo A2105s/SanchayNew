@@ -27,3 +27,6 @@ tsc_errors.txt
 
 # local document storage (filesystem driver)
 .local-storage/
+
+# scratch and transcript logs
+Last_Chat_Freebuff

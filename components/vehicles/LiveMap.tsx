@@ -285,8 +285,25 @@ export function LiveMap() {
       const el = document.createElement('div');
       el.style.cssText = `width:${size}px;height:${size}px;border-radius:8px;background:#1e293b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer`;
       el.textContent = String(count);
-      el.title = `${s.name} — ${count} vehicles`;
-      const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).addTo(map);
+
+      const inchargeInfo = s.inchargeName ? `\nIn-charge: ${s.inchargeName}` : '';
+      const phoneInfo = s.phone ? `\nCUG: ${s.phone}` : '';
+      el.title = `${s.name} (${s.zone} Zone)\nFleet Pool: ${count} vehicles${inchargeInfo}${phoneInfo}\nGPS: ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`;
+
+      const inchargeHtml = s.inchargeName ? `<div style="font-size:12px;margin-top:2px;"><b>In-charge:</b> ${s.inchargeName}</div>` : '';
+      const phoneHtml = s.phone ? `<div style="font-size:12px;margin-top:2px;"><b>CUG Contact:</b> <a href="tel:${s.phone}" style="color:#2563eb;text-decoration:none;">${s.phone}</a></div>` : '';
+      const popupHtml = `
+        <div style="font-family:system-ui,-apple-system,sans-serif;color:#0f172a;padding:4px;min-width:180px;">
+          <div style="font-weight:700;font-size:13px;">${s.name}</div>
+          <div style="font-size:11px;color:#64748b;">${s.zone} Zone &bull; ${s.district}</div>
+          ${inchargeHtml}
+          ${phoneHtml}
+          <div style="font-size:11px;color:#475569;margin-top:4px;"><b>Allocatable Fleet:</b> ${count} vehicles</div>
+          <div style="font-size:10px;color:#94a3b8;margin-top:3px;font-family:monospace;">${s.lat.toFixed(4)}°N, ${s.lng.toFixed(4)}°E</div>
+        </div>
+      `;
+      const popup = new ml.Popup({ offset: 12, closeButton: true }).setHTML(popupHtml);
+      const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
       stationMarkersRef.current.push(marker);
     }
   }, [stations, showStations, mapReady]);

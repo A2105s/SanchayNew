@@ -314,6 +314,7 @@ function ReportIncidentModal({
   const [severity, setSeverity] = useState<IncidentView['severity']>('WARNING');
   const [message, setMessage] = useState('');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [capturedAddress, setCapturedAddress] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -325,9 +326,21 @@ function ReportIncidentModal({
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setCoords({ lat, lng });
         setLocating(false);
         toast('Location captured', 'success');
+        // Describe the point for the human reading the incident. The incident itself stores
+        // coordinates only, and a failed lookup never blocks reporting.
+        void api
+          .get<{ configured: boolean; place: { address: string } | null }>(
+            `/api/integrations/geo/reverse?lat=${lat.toFixed(6)}&lng=${lng.toFixed(6)}`
+          )
+          .then((result) => {
+            if (result.configured && result.place) setCapturedAddress(result.place.address);
+          })
+          .catch(() => undefined);
       },
       () => {
         setLocating(false);
@@ -426,6 +439,12 @@ function ReportIncidentModal({
           </Button>
           {coords && <span className="text-muted mono" style={{ fontSize: '0.78rem' }}>{coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}</span>}
         </div>
+        {capturedAddress ? (
+          <p className="address-search__readout" style={{ margin: 0 }}>
+            <MapPin size={13} aria-hidden="true" />
+            <span>{capturedAddress}</span>
+          </p>
+        ) : null}
       </div>
     </Modal>
   );

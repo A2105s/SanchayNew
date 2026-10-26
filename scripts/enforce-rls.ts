@@ -32,7 +32,8 @@ const TABLES = [
   'UsageCounter',
   'AppSetting',
   'BackendEvent',
-  'SyncJob'
+  'SyncJob',
+  'ExternalDataCache'
 ];
 
 async function main() {

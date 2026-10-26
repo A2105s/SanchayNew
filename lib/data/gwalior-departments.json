@@ -1,0 +1,69 @@
+[
+  {
+    "code": "GWL-DISTRICT",
+    "name": "District Administration & Collectorate Gwalior",
+    "hindiName": "जिला प्रशासन एवं कलेक्ट्रेट, ग्वालियर",
+    "kind": "DISTRICT",
+    "head": "District Magistrate & Collector, Gwalior",
+    "address": "Collectorate Campus, OCM Mill Road, Padav, Gwalior, MP 474002",
+    "phone": "0751-2446200",
+    "email": "dmgwalior@mp.gov.in",
+    "helpline": "181 (CM Helpline)"
+  },
+  {
+    "code": "GWL-POLICE",
+    "name": "Gwalior District Police (MP Police)",
+    "hindiName": "ग्वालियर जिला पुलिस (म.प्र. पुलिस)",
+    "kind": "POLICE",
+    "head": "Superintendent of Police (SP), Gwalior - Shri Dharamveer Singh (IPS)",
+    "address": "SP Office, Police Control Room Road, Jayendraganj, Gwalior, MP 474009",
+    "phone": "0751-2445222",
+    "cug": "7049110800",
+    "email": "sp_gwalior@mppolice.gov.in",
+    "helpline": "112 / 100"
+  },
+  {
+    "code": "GWL-HEALTH",
+    "name": "Chief Medical and Health Office (CMHO) Gwalior",
+    "hindiName": "मुख्य चिकित्सा एवं स्वास्थ्य अधिकारी, ग्वालियर",
+    "kind": "HEALTH",
+    "head": "CMHO Gwalior - Department of Public Health and Family Welfare",
+    "address": "CMHO Office Campus, Morar, Gwalior, MP 474006",
+    "phone": "0751-2368444",
+    "email": "cmhogwa@mp.gov.in",
+    "helpline": "108 (Ambulance) / 102"
+  },
+  {
+    "code": "GWL-GMC",
+    "name": "Gwalior Municipal Corporation (Nagar Nigam)",
+    "hindiName": "नगर पालिक निगम, ग्वालियर",
+    "kind": "MUNICIPAL",
+    "head": "Municipal Commissioner, GMC Gwalior",
+    "address": "Narayan Krishna Shejwalkar Bhawan, City Center, Gwalior, MP 474011",
+    "phone": "0751-2438000",
+    "email": "gmcgwalior@mpgov.in",
+    "helpline": "0751-2438012 / 101 (Fire)"
+  },
+  {
+    "code": "GWL-PWD",
+    "name": "Public Works Department (PWD) Division Gwalior",
+    "hindiName": "लोक निर्माण विभाग (लो.नि.वि.), संभाग ग्वालियर",
+    "kind": "PWD",
+    "head": "Executive Engineer (EE), PWD Gwalior Division No. 1",
+    "address": "PWD Complex, MLB Road, Padav, Gwalior, MP 474002",
+    "phone": "0751-2445350",
+    "email": "eepwdgwl1@mp.gov.in",
+    "helpline": "0751-2445355"
+  },
+  {
+    "code": "GWL-ELECTION",
+    "name": "District Election Office Gwalior",
+    "hindiName": "जिला निर्वाचन कार्यालय, ग्वालियर",
+    "kind": "ELECTION",
+    "head": "Deputy District Election Officer (Dy. DEO), Gwalior",
+    "address": "Collectorate Campus, Room No. 104, City Center, Gwalior, MP 474002",
+    "phone": "0751-2446215",
+    "email": "dydeogwl@mp.gov.in",
+    "helpline": "1950 (Voter Helpline)"
+  }
+]

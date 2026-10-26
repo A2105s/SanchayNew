@@ -1648,5 +1648,134 @@ td {
   border-color: var(--color-brand);
 }
 
+/* ============================================================
+   EXPANDABLE HORIZONTAL CARD (EasyLife Parity: "Show form" banner)
+   ============================================================ */
+.expandable-card {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--brand-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.expandable-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 14px var(--space-5);
+  cursor: pointer;
+  user-select: none;
+  background: var(--color-bg-primary);
+  transition: background-color var(--transition-fast);
+}
+
+.expandable-card__header:hover {
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.03));
+}
+
+.expandable-card__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.expandable-card__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--color-brand-subtle);
+  color: var(--color-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.expandable-card__icon--warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+.expandable-card__icon--success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.expandable-card__icon--danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.expandable-card__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.expandable-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.expandable-card__subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.expandable-card__right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.expandable-card__toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--color-brand);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.expandable-card__toggle-btn:hover {
+  background: var(--color-brand-subtle);
+}
+
+.expandable-card__body {
+  padding: var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+  animation: expandSlideDown 0.22s ease-out;
+}
+
+@keyframes expandSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 
 

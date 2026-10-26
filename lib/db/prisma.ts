@@ -8,14 +8,8 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
  * The dev pool is capped so hot-reloads cannot exhaust the session pooler.
  */
 function resolveDatasourceUrl(): string | undefined {
-  if (process.env.NODE_ENV === 'development') {
-    const direct = process.env.DIRECT_URL;
-    if (!direct) return undefined;
-    if (direct.includes('connection_limit=')) return direct;
-    return `${direct}${direct.includes('?') ? '&' : '?'}connection_limit=5`;
-  }
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) return undefined;
+  if (!dbUrl) return process.env.DIRECT_URL;
   // If connection_limit=1 is present, upgrade to 10 with 20s pool_timeout to avoid starvation on parallel queries
   if (dbUrl.includes('connection_limit=1')) {
     return dbUrl.replace('connection_limit=1', 'connection_limit=10&pool_timeout=20');

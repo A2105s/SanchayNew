@@ -359,7 +359,7 @@ export function VehicleDetail({ id }: { id: string }) {
       ) : null}
 
       {tab === 'operations' && !masked ? (
-        <OperationsSection vehicle={v} trips={trips} maintenance={maintenance} incidents={incidents} fuelLogs={fuelLogs} legal={legal} onDone={refetch} />
+        <OperationsSection vehicle={v} trips={trips} maintenance={maintenance} incidents={incidents} fuelLogs={fuelLogs} legal={legal} canRestriction={canRestriction} onDone={refetch} />
       ) : null}
 
       {tab === 'reservations' ? (
@@ -681,7 +681,9 @@ function OperationsSection({
   maintenance,
   incidents,
   fuelLogs,
-  legal
+  legal,
+  canRestriction,
+  onDone
 }: {
   vehicle: VehicleView;
   trips: VehicleDetailData['trips'];
@@ -689,10 +691,12 @@ function OperationsSection({
   incidents: VehicleDetailData['incidents'];
   fuelLogs: VehicleDetailData['fuelLogs'];
   legal: VehicleDetailData['legal'];
+  canRestriction: boolean;
   onDone: () => void;
 }) {
   return (
     <div className="stack">
+      <CustodyPanel vehicle={vehicle} legal={legal} canRestriction={canRestriction} onDone={onDone} />
       <Panel title="Maintenance">
         {maintenance.length === 0 ? (
           <p className="text-muted">No maintenance records.</p>
@@ -745,13 +749,148 @@ function OperationsSection({
         {legal.length === 0 ? <p className="text-muted">No legal records.</p> : (
           <ul className="plain-list">
             {legal.map((l) => (
-              <li key={l.id}><strong>{l.type}</strong> · <span className="mono">{l.referenceNo}</span> · {l.status}</li>
+              <li key={l.id}>
+                <strong>{l.type}</strong> · <span className="mono">{l.referenceNo}</span> · {l.status}{' '}
+                <Badge tone="neutral">{l.authority}</Badge>
+                {l.cnr ? (
+                  <div className="text-muted" style={{ fontSize: '0.8rem' }}>
+                    CNR <span className="mono">{l.cnr}</span>
+                    {l.caseStage ? ` · stage: ${l.caseStage}` : ''}
+                    {l.caseVerifiedAt ? ` · verified ${fmtDateTime(l.caseVerifiedAt)}` : ''}
+                  </div>
+                ) : null}
+                {canRestriction && l.cnr ? <CourtCaseRefresh vehicleId={l.vehicleId} recordId={l.id} onDone={onDone} /> : null}
+              </li>
             ))}
           </ul>
         )}
       </Panel>
     </div>
   );
+}
+
+/* ---------------- Custody & disposal workflow ---------------- */
+
+const CUSTODY_LABEL: Record<string, string> = {
+  IN_CUSTODY: 'In custody',
+  AUCTION_READY: 'Auction / disposal ready',
+  RELEASED: 'Released from custody',
+  DISPOSED: 'Disposed'
+};
+
+function CustodyPanel({ vehicle, legal, canRestriction, onDone }: { vehicle: VehicleView; legal: VehicleDetailData['legal']; canRestriction: boolean; onDone: () => void }) {
+  const { toast } = useToast();
+  const closed = vehicle.custodyState === 'RELEASED' || vehicle.custodyState === 'DISPOSED';
+  const seized = vehicle.ownershipCategory === 'SEIZED_IMPOUNDED';
+  const showWorkflow = seized || vehicle.custodyState != null;
+  const [mode, setMode] = useState<'none' | 'link' | 'release' | 'auction'>('none');
+  const [cnr, setCnr] = useState('');
+  const [reason, setReason] = useState('');
+  const [authority, setAuthority] = useState('');
+  const [releasedTo, setReleasedTo] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  if (!showWorkflow) return null;
+
+  async function submit(action: 'linkCourtCase' | 'releaseCustody' | 'markAuctionReady', payload: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      await api.post(`/api/cloud/vehicles/${vehicle.id}/actions`, { type: action, ...payload });
+      toast('Recorded', 'success');
+      setMode('none');
+      setCnr('');
+      setReason('');
+      setAuthority('');
+      setReleasedTo('');
+      onDone();
+    } catch (e) {
+      const m = e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Failed';
+      toast(m, 'danger');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Panel title="Custody & disposal">
+      <div className="cluster" style={{ flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+        <Badge tone={vehicle.custodyState === 'AUCTION_READY' ? 'warning' : closed ? 'neutral' : 'danger'}>
+          {CUSTODY_LABEL[vehicle.custodyState ?? 'IN_CUSTODY']}
+        </Badge>
+        {seized ? <OwnershipBadge category={vehicle.ownershipCategory} /> : null}
+      </div>
+      {vehicle.custodyNote ? (
+        <p className="text-muted" style={{ fontSize: '0.85rem', marginTop: 0 }}>{vehicle.custodyNote}</p>
+      ) : null}
+      {seized && legal.filter((l) => l.type === 'COURT_CASE').length === 0 ? (
+        <div className="toast-inline toast-inline--warning" role="note">
+          <AlertTriangle size={16} className="toast-inline__icon" aria-hidden="true" />
+          <span className="toast-inline__message">
+            No court case is linked. Release or auction must rest on a verified legal authorisation — link the eCourts case (CNR) as evidence first.
+          </span>
+        </div>
+      ) : null}
+      {canRestriction && !closed ? (
+        <div className="cluster" style={{ flexWrap: 'wrap' }}>
+          <Button variant="secondary" size="sm" onClick={() => setMode(mode === 'link' ? 'none' : 'link')}>Link court case (CNR)</Button>
+          {seized ? <Button variant="secondary" size="sm" onClick={() => setMode(mode === 'release' ? 'none' : 'release')}>Record custody release</Button> : null}
+          <Button variant="secondary" size="sm" onClick={() => setMode(mode === 'auction' ? 'none' : 'auction')}>Mark auction-ready</Button>
+        </div>
+      ) : null}
+      {mode === 'link' ? (
+        <div className="veh-inline-form">
+          <input className="input" placeholder="16-character CNR, e.g. MPGW010012342024" value={cnr} onChange={(e) => setCnr(e.target.value)} maxLength={16} aria-label="CNR number" />
+          <div className="cluster">
+            <Button variant="ghost" size="sm" onClick={() => setMode('none')} disabled={busy}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={busy} disabled={cnr.trim().length !== 16} onClick={() => submit('linkCourtCase', { cnr: cnr.trim().toUpperCase() })}>Fetch & link</Button>
+          </div>
+          <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Case data comes from eCourts as supporting evidence for a human decision — it never changes eligibility by itself.</p>
+        </div>
+      ) : null}
+      {mode === 'release' ? (
+        <div className="veh-inline-form">
+          <input className="input" placeholder="Authority (e.g. CJM Gwalior order dt. …)" value={authority} onChange={(e) => setAuthority(e.target.value)} aria-label="Releasing authority" />
+          <input className="input" placeholder="Released to (owner / department, optional)" value={releasedTo} onChange={(e) => setReleasedTo(e.target.value)} aria-label="Released to" />
+          <input className="input" placeholder="Reason / order reference" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Release reason" />
+          <div className="cluster">
+            <Button variant="ghost" size="sm" onClick={() => setMode('none')} disabled={busy}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={busy} disabled={!reason.trim() || !authority.trim()} onClick={() => submit('releaseCustody', { reason: reason.trim(), authority: authority.trim(), releasedTo: releasedTo.trim() || undefined })}>Record release</Button>
+          </div>
+          <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Lifts custody restrictions, closes open seizure/court records and retires the asset. Everything is written to the audit ledger.</p>
+        </div>
+      ) : null}
+      {mode === 'auction' ? (
+        <div className="veh-inline-form">
+          <input className="input" placeholder="Authorising authority" value={authority} onChange={(e) => setAuthority(e.target.value)} aria-label="Auction authority" />
+          <div className="cluster">
+            <Button variant="ghost" size="sm" onClick={() => setMode('none')} disabled={busy}>Cancel</Button>
+            <Button variant="primary" size="sm" loading={busy} disabled={!authority.trim()} onClick={() => submit('markAuctionReady', { authority: authority.trim() })}>Mark auction-ready</Button>
+          </div>
+          <p className="text-muted" style={{ fontSize: '0.8rem', margin: 0 }}>Withdraws the vehicle from ordinary allocation and lists it for the GeM disposal export on the Idle &amp; reuse page.</p>
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+function CourtCaseRefresh({ vehicleId, recordId, onDone }: { vehicleId: string; recordId: string; onDone: () => void }) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  async function refresh() {
+    setBusy(true);
+    try {
+      await api.post(`/api/cloud/vehicles/${vehicleId}/actions`, { type: 'refreshCourtCase', recordId });
+      toast('Case refreshed from eCourts cache', 'success');
+      onDone();
+    } catch (e) {
+      toast(e instanceof ApiError ? e.message : e instanceof Error ? e.message : 'Failed', 'danger');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <Button variant="ghost" size="sm" onClick={refresh} loading={busy}>Refresh case</Button>;
 }
 
 /* ---------------- Telemetry ---------------- */

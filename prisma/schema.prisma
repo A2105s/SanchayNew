@@ -134,6 +134,10 @@ model Vehicle {
 
   /// GOVERNMENT_FLEET | SEIZED_IMPOUNDED | OTHER_UNVERIFIED  (default fails closed)
   ownershipCategory      String    @default("OTHER_UNVERIFIED")
+  /// Custody / disposal workflow: IN_CUSTODY | AUCTION_READY | RELEASED | DISPOSED (null = ordinary fleet, no custody flow)
+  custodyState           String?
+  custodyNote            String?
+  custodyUpdatedAt       DateTime?
   /// Cached output of the server-side eligibility service
   /// ELIGIBLE | RESTRICTED | PENDING_VERIFICATION | INELIGIBLE
   eligibilityState       String    @default("PENDING_VERIFICATION")
@@ -344,6 +348,12 @@ model LegalRecord {
   amountInr    Int?
   nextActionAt DateTime?
   authority    String
+  /// eCourts linkage (COURT_CASE only): 16-char CNR, provider case metadata, last verified fetch
+  cnr            String?
+  caseTitle      String?
+  caseStage      String?
+  courtName      String?
+  caseVerifiedAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

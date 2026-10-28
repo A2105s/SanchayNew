@@ -126,7 +126,16 @@ export const vehicleActionSchema = z.discriminatedUnion('type', [
     })
   }),
   z.object({ type: z.literal('updateLegalRecord'), recordId: z.string().trim().min(1), status: zLegalStatus, nextActionAt: isoDateNullable.optional() }),
-  z.object({ type: z.literal('retire'), reason: z.string().trim().min(1).max(500) })
+  z.object({ type: z.literal('retire'), reason: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal('linkCourtCase'), cnr: z.string().trim().length(16).toUpperCase() }),
+  z.object({ type: z.literal('refreshCourtCase'), recordId: z.string().trim().min(1) }),
+  z.object({
+    type: z.literal('releaseCustody'),
+    reason: z.string().trim().min(1).max(500),
+    authority: z.string().trim().min(1).max(200),
+    releasedTo: z.string().trim().max(200).optional()
+  }),
+  z.object({ type: z.literal('markAuctionReady'), authority: z.string().trim().min(1).max(200) })
 ]);
 
 export const vehicleBulkActionSchema = z.discriminatedUnion('type', [

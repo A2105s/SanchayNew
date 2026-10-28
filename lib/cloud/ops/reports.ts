@@ -55,6 +55,7 @@ const REPORT_TITLES: Record<ReportKind, string> = {
   'approval-cycle-time': 'Approval Cycle Time',
   'allocation-history': 'Allocation History',
   'maintenance-history': 'Maintenance History',
+  'gem-disposal': 'GeM Disposal (Auction-Ready)',
   'audit-events': 'Audit Events'
 };
 
@@ -162,6 +163,28 @@ export async function buildReport(user: SessionUser, kind: ReportKind, filters: 
           { key: 'eligibility', label: 'Eligibility' }
         ],
         rows: rows.map((v) => ({ asset: v.assetCode, registration: maskRegistration(v.registrationNumber), ownership: v.ownershipCategory, eligibility: v.eligibilityState })),
+        truncated
+      };
+    }
+
+    case 'gem-disposal': {
+      const where: Prisma.VehicleWhereInput = { AND: [vehicleWhere, { custodyState: 'AUCTION_READY' }] };
+      const vehicles = await prisma.vehicle.findMany({ where, take: rowCap + 1 });
+      const truncated = vehicles.length > rowCap;
+      const rows = vehicles.slice(0, rowCap);
+      return {
+        ...base,
+        metrics: [metric('count', 'Auction-ready', rows.length, 'Vehicles marked AUCTION_READY in the custody/disposal workflow; withdrawn from ordinary allocation.')],
+        columns: [
+          { key: 'asset', label: 'Asset' },
+          { key: 'registration', label: 'Registration' },
+          { key: 'makeModel', label: 'Make / model' },
+          { key: 'class', label: 'Class' },
+          { key: 'ownership', label: 'Ownership' },
+          { key: 'custodyNote', label: 'Disposal authorization' },
+          { key: 'since', label: 'Marked at' }
+        ],
+        rows: rows.map((v) => ({ asset: v.assetCode, registration: maskRegistration(v.registrationNumber), makeModel: v.makeModel ?? '', class: v.vehicleClass, ownership: v.ownershipCategory, custodyNote: v.custodyNote ?? '', since: v.custodyUpdatedAt ? v.custodyUpdatedAt.toISOString() : '' })),
         truncated
       };
     }

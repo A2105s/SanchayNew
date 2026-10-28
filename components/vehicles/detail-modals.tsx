@@ -534,6 +534,11 @@ export function LegalRecordModal({
             amountInr: amountInr ? Number(amountInr) : null,
             nextActionAt: nextActionAt || null,
             authority: authority.trim(),
+            cnr: null,
+            caseTitle: null,
+            caseStage: null,
+            courtName: null,
+            caseVerifiedAt: null,
           },
         });
       }

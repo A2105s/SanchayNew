@@ -117,11 +117,14 @@ export function KpiCard({
    Layout helpers
    ────────────────────────────────────────────────────────────── */
 
-export function SectionHeading({ title, description }: { title: string; description?: string }) {
+export function SectionHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
   return (
-    <div className="an-section">
-      <h2 className="an-section__title">{title}</h2>
-      {description ? <span className="an-section__desc">{description}</span> : null}
+    <div className="an-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div>
+        <h2 className="an-section__title">{title}</h2>
+        {description ? <span className="an-section__desc">{description}</span> : null}
+      </div>
+      {action}
     </div>
   );
 }

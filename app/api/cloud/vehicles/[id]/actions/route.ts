@@ -37,6 +37,10 @@ function permissionFor(action: VehicleActionParsed): Permission {
       return 'trip.write';
     case 'addLegalRecord':
     case 'updateLegalRecord':
+    case 'linkCourtCase':
+    case 'refreshCourtCase':
+    case 'releaseCustody':
+    case 'markAuctionReady':
       return 'restriction.manage';
     default:
       return 'vehicle.edit';

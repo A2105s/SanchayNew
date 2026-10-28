@@ -13,6 +13,7 @@ import { nextAssetCode, nextIncidentCode, nextTicketCode, nextTripCode } from '@
 import { reevaluateEligibility } from '@/lib/cloud/eligibility';
 import { recomputeStationInventoryForVehicle } from '@/lib/cloud/ops/transfers';
 import { orgTree } from '@/lib/auth/scope';
+import { getCaseByCnr } from '@/lib/integrations/ecourts/client';
 import type { VehicleInputParsed, VehicleActionParsed } from '@/lib/validation/schemas';
 
 type TxClient = Prisma.TransactionClient;
@@ -560,6 +561,147 @@ export async function updateLegalRecord(user: SessionUser, id: string, args: { r
 }
 
 // ---------------------------------------------------------------------------
+// Seized-vehicle custody & disposal workflow (spec 13: legal-status gating)
+// ---------------------------------------------------------------------------
+
+const ACTIVE_CUSTODY_STATES = ['IN_CUSTODY', 'AUCTION_READY'];
+
+function assertCustodyActionable(vehicle: Vehicle, action: string): void {
+  if (vehicle.custodyState && !ACTIVE_CUSTODY_STATES.includes(vehicle.custodyState)) {
+    throw new DomainError(`Custody workflow is closed for this vehicle (${vehicle.custodyState}); ${action} is no longer possible.`, 409);
+  }
+}
+
+/** Link an eCourts case (by CNR) to the vehicle as a COURT_CASE legal record. Evidence only — never an eligibility verdict. */
+export async function linkCourtCase(user: SessionUser, id: string, cnr: string, correlationId: string) {
+  const current = await loadOwnVehicle(user, id);
+  const result = await getCaseByCnr(cnr, { refresh: false });
+  if (result.status === 'not_configured') throw new DomainError('Court-case verification is not configured on this server.', 503);
+  if (result.status === 'not_found') throw new DomainError('No eCourts record was found for that CNR.', 404);
+  if (result.status === 'invalid_request') throw new DomainError('That CNR was rejected by eCourts as invalid.', 400);
+  if (!result.case) throw new DomainError('eCourts is unavailable right now. This is not a negative result — try again later.', 503);
+
+  const c = result.case;
+  const duplicate = await prisma.legalRecord.findFirst({ where: { vehicleId: id, type: 'COURT_CASE', cnr: c.cnr, status: { not: 'RESOLVED' } } });
+  if (duplicate) throw new DomainError(`Case ${c.cnr} is already linked to this vehicle.`, 409);
+
+  const disposed = (c.disposalType != null && c.disposalType !== '') || (c.status.code ?? '').toUpperCase().includes('DISPOSED');
+  const legal = await prisma.$transaction(async (tx) => {
+    const row = await tx.legalRecord.create({
+      data: {
+        vehicleId: id,
+        type: 'COURT_CASE',
+        referenceNo: c.caseNumber ?? c.cnr,
+        date: toDate(c.filingDate) ?? new Date(),
+        description: [c.caseType.label ? `Case type: ${c.caseType.label}` : null, c.actsAndSections.length ? c.actsAndSections.join('; ') : null].filter(Boolean).join(' · ') || 'eCourts case linked by CNR.',
+        status: disposed ? 'RESOLVED' : 'ACTIVE',
+        authority: c.court.label ?? 'eCourts',
+        nextActionAt: toDate(c.nextHearingDate),
+        cnr: c.cnr,
+        caseTitle: [c.caseType.label, c.caseNumber].filter(Boolean).join(' ') || c.cnr,
+        caseStage: c.status.label,
+        courtName: c.court.label,
+        caseVerifiedAt: new Date()
+      }
+    });
+    await writeAudit(tx, { entityType: 'LegalRecord', entityId: row.id, action: 'CourtCaseLinked', newValue: c.cnr, performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId, reason: 'Custody workflow: eCourts case linked as evidence' });
+    return row;
+  });
+  invalidate();
+  return { vehicle: current, legalRecord: legal, cached: result.cached };
+}
+
+/** Re-fetch a linked court case from the eCourts cache and refresh its stage/status. */
+export async function refreshCourtCase(user: SessionUser, id: string, recordId: string, correlationId: string) {
+  const current = await loadOwnVehicle(user, id);
+  const record = await prisma.legalRecord.findUnique({ where: { id: recordId } });
+  if (!record || record.vehicleId !== id) throw new DomainError('Legal record not found for this vehicle.', 404);
+  if (record.type !== 'COURT_CASE' || !record.cnr) throw new DomainError('Only an eCourts-linked court case can be refreshed.', 400);
+
+  const result = await getCaseByCnr(record.cnr, { refresh: false });
+  if (result.status !== 'ok' || !result.case) throw new DomainError('eCourts is unavailable right now — the stored case details are unchanged.', 503);
+  const c = result.case;
+  const disposed = (c.disposalType != null && c.disposalType !== '') || (c.status.code ?? '').toUpperCase().includes('DISPOSED');
+  const legal = await prisma.$transaction(async (tx) => {
+    const row = await tx.legalRecord.update({
+      where: { id: record.id },
+      data: {
+        status: disposed ? 'RESOLVED' : record.status === 'RESOLVED' ? 'RESOLVED' : 'ACTIVE',
+        caseStage: c.status.label,
+        courtName: c.court.label,
+        nextActionAt: toDate(c.nextHearingDate),
+        caseVerifiedAt: new Date()
+      }
+    });
+    await writeAudit(tx, { entityType: 'LegalRecord', entityId: row.id, action: 'CourtCaseRefreshed', fieldName: 'caseStage', oldValue: record.caseStage, newValue: c.status.label, performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId });
+    return row;
+  });
+  invalidate();
+  return { vehicle: current, legalRecord: legal };
+}
+
+/** Release a seized vehicle from custody (court order / release to owner). Lifts custody restrictions, closes open seizure records, retires the asset. */
+export async function releaseCustody(user: SessionUser, id: string, args: { reason: string; authority: string; releasedTo?: string }, correlationId: string): Promise<VehicleView> {
+  const current = await loadOwnVehicle(user, id);
+  if (current.ownershipCategory !== 'SEIZED_IMPOUNDED') throw new DomainError('Only seized/impounded vehicles follow the custody-release workflow.', 400);
+  assertCustodyActionable(current, 'release');
+
+  const vehicle = await prisma.$transaction(async (tx) => {
+    const lifted = await tx.vehicleRestriction.updateMany({
+      where: { vehicleId: id, liftedAt: null, type: { in: ['LEGAL_CUSTODY', 'COURT_ORDER'] } },
+      data: { liftedAt: new Date(), liftedBy: user.username, liftReason: `Custody released: ${args.reason}` }
+    });
+    const closed = await tx.legalRecord.updateMany({
+      where: { vehicleId: id, type: { in: ['SEIZURE', 'COURT_CASE'] }, status: { not: 'RESOLVED' } },
+      data: { status: 'RESOLVED' }
+    });
+    await tx.vehicle.update({
+      where: { id },
+      data: {
+        custodyState: 'RELEASED',
+        custodyNote: `Released by ${args.authority}${args.releasedTo ? ` to ${args.releasedTo}` : ''}: ${args.reason}`,
+        custodyUpdatedAt: new Date(),
+        operationalStatus: 'RETIRED'
+      }
+    });
+    await reevaluateEligibility(id, tx);
+    await writeAudit(tx, { entityType: 'Vehicle', entityId: id, action: 'CustodyReleased', fieldName: 'custodyState', oldValue: current.custodyState ?? 'IN_CUSTODY', newValue: 'RELEASED', performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId, reason: args.reason });
+    const refreshed = await tx.vehicle.findUniqueOrThrow({ where: { id } });
+    await recomputeStationInventoryForVehicle(tx, refreshed.stationId);
+    return refreshed;
+  }, { timeout: 20000, maxWait: 10000 });
+  invalidate();
+  return mapWithOrg(vehicle);
+}
+
+/** Mark a vehicle ready for the authorised disposal/auction process (GeM surplus listing). Stops ordinary allocation. */
+export async function markAuctionReady(user: SessionUser, id: string, authority: string, correlationId: string): Promise<VehicleView> {
+  const current = await loadOwnVehicle(user, id);
+  if (current.ownershipCategory === 'OTHER_UNVERIFIED') throw new DomainError('Unverified vehicles must complete ownership verification before disposal.', 400);
+  if (current.custodyState === 'AUCTION_READY') throw new DomainError('Vehicle is already marked auction-ready.', 409);
+  assertCustodyActionable(current, 'auction marking');
+
+  const vehicle = await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: {
+        custodyState: 'AUCTION_READY',
+        custodyNote: `Auction/disposal authorised by ${authority}`,
+        custodyUpdatedAt: new Date(),
+        operationalStatus: 'RETIRED'
+      }
+    });
+    await reevaluateEligibility(id, tx);
+    await writeAudit(tx, { entityType: 'Vehicle', entityId: id, action: 'AuctionReadyMarked', fieldName: 'custodyState', oldValue: current.custodyState ?? null, newValue: 'AUCTION_READY', performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId, reason: `Authority: ${authority}` });
+    const refreshed = await tx.vehicle.findUniqueOrThrow({ where: { id } });
+    await recomputeStationInventoryForVehicle(tx, refreshed.stationId);
+    return refreshed;
+  }, { timeout: 20000, maxWait: 10000 });
+  invalidate();
+  return mapWithOrg(vehicle);
+}
+
+// ---------------------------------------------------------------------------
 // Action dispatcher
 // ---------------------------------------------------------------------------
 
@@ -628,6 +770,18 @@ export async function applyVehicleAction(user: SessionUser, id: string, action: 
       const r = await updateLegalRecord(user, id, action, correlationId);
       return { vehicle: await mapWithOrg(r.vehicle), legalRecord: r.legalRecord };
     }
+    case 'linkCourtCase': {
+      const r = await linkCourtCase(user, id, action.cnr, correlationId);
+      return { vehicle: await mapWithOrg(r.vehicle), legalRecord: r.legalRecord };
+    }
+    case 'refreshCourtCase': {
+      const r = await refreshCourtCase(user, id, action.recordId, correlationId);
+      return { vehicle: await mapWithOrg(r.vehicle), legalRecord: r.legalRecord };
+    }
+    case 'releaseCustody':
+      return { vehicle: await releaseCustody(user, id, action, correlationId) };
+    case 'markAuctionReady':
+      return { vehicle: await markAuctionReady(user, id, action.authority, correlationId) };
     case 'retire':
       return { vehicle: await retireVehicle(user, id, action.reason, correlationId) };
     default: {

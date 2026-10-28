@@ -28,6 +28,8 @@ function suggestionFor(v: VehicleView, days: number): string {
 
 export default function IdleReusePage() {
   const { snapshot, loading, error, can } = useFleet();
+  const canRestriction = can('restriction.manage');
+  const canExport = can('export');
 
   const model = useMemo(() => {
     if (!snapshot) return null;
@@ -47,8 +49,10 @@ export default function IdleReusePage() {
     // Never allocatable: seized / unverified / restricted. Listed read-only with the server's reason codes.
     const blocked = vehicles.filter((v) => v.eligibilityState !== 'ELIGIBLE' && v.operationalStatus !== 'RETIRED');
     // Disposal candidates: retired government fleet only.
-    const retired = vehicles.filter((v) => v.ownershipCategory === 'GOVERNMENT_FLEET' && v.operationalStatus === 'RETIRED');
-    return { reuse, blocked, retired, thresholdHours: snapshot.settings?.idleThresholdHours ?? 72 };
+    const retired = vehicles.filter((v) => v.ownershipCategory === 'GOVERNMENT_FLEET' && v.operationalStatus === 'RETIRED' && v.custodyState !== 'AUCTION_READY');
+    // Auction-ready: marked through the custody & disposal workflow on the vehicle passport.
+    const auctionReady = vehicles.filter((v) => v.custodyState === 'AUCTION_READY');
+    return { reuse, blocked, retired, auctionReady, thresholdHours: snapshot.settings?.idleThresholdHours ?? 72 };
   }, [snapshot]);
 
   if (loading && !snapshot) {
@@ -110,11 +114,18 @@ export default function IdleReusePage() {
                       <td className="mono">{r.days} d</td>
                       <td>{r.suggestion}</td>
                       <td>
-                        {can('request.create') ? (
-                          <ButtonLink href={`/requests?new=1&vehicleId=${r.vehicle.id}`} variant="secondary" size="sm" icon={<Recycle size={14} />}>
-                            Request this vehicle
-                          </ButtonLink>
-                        ) : null}
+                        <div className="cluster" style={{ flexWrap: 'wrap' }}>
+                          {can('request.create') ? (
+                            <ButtonLink href={`/requests?new=1&vehicleId=${r.vehicle.id}`} variant="secondary" size="sm" icon={<Recycle size={14} />}>
+                              Request this vehicle
+                            </ButtonLink>
+                          ) : null}
+                          {canRestriction && r.days >= 30 ? (
+                            <ButtonLink href={`/vehicles/${r.vehicle.id}`} variant="ghost" size="sm" icon={<Archive size={14} />}>
+                              Disposal options
+                            </ButtonLink>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -172,12 +183,49 @@ export default function IdleReusePage() {
           <div style={{ marginTop: 12 }} className="cluster">
             <ShieldAlert size={15} aria-hidden="true" />
             <span className="text-muted" style={{ fontSize: '0.82rem' }}>
-              Seized and impounded vehicles are held in custody. They can only become allocatable through a verified legal authorisation recorded by an authorised officer.
+              Seized and impounded vehicles are held in custody. Link the eCourts case and record a release or auction authorisation from the vehicle passport (Operations tab) — they can only leave custody through a verified legal authorisation recorded by an authorised officer.
             </span>
           </div>
         </ChartCard>
 
-        <SectionHeading title="Disposal candidates" description="Retired government-fleet vehicles only" />
+        <SectionHeading
+          title="Disposal & auction (GeM)"
+          description="Vehicles marked auction-ready through the custody & disposal workflow on their passport, plus retired fleet awaiting disposal."
+          action={canExport ? <ButtonLink href="/api/cloud/exports/gem-disposal" variant="secondary" size="sm" icon={<Archive size={14} />}>Export GeM CSV</ButtonLink> : undefined}
+        />
+        <ChartCard title="Auction-ready" subtitle="Withdrawn from ordinary allocation; listed for the authorised disposal process">
+          {model.auctionReady.length === 0 ? (
+            <EmptyState label="No vehicle is currently marked auction-ready. Mark one from its passport (Operations tab) or the Disposal options link above." />
+          ) : (
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>Class</th>
+                    <th>Ownership</th>
+                    <th>Disposal authorization</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {model.auctionReady.map((v) => (
+                    <tr key={v.id}>
+                      <td>
+                        <Link href={`/vehicles/${v.id}`}>
+                          <span className="reg-plate-inline">{v.registrationNumber}</span>
+                        </Link>
+                        <div className="text-muted" style={{ fontSize: '0.8rem' }}>{v.displayName}</div>
+                      </td>
+                      <td>{CLASS_LABEL[v.vehicleClass]}</td>
+                      <td><OwnershipBadge category={v.ownershipCategory} /></td>
+                      <td className="text-muted" style={{ fontSize: '0.85rem' }}>{v.custodyNote ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </ChartCard>
         <ChartCard title="Retired fleet" subtitle="Handled through your department's disposal process">
           {model.retired.length === 0 ? (
             <EmptyState label="No retired government vehicles." />

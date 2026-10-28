@@ -136,6 +136,9 @@ export function mapVehicle(row: Vehicle, organizationName: string, freshMinutes 
     status: row.status as VehicleStatus,
     operationalStatus: row.operationalStatus as OperationalStatus,
     ownershipCategory: row.ownershipCategory as OwnershipCategory,
+    custodyState: (row.custodyState as VehicleView['custodyState']) ?? null,
+    custodyNote: row.custodyNote,
+    custodyUpdatedAt: iso(row.custodyUpdatedAt),
     eligibilityState: row.eligibilityState as EligibilityState,
     eligibilityReasons: reasons,
     eligibilityPolicyVersion: row.eligibilityPolicyVersion,
@@ -279,7 +282,12 @@ export function mapLegal(row: LegalRecord): LegalRecordView {
     status: row.status as LegalRecordView['status'],
     amountInr: row.amountInr,
     nextActionAt: iso(row.nextActionAt),
-    authority: row.authority
+    authority: row.authority,
+    cnr: row.cnr,
+    caseTitle: row.caseTitle,
+    caseStage: row.caseStage,
+    courtName: row.courtName,
+    caseVerifiedAt: iso(row.caseVerifiedAt)
   };
 }
 

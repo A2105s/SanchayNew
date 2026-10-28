@@ -136,6 +136,10 @@ export interface VehicleView {
   status: VehicleStatus; // live motion
   operationalStatus: OperationalStatus;
   ownershipCategory: OwnershipCategory;
+  /** Custody / disposal workflow: IN_CUSTODY | AUCTION_READY | RELEASED | DISPOSED; null = ordinary fleet */
+  custodyState: 'IN_CUSTODY' | 'AUCTION_READY' | 'RELEASED' | 'DISPOSED' | null;
+  custodyNote: string | null;
+  custodyUpdatedAt: string | null;
   eligibilityState: EligibilityState;
   eligibilityReasons: EligibilityReason[];
   eligibilityPolicyVersion: string | null;
@@ -332,6 +336,12 @@ export interface LegalRecordView {
   amountInr: number | null;
   nextActionAt: string | null;
   authority: string;
+  /** eCourts linkage (COURT_CASE only) */
+  cnr: string | null;
+  caseTitle: string | null;
+  caseStage: string | null;
+  courtName: string | null;
+  caseVerifiedAt: string | null;
 }
 
 export interface IncidentView {
@@ -830,6 +840,7 @@ export type ReportKind =
   | 'approval-cycle-time'
   | 'allocation-history'
   | 'maintenance-history'
+  | 'gem-disposal'
   | 'audit-events';
 
 export interface ReportMetric {

@@ -95,3 +95,87 @@ Four new audited vehicle actions (permission `restriction.manage`, held by ORG_A
 - Typecheck clean; database schema pushed; app verified.
 - Not yet committed — say the word and tonight's work can be committed/pushed as one or several commits.
 - Next up when you are: the **Civic Spaces module** (spec files 00–12), reusing the eligibility, request/approval, reporting and map patterns the vehicle module already has.
+
+---
+
+# Addendum (same night): Civic Spaces module — Phase 2 build
+
+## Schema (`prisma/schema.prisma`, pushed via `npm run db:push`)
+- **`Space`** — assetCode `SCH-SP-####`, name, category (MEETING_ROOM / TRAINING_HALL / AUDITORIUM / OFFICE / COMMUNITY_HALL / STORE / OTHER), org ownership, building/address/district, lat+lng, capacity, areaSqft, `operationalState` (AVAILABLE | IDLE | RESTRICTED | RETIRED — "Booked" is derived from live bookings, "Maintenance" from blocking tickets), amenities/accessibility (JSON arrays), per-weekday IST operating hours, min/max booking hours, booking lead days, manager/contact.
+- **`SpaceBooking`** — bookingCode `SB-YYYY-####`, purpose, attendees, startAt/endAt, status `PENDING | CONFIRMED | REJECTED | CANCELLED | COMPLETED`, review/rejection/cancellation metadata.
+- **`SpaceMaintenance`** — severity LOW→CRITICAL, OPEN/IN_PROGRESS/RESOLVED, `blocksBooking` flag (CRITICAL defaults to blocking).
+- **`SpaceRequest`** — REGISTER / UPDATE proposals, status `SUBMITTED | UNDER_REVIEW | NEEDS_INFO | APPROVED | REJECTED | WITHDRAWN`, reviewer fields, `appliedAt` idempotency marker.
+
+**Database-level guarantees** (`prisma/post-push.sql`, applied): a PostgreSQL `EXCLUDE USING gist` constraint makes two overlapping live bookings on one space impossible even under concurrent requests (PENDING also blocks, preventing double-holds); period validity and CHECK constraints on every enumerated state.
+
+## Booking engine (`lib/fleet/spaces.ts` pure policy + `lib/cloud/ops/space-bookings.ts`)
+- Pure policy functions: IST (UTC+5:30, fixed offset) operating-hours window checks, same-day enforcement, min/max duration, lead-time window, capacity, slot states `available / pending approval / booked / blocked / maintenance` (text-encoded, spec 09).
+- `createSpaceBooking`: full policy re-validation server-side, slot re-check inside the transaction, then auto-CONFIRM if duration ≤ the configurable threshold, else PENDING for review. The EXCLUDE constraint is the final concurrency guard (violation → friendly 409 "slot just taken").
+- Review actions: approve (re-validates slot availability first), reject (reason), cancel (requester or reviewing officer), complete. **Self-review is always blocked** (separation of duties). Every transition is audited.
+- Calendar endpoint: per-space live bookings + maintenance-blocked flag.
+
+## Request center (`lib/cloud/ops/space-requests.ts`, spec 11)
+- REGISTER and UPDATE proposals with duplicate-open-request guard.
+- Reviewer actions: start review, request info, approve (idempotent apply), reject, withdraw (requester only). Stored payloads are **re-validated against the space field schema at apply time** — persisted JSON is never trusted. Approved UPDATEs write before/after audit entries; approved REGISTERs create the space in the **requester's** organization with a fresh asset code.
+
+## Settings (`/spaces/settings`, admin only)
+- `approvalThresholdHours` (0 = all bookings need review), `bookingWindowDays`, `idleAlertDays`; every change audited with old/new values and a required reason.
+
+## Reports
+- New report kinds in the existing audited report/export pipeline: `space-bookings` (list, CSV exportable) and `space-utilization` (booked hours + booking counts per space).
+
+## API routes (all `requirePermission`, zod-validated, `{success,data}` envelope)
+`GET/POST /api/cloud/spaces` · `GET /api/cloud/spaces/[id]` · `POST /api/cloud/spaces/[id]/actions` (update / setState / raiseMaintenance / updateMaintenance) · `GET /api/cloud/spaces/[id]/calendar` · `GET/POST /api/cloud/space-bookings` · `POST /api/cloud/space-bookings/[id]/actions` · `GET/POST /api/cloud/space-requests` · `POST /api/cloud/space-requests/[id]/actions` · `GET/PUT /api/cloud/space-settings`
+
+## Permissions
+New capabilities `space.manage` (ORG_ADMIN, DEPT_OFFICER), `space.book` (+ STATION_OFFICER, FIELD_STAFF), `space.review` (ORG_ADMIN, DEPT_OFFICER) added to the authoritative matrix in `lib/auth/roles.ts`.
+
+## UI (EasyLife patterns, light/dark, scoped to role)
+- **`/spaces`** — KPI row (in scope / bookable now / in use / idle 14+ d), search (name/address/asset ID), category & state filters, min-capacity and bookable-only filters, card grid with per-card booking rules explained (spec 02: disabled CTAs explain why), registration request modal.
+- **`/spaces/[id]`** — full passport: about, amenities/accessibility, operating hours panel, MiniMap when coordinates exist, maintenance tickets (raise/update for managers), recent bookings, booking dialog with live policy hints (duration vs allowed range, lead date, slot-conflict messaging).
+- **`/spaces/bookings`** — my bookings (upcoming/pending/completed/cancelled/rejected buckets) + review-queue mode with approve/reject/cancel dialogs.
+- **`/spaces/requests`** — my requests + review queue with the full state machine, proposed-changes viewer, withdraw.
+- **`/spaces/settings`** — booking policy form.
+- Sidebar + command palette wired; the old `/spaces` placeholder is replaced.
+
+## Seed + verification
+- 6 demo spaces seeded across District Administration, Police, CMHO, GMC, PWD and Election orgs with realistic operating hours and amenities.
+- Runtime-verified end-to-end (domain + HTTP):
+  1. valid 2 h booking → **auto-CONFIRMED** (≤ 4 h threshold)
+  2. overlapping request → **409 "slot just taken"**
+  3. after-hours request → **422 policy rejection**
+  4. 5 h request → **PENDING** review
+  5. requester approving own booking → **blocked**
+  6. reviewer approval → CONFIRMED, audit rows written
+  7. HTTP smoke: spaces search, detail, utilization report, bookings CSV export all 200 through the running server.
+- Typecheck and ESLint clean across all new files. Test bookings cleaned from the DB afterward.
+
+## Deliberate scope notes (for the next iteration)
+- Full map dashboard with clustering (spec 03/04): detail page uses the existing MiniMap; a dedicated spaces map view is the first follow-up.
+- Public citizen signup (spec 05): intentionally not built — Sanchay stays an internal operator platform; spaces reuse the same session/role system.
+- Print/QR passport for spaces and notifications on status changes are not wired yet.
+
+---
+
+# Addendum 2: Police-station logins & the IAS oversight narrative
+
+Per the operational model: the requesting loop runs **between two police stations** (or any two government bodies), while senior officials (IAS / District Magistrate) oversee as platform admins **and** act as the court-side approving authority in the seized-vehicle custody workflow. The Spaces module intentionally keeps department-level logins — no station identity needed there.
+
+## What was added
+
+1. **A station-officer login for every police station** — username `ps.<station>` (e.g. `ps.kotwali`, `ps.antri`, `ps.bahodapur`…), display name "Station Incharge — <station>", shared demo password. Created live (37 stations) and added to the seed for fresh installs (`lib/seed/gwalior.ts`).
+2. **`dm.gwalior`** — "District Magistrate, Gwalior (IAS) — approving authority", ADMIN role under the District Administration org. Added to the seed too. In the demo narrative this is the higher official: oversees the whole platform as admin, and the court-judge authority is exercised in the custody workflow (release/auction record the authorising authority, e.g. "CJM Gwalior order").
+3. **`GET /api/auth/stations`** — public, read-only directory (station name + login username only) that powers the login page. Added to the `proxy.ts` public allowlist.
+4. **Login page** — new "Police station login" dropdown listing all stations by name; picking one fills the username and demo password. Demo-account list now leads with `dm.gwalior` and the hint explains the station-to-station loop.
+
+## Verified live
+- `ps.kotwali` logs in and sees only its station-scoped fleet (3 vehicles, 1 org).
+- Random station (`ps.bahodapur`) logs in via the directory credentials.
+- `dm.gwalior` logs in as platform admin.
+- Station directory endpoint 200 with 39 station logins after the proxy allowlist change.
+
+## How the demo loop plays out
+1. Sign in as **Station A** (e.g. `ps.kotwali`) → `/vehicles/discover` → find an eligible vehicle at **Station B** for a date range → request it.
+2. Sign in as **Station B**'s officer (or `dept.officer`) → `/requests` → approve (atomic allocation) → handover → return.
+3. Sign in as **`dm.gwalior`** (IAS) → dashboard/audit oversight; for seized vehicles, record release or auction authorisation in the custody workflow citing the court order.
+4. Spaces flows run at department level (`dept.health`, `org.police`, `dm.gwalior` for policy) — no station logins, by design.

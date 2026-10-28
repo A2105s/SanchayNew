@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { spaceIdleDays } from '@/lib/fleet/spaces';
+
 import type {
   Allocation,
   ApprovalStep,
@@ -16,6 +18,10 @@ import type {
   Operator,
   Organization,
   ReturnRecord,
+  Space,
+  SpaceBooking,
+  SpaceMaintenance,
+  SpaceRequest,
   Station,
   StationInventory,
   Trip,
@@ -62,7 +68,11 @@ import type {
   VehicleStatus,
   OperationalStatus,
   EligibilityState,
-  VehicleView
+  VehicleView,
+  SpaceView,
+  SpaceBookingView,
+  SpaceMaintenanceView,
+  SpaceRequestView
 } from '@/types';
 import { maskRegistration } from '@/lib/auth/scope';
 
@@ -555,5 +565,117 @@ export function mapOperator(row: Operator): OperatorView {
     stationId: row.stationId,
     active: row.active,
     lastLoginAt: iso(row.lastLoginAt)
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Civic Spaces
+// ---------------------------------------------------------------------------
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string') : [];
+}
+
+export function mapSpace(
+  row: Space & { organization?: { name: string } | null },
+  now = new Date(),
+  lastBookingEnd: Date | null = null
+): SpaceView {
+  const state = row.operationalState as SpaceView['operationalState'];
+  return {
+    id: row.id,
+    assetCode: row.assetCode,
+    name: row.name,
+    category: row.category as SpaceView['category'],
+    organizationId: row.organizationId,
+    organizationName: row.organization?.name ?? '',
+    buildingOrCampus: row.buildingOrCampus,
+    addressLine: row.addressLine,
+    district: row.district,
+    city: row.city,
+    lat: row.lat,
+    lng: row.lng,
+    capacity: row.capacity,
+    areaSqft: row.areaSqft,
+    operationalState: state,
+    description: row.description,
+    managerName: row.managerName,
+    contactOfficerName: row.contactOfficerName,
+    contactPhone: row.contactPhone,
+    amenities: stringArray(row.amenities),
+    accessibility: stringArray(row.accessibility),
+    operatingHours: (row.operatingHours ?? {}) as SpaceView['operatingHours'],
+    minBookingHours: row.minBookingHours,
+    maxBookingHours: row.maxBookingHours,
+    bookingLeadDays: row.bookingLeadDays,
+    notes: row.notes,
+    createdAt: isoReq(row.createdAt),
+    updatedAt: isoReq(row.updatedAt),
+    busyNow: false,
+    blockedByMaintenance: false,
+    idleDays: state === 'RESTRICTED' || state === 'RETIRED' ? null : spaceIdleDays(lastBookingEnd, false, now)
+  };
+}
+
+export function mapSpaceBooking(row: SpaceBooking & { space?: { name: string; assetCode: string } | null }): SpaceBookingView {
+  return {
+    id: row.id,
+    bookingCode: row.bookingCode,
+    spaceId: row.spaceId,
+    spaceName: row.space?.name ?? '',
+    spaceAssetCode: row.space?.assetCode ?? '',
+    requestedBy: row.requestedBy,
+    requestedForOrgId: row.requestedForOrgId,
+    requestedForOrgName: null,
+    purpose: row.purpose,
+    attendees: row.attendees,
+    startAt: isoReq(row.startAt),
+    endAt: isoReq(row.endAt),
+    status: row.status as SpaceBookingView['status'],
+    reviewNote: row.reviewNote,
+    approvedBy: row.approvedBy,
+    approvedAt: iso(row.approvedAt),
+    rejectionReason: row.rejectionReason,
+    cancelledBy: row.cancelledBy,
+    cancelledAt: iso(row.cancelledAt),
+    cancellationReason: row.cancellationReason,
+    completedAt: iso(row.completedAt),
+    createdAt: isoReq(row.createdAt)
+  };
+}
+
+export function mapSpaceMaintenance(row: SpaceMaintenance): SpaceMaintenanceView {
+  return {
+    id: row.id,
+    spaceId: row.spaceId,
+    title: row.title,
+    description: row.description,
+    severity: row.severity as SpaceMaintenanceView['severity'],
+    status: row.status as SpaceMaintenanceView['status'],
+    blocksBooking: row.blocksBooking,
+    reportedBy: row.reportedBy,
+    resolvedBy: row.resolvedBy,
+    resolvedAt: iso(row.resolvedAt),
+    resolutionNote: row.resolutionNote,
+    costInr: row.costInr,
+    createdAt: isoReq(row.createdAt)
+  };
+}
+
+export function mapSpaceRequest(row: SpaceRequest & { space?: { name: string } | null }): SpaceRequestView {
+  return {
+    id: row.id,
+    type: row.type as SpaceRequestView['type'],
+    spaceId: row.spaceId,
+    spaceName: row.space?.name ?? null,
+    requestedBy: row.requestedBy,
+    payload: (row.payload ?? {}) as Record<string, unknown>,
+    status: row.status as SpaceRequestView['status'],
+    infoRequestReason: row.infoRequestReason,
+    reviewNote: row.reviewNote,
+    reviewedBy: row.reviewedBy,
+    reviewedAt: iso(row.reviewedAt),
+    appliedAt: iso(row.appliedAt),
+    createdAt: isoReq(row.createdAt)
   };
 }

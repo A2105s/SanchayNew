@@ -54,3 +54,33 @@ DROP TRIGGER IF EXISTS audit_log_append_only ON "AuditLog";
 CREATE TRIGGER audit_log_append_only
   BEFORE UPDATE OR DELETE ON "AuditLog"
   FOR EACH ROW EXECUTE FUNCTION sanchay_audit_append_only();
+
+-- 5. Civic Spaces (spec 09/10): a space can never hold two overlapping live bookings,
+--    even under concurrent create attempts (PENDING also blocks to prevent double-holds).
+ALTER TABLE "SpaceBooking" DROP CONSTRAINT IF EXISTS space_booking_no_overlap;
+ALTER TABLE "SpaceBooking"
+  ADD CONSTRAINT space_booking_no_overlap
+  EXCLUDE USING gist ("spaceId" WITH =, tsrange("startAt", "endAt", '[)') WITH &&)
+  WHERE ("status" IN ('PENDING', 'CONFIRMED'));
+ALTER TABLE "SpaceBooking" DROP CONSTRAINT IF EXISTS space_booking_period_valid;
+ALTER TABLE "SpaceBooking" ADD CONSTRAINT space_booking_period_valid CHECK ("endAt" > "startAt");
+
+-- Spaces enumerated states (fail closed)
+ALTER TABLE "Space" DROP CONSTRAINT IF EXISTS space_operational_state_valid;
+ALTER TABLE "Space" ADD CONSTRAINT space_operational_state_valid
+  CHECK ("operationalState" IN ('AVAILABLE', 'IDLE', 'RESTRICTED', 'RETIRED'));
+ALTER TABLE "SpaceBooking" DROP CONSTRAINT IF EXISTS space_booking_status_valid;
+ALTER TABLE "SpaceBooking" ADD CONSTRAINT space_booking_status_valid
+  CHECK ("status" IN ('PENDING', 'CONFIRMED', 'REJECTED', 'CANCELLED', 'COMPLETED'));
+ALTER TABLE "SpaceMaintenance" DROP CONSTRAINT IF EXISTS space_maintenance_severity_valid;
+ALTER TABLE "SpaceMaintenance" ADD CONSTRAINT space_maintenance_severity_valid
+  CHECK ("severity" IN ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL'));
+ALTER TABLE "SpaceMaintenance" DROP CONSTRAINT IF EXISTS space_maintenance_status_valid;
+ALTER TABLE "SpaceMaintenance" ADD CONSTRAINT space_maintenance_status_valid
+  CHECK ("status" IN ('OPEN', 'IN_PROGRESS', 'RESOLVED'));
+ALTER TABLE "SpaceRequest" DROP CONSTRAINT IF EXISTS space_request_type_valid;
+ALTER TABLE "SpaceRequest" ADD CONSTRAINT space_request_type_valid
+  CHECK ("type" IN ('REGISTER', 'UPDATE'));
+ALTER TABLE "SpaceRequest" DROP CONSTRAINT IF EXISTS space_request_status_valid;
+ALTER TABLE "SpaceRequest" ADD CONSTRAINT space_request_status_valid
+  CHECK ("status" IN ('SUBMITTED', 'UNDER_REVIEW', 'NEEDS_INFO', 'APPROVED', 'REJECTED', 'WITHDRAWN'));

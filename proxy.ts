@@ -64,6 +64,11 @@ async function handleRequest(request: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
+  // Read-only station login directory for the login page's station picker.
+  if (pathname.startsWith('/api/auth/stations')) {
+    return withSecurityHeaders(NextResponse.next());
+  }
+
   // IoT ingest uses its own per-device key, not the cookie session.
   if (pathname.startsWith('/api/iot/ingest')) {
     return withSecurityHeaders(NextResponse.next());

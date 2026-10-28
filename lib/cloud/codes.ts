@@ -51,3 +51,13 @@ export async function nextAssetCode(tx: TxClient = prisma): Promise<string> {
   const count = await tx.vehicle.count();
   return `SCH-V-${pad(count + 1, 4)}`;
 }
+
+export async function nextSpaceCode(tx: TxClient = prisma): Promise<string> {
+  const count = await tx.space.count();
+  return `SCH-SP-${pad(count + 1, 4)}`;
+}
+
+export async function nextSpaceBookingCode(tx: TxClient = prisma): Promise<string> {
+  const count = await tx.spaceBooking.count({ where: { createdAt: { gte: yearStart() } } });
+  return yearSeqCode(count, 'SB', 4);
+}

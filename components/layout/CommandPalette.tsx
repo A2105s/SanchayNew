@@ -31,7 +31,10 @@ const PAGES: PageEntry[] = [
   { href: '/audit', label: 'Audit' },
   { href: '/settings', label: 'Settings' },
   { href: '/notifications', label: 'Notifications' },
-  { href: '/spaces', label: 'Spaces' }
+  { href: '/spaces', label: 'Spaces' },
+  { href: '/spaces/bookings', label: 'Space bookings' },
+  { href: '/spaces/requests', label: 'Space requests' },
+  { href: '/spaces/settings', label: 'Space booking policy' }
 ];
 
 interface CommandPaletteProps {

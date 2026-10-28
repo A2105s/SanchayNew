@@ -69,7 +69,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/reports', label: 'Reports', icon: AnimatedBarChart, requiresAny: ['report.read'] },
   { href: '/audit', label: 'Audit', icon: AnimatedLedger, requiresAny: ['audit.read'] },
   { href: '/settings', label: 'Settings', icon: AnimatedGear, requiresAny: ['settings.manage'] },
-  { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, badge: 'Soon' }
+  { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, requiresAny: ['fleet.read'] },
+  { href: '/spaces/bookings', label: 'Space bookings', icon: AnimatedClipboard, requiresAny: ['space.book', 'fleet.read'] },
+  { href: '/spaces/requests', label: 'Space requests', icon: AnimatedLedger, requiresAny: ['space.book', 'fleet.read'] },
 ];
 
 /** Sidebar sections. Items keep their permission filtering; this only decides order and headings. */
@@ -79,7 +81,7 @@ const GROUPS: { id: string; heading: string | null; hrefs: string[] }[] = [
   { id: 'requests', heading: 'Requests', hrefs: ['/requests', '/allocations', '/transfers'] },
   { id: 'oversight', heading: 'Oversight', hrefs: ['/operations', '/compliance', '/maintenance', '/idle', '/incidents', '/iot'] },
   { id: 'insights', heading: 'Insights', hrefs: ['/reports', '/audit'] },
-  { id: 'more', heading: 'More', hrefs: ['/settings', '/spaces'] }
+  { id: 'more', heading: 'More', hrefs: ['/settings', '/spaces', '/spaces/bookings', '/spaces/requests'] }
 ];
 /** FIELD_STAFF sees a reduced set: Dashboard, Fleet, Live map, Incidents. */
 const FIELD_STAFF_HREFS = new Set(['/dashboard', '/vehicles', '/vehicles/map', '/incidents']);

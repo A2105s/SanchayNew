@@ -28,8 +28,23 @@ export type Permission =
   | 'audit.read'
   | 'report.read'
   | 'export'
+  | 'space.manage'
+  | 'space.book'
+  | 'space.review'
   | 'settings.manage'
   | 'operators.manage';
+
+export type SpaceState = 'AVAILABLE' | 'IDLE' | 'RESTRICTED' | 'RETIRED';
+export type SpaceCategory =
+  | 'MEETING_ROOM'
+  | 'TRAINING_HALL'
+  | 'AUDITORIUM'
+  | 'OFFICE'
+  | 'COMMUNITY_HALL'
+  | 'STORE'
+  | 'OTHER';
+export type SpaceBookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+export type SpaceRequestStatus = 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_INFO' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN';
 
 export type VehicleStatus = 'MOVING' | 'IDLE' | 'BREAKDOWN' | 'OFFLINE'; // live motion state from telemetry only
 export type OperationalStatus = 'ACTIVE' | 'MAINTENANCE' | 'OUT_OF_SERVICE' | 'RETIRED';
@@ -841,6 +856,8 @@ export type ReportKind =
   | 'allocation-history'
   | 'maintenance-history'
   | 'gem-disposal'
+  | 'space-bookings'
+  | 'space-utilization'
   | 'audit-events';
 
 export interface ReportMetric {
@@ -862,4 +879,112 @@ export interface ReportResult {
   columns: { key: string; label: string }[];
   rows: Record<string, string | number | boolean | null>[];
   truncated: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Civic Spaces (spec files 01-12)
+// ---------------------------------------------------------------------------
+
+export interface SpaceView {
+  id: string;
+  assetCode: string;
+  name: string;
+  category: SpaceCategory;
+  organizationId: string;
+  organizationName: string;
+  buildingOrCampus: string | null;
+  addressLine: string | null;
+  district: string | null;
+  city: string;
+  lat: number | null;
+  lng: number | null;
+  capacity: number;
+  areaSqft: number | null;
+  operationalState: SpaceState;
+  description: string | null;
+  managerName: string | null;
+  contactOfficerName: string | null;
+  contactPhone: string | null;
+  amenities: string[];
+  accessibility: string[];
+  /** Per-weekday IST operating hours; missing day = closed */
+  operatingHours: Partial<Record<'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat', [string, string]>>;
+  minBookingHours: number;
+  maxBookingHours: number;
+  bookingLeadDays: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Derived at read time: a live PENDING/CONFIRMED booking exists right now */
+  busyNow: boolean;
+  /** Derived: an unresolved booking-blocking maintenance ticket exists */
+  blockedByMaintenance: boolean;
+  /** Derived: whole days since the last booking ended (null = never booked or active now) */
+  idleDays: number | null;
+}
+
+export interface SpaceBookingView {
+  id: string;
+  bookingCode: string;
+  spaceId: string;
+  spaceName: string;
+  spaceAssetCode: string;
+  requestedBy: string;
+  requestedForOrgId: string | null;
+  requestedForOrgName: string | null;
+  purpose: string;
+  attendees: number | null;
+  startAt: string;
+  endAt: string;
+  status: SpaceBookingStatus;
+  reviewNote: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  rejectionReason: string | null;
+  cancelledBy: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  completedAt: string | null;
+  createdAt: string;
+}
+
+export interface SpaceMaintenanceView {
+  id: string;
+  spaceId: string;
+  title: string;
+  description: string | null;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED';
+  blocksBooking: boolean;
+  reportedBy: string;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+  resolutionNote: string | null;
+  costInr: number | null;
+  createdAt: string;
+}
+
+export interface SpaceRequestView {
+  id: string;
+  type: 'REGISTER' | 'UPDATE';
+  spaceId: string | null;
+  spaceName: string | null;
+  requestedBy: string;
+  payload: Record<string, unknown>;
+  status: SpaceRequestStatus;
+  infoRequestReason: string | null;
+  reviewNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  appliedAt: string | null;
+  createdAt: string;
+}
+
+export interface SpaceSettings {
+  /** Bookings longer than this many hours require officer review; 0 = all require review */
+  approvalThresholdHours: number;
+  /** Earliest bookable date, in days from now (upper bound on top of per-space lead) */
+  bookingWindowDays: number;
+  /** A bookable space with no bookings for this many days is flagged idle-for-reuse */
+  idleAlertDays: number;
 }

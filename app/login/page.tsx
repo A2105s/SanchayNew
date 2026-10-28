@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertCircle, Eye, EyeOff, Lock, User } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Lock, User, Building2 } from 'lucide-react';
 import Grainient from '@/components/ui/Grainient';
 
 /** Only allow relative, single-slash paths (blocks //evil.com and absolute URLs). */
@@ -13,6 +13,7 @@ function safeNext(next: string | null): string {
 }
 
 const DEMO_ACCOUNTS: { user: string; role: string }[] = [
+  { user: 'dm.gwalior', role: 'District Magistrate (IAS) — platform admin & approving authority' },
   { user: 'admin', role: 'Platform administrator' },
   { user: 'org.police', role: 'Police organization admin' },
   { user: 'dept.officer', role: 'Police department officer (approver)' },
@@ -23,6 +24,11 @@ const DEMO_ACCOUNTS: { user: string; role: string }[] = [
   { user: 'auditor.demo', role: 'Auditor (read-only)' }
 ];
 
+interface StationLogin {
+  username: string;
+  station: string;
+}
+
 function LoginForm() {
   const searchParams = useSearchParams();
   const next = safeNext(searchParams.get('next'));
@@ -32,6 +38,16 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [stations, setStations] = useState<StationLogin[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/stations')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!cancelled && j?.data) setStations(j.data as StationLogin[]); })
+      .catch(() => { /* the dropdown stays hidden; username entry still works */ });
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -124,6 +140,33 @@ function LoginForm() {
             </div>
           </div>
 
+          {stations.length > 0 ? (
+            <div className="login-field">
+              <label htmlFor="station-pick">Police station login</label>
+              <div className="login-field__input-wrap">
+                <Building2 className="login-field__icon" size={18} aria-hidden="true" />
+                <select
+                  id="station-pick"
+                  value=""
+                  disabled={loading}
+                  onChange={(event) => {
+                    const pick = stations.find((s) => s.username === event.target.value);
+                    if (pick) {
+                      setUsername(pick.username);
+                      setPassword('Sanchay@Demo1');
+                    }
+                  }}
+                  style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', font: 'inherit', color: 'inherit' }}
+                >
+                  <option value="" disabled>Sign in as a police station…</option>
+                  {stations.map((s) => (
+                    <option key={s.username} value={s.username}>{s.station}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
+
           <div className="login-field">
             <label htmlFor="password">Password</label>
             <div className="login-field__input-wrap">
@@ -164,7 +207,7 @@ function LoginForm() {
                 {a.user}
               </button>
             ))}
-            <small className="text-muted" style={{ flexBasis: '100%', marginTop: 4 }}>Click a name to fill it in. Default demo password is Sanchay@Demo1 (auto-fills on click).</small>
+            <small className="text-muted" style={{ flexBasis: '100%', marginTop: 4 }}>Click a name to fill it in — demo password Sanchay@Demo1 (auto-fills). Police stations request vehicles between each other; the DM (IAS) oversees as admin and court authority. Spaces use department logins.</small>
           </div>
         </details>
 

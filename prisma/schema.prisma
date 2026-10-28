@@ -39,6 +39,7 @@ model Organization {
   stations  Station[]
   vehicles  Vehicle[]
   requests  AssetRequest[]
+  spaces    Space[]
 }
 
 model Operator {
@@ -788,4 +789,137 @@ model ExternalDataCache {
 
   @@unique([provider, cacheKey])
   @@index([provider, expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Civic Spaces module (spec files 00-12): government rooms, halls, facilities
+// ---------------------------------------------------------------------------
+
+model Space {
+  id          String   @id @default(cuid())
+  /// Human asset code, e.g. SCH-SP-0001 (globally unique, never reused)
+  assetCode   String   @unique
+  name        String
+  /// MEETING_ROOM | TRAINING_HALL | AUDITORIUM | OFFICE | COMMUNITY_HALL | STORE | OTHER
+  category    String
+  organizationId String
+  buildingOrCampus String?
+  addressLine String?
+  /// Zone / district within the city, e.g. Lashkar
+  district    String?
+  city        String   @default("Gwalior")
+  lat         Float?
+  lng         Float?
+  capacity    Int      @default(0)
+  areaSqft    Int?
+  /// AVAILABLE | IDLE | RESTRICTED | RETIRED (BOOKED is derived from live bookings; MAINTENANCE from blocking tickets)
+  operationalState String @default("IDLE")
+  description String?
+  managerName String?
+  contactOfficerName String?
+  contactPhone String?
+  /// string[] of amenities, e.g. ["Projector","AC","WiFi"]
+  amenities   Json?
+  /// string[] of accessibility features, e.g. ["Lift","Wheelchair ramp"]
+  accessibility Json?
+  /// Per-weekday operating hours (IST): { mon: ["09:00","21:00"], ... } — missing day = closed
+  operatingHours Json?
+  minBookingHours Int  @default(1)
+  maxBookingHours Int  @default(8)
+  /// Earliest a booking may start, in days from now
+  bookingLeadDays Int  @default(7)
+  notes       String?
+  createdBy   String   @default("system")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  bookings     SpaceBooking[]
+  maintenance  SpaceMaintenance[]
+  requests     SpaceRequest[]
+
+  @@index([organizationId, operationalState])
+  @@index([category])
+}
+
+model SpaceBooking {
+  id String   @id @default(cuid())
+  /// Human booking reference, e.g. SCH-SB-0001
+  bookingCode String @unique
+  spaceId  String
+  /// Operator username who requested the booking
+  requestedBy String
+  /// Department the space is booked for (organization id), when relevant
+  requestedForOrgId String?
+  purpose  String
+  attendees Int?
+  startAt  DateTime
+  endAt    DateTime
+  /// PENDING | CONFIRMED | REJECTED | CANCELLED | COMPLETED
+  status   String   @default("PENDING")
+  reviewNote String?
+  approvedBy String?
+  approvedAt DateTime?
+  rejectionReason String?
+  cancelledBy String?
+  cancelledAt DateTime?
+  cancellationReason String?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, status, startAt])
+  @@index([requestedBy, status])
+}
+
+model SpaceMaintenance {
+  id String @id @default(cuid())
+  spaceId String
+  title   String
+  description String?
+  /// LOW | MEDIUM | HIGH | CRITICAL
+  severity String @default("MEDIUM")
+  /// OPEN | IN_PROGRESS | RESOLVED
+  status   String @default("OPEN")
+  /// CRITICAL severity defaults to blocking; the flag keeps policy in data, not inferred
+  blocksBooking Boolean @default(false)
+  reportedBy String
+  resolvedBy String?
+  resolvedAt DateTime?
+  resolutionNote String?
+  costInr Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space Space @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+  @@index([spaceId, status])
+}
+
+model SpaceRequest {
+  id String @id @default(cuid())
+  /// REGISTER (new space) | UPDATE (amend an existing one)
+  type String
+  /// Null for REGISTER requests
+  spaceId String?
+  requestedBy String
+  /// Proposed field values; validated against the space field schema before apply
+  payload Json
+  /// SUBMITTED | UNDER_REVIEW | NEEDS_INFO | APPROVED | REJECTED | WITHDRAWN
+  status String @default("SUBMITTED")
+  infoRequestReason String?
+  reviewNote String?
+  reviewedBy String?
+  reviewedAt DateTime?
+  /// When an approved UPDATE was applied to the canonical record (idempotent apply marker)
+  appliedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  space Space? @relation(fields: [spaceId], references: [id], onDelete: SetNull)
+
+  @@index([status, type])
+  @@index([spaceId])
 }

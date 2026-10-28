@@ -160,7 +160,7 @@ export const vehicleSearchSchema = z.object({
   staleTelemetry: z.coerce.boolean().optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
-  availableOnly: z.coerce.boolean().optional(),
+  availableOnly: z.preprocess((v) => v === 'true' || v === true || v === '1', z.boolean()).optional(),
   scope: z.enum(['own', 'discover']).optional(),
   page: z.coerce.number().int().min(1).max(100000).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
@@ -372,3 +372,109 @@ export function zodMessage(error: z.ZodError): string {
   const path = first.path.join('.');
   return path ? `${path}: ${first.message}` : first.message;
 }
+
+// ---------------------------------------------------------------------------
+// Civic Spaces (spec files 01-12)
+// ---------------------------------------------------------------------------
+
+const zSpaceCategory = z.enum(['MEETING_ROOM', 'TRAINING_HALL', 'AUDITORIUM', 'OFFICE', 'COMMUNITY_HALL', 'STORE', 'OTHER']);
+const zSpaceState = z.enum(['AVAILABLE', 'IDLE', 'RESTRICTED', 'RETIRED']);
+const zDayKey = z.enum(['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']);
+const zHhMm = z.string().trim().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
+const zSpaceOperatingHours = z.record(zDayKey, z.tuple([zHhMm, zHhMm]));
+
+export const spaceFieldSchema = z.object({
+  name: z.string().trim().min(2).max(160),
+  category: zSpaceCategory,
+  buildingOrCampus: z.string().trim().max(200).optional(),
+  addressLine: z.string().trim().max(300).optional(),
+  district: z.string().trim().max(80).optional(),
+  lat: z.number().min(-90).max(90).nullish(),
+  lng: z.number().min(-180).max(180).nullish(),
+  capacity: z.number().int().min(0).max(100000),
+  areaSqft: z.number().int().min(0).nullish(),
+  operationalState: zSpaceState.optional(),
+  description: z.string().trim().max(2000).optional(),
+  managerName: z.string().trim().max(120).optional(),
+  contactOfficerName: z.string().trim().max(120).optional(),
+  contactPhone: z.string().trim().max(20).optional(),
+  amenities: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  accessibility: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
+  operatingHours: zSpaceOperatingHours.optional(),
+  minBookingHours: z.number().int().min(1).max(24).optional(),
+  maxBookingHours: z.number().int().min(1).max(72).optional(),
+  bookingLeadDays: z.number().int().min(0).max(365).optional(),
+  notes: z.string().trim().max(2000).optional()
+});
+
+export const spaceInputSchema = spaceFieldSchema;
+
+export const spaceSearchSchema = z.object({
+  q: z.string().trim().max(120).optional(),
+  category: zSpaceCategory.optional(),
+  state: zSpaceState.optional(),
+  minCapacity: z.coerce.number().int().min(0).optional(),
+  from: isoDateNullable.optional(),
+  to: isoDateNullable.optional(),
+  availableOnly: z.coerce.boolean().optional()
+});
+
+export const spaceActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('update'), patch: spaceFieldSchema.partial() }),
+  z.object({ type: z.literal('setState'), state: zSpaceState, reason: z.string().trim().min(1).max(500) }),
+  z.object({
+    type: z.literal('raiseMaintenance'),
+    title: z.string().trim().min(2).max(200),
+    description: z.string().trim().max(2000).optional(),
+    severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
+    blocksBooking: z.boolean().optional()
+  }),
+  z.object({ type: z.literal('updateMaintenance'), ticketId: z.string().trim().min(1), status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED']), resolutionNote: z.string().trim().max(2000).optional(), costInr: z.number().int().min(0).optional() })
+]);
+
+export const spaceBookingInputSchema = z.object({
+  spaceId: z.string().trim().min(1),
+  purpose: z.string().trim().min(3).max(500),
+  attendees: z.number().int().min(1).max(100000).optional(),
+  requestedForOrgId: z.string().trim().min(1).optional(),
+  startAt: isoDate,
+  endAt: isoDate
+});
+
+export const spaceBookingSearchSchema = z.object({
+  scope: z.enum(['mine', 'review', 'space']).optional(),
+  spaceId: z.string().trim().min(1).optional(),
+  bucket: z.enum(['upcoming', 'pending', 'completed', 'cancelled', 'rejected']).optional()
+});
+
+export const spaceBookingActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('approve'), note: z.string().trim().max(2000).optional() }),
+  z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal('cancel'), reason: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal('complete'), note: z.string().trim().max(2000).optional() })
+]);
+
+const zSpaceRequestPayload = spaceFieldSchema.partial();
+
+export const spaceRequestInputSchema = z.object({
+  type: z.enum(['REGISTER', 'UPDATE']),
+  spaceId: z.string().trim().min(1).optional(),
+  payload: zSpaceRequestPayload
+});
+
+export const spaceRequestActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('startReview') }),
+  z.object({ type: z.literal('requestInfo'), reason: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal('approve'), note: z.string().trim().max(2000).optional() }),
+  z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(500) }),
+  z.object({ type: z.literal('withdraw') })
+]);
+
+export type SpaceInputParsed = z.infer<typeof spaceInputSchema>;
+export type SpaceSearchParsed = z.infer<typeof spaceSearchSchema>;
+export type SpaceActionParsed = z.infer<typeof spaceActionSchema>;
+export type SpaceBookingInputParsed = z.infer<typeof spaceBookingInputSchema>;
+export type SpaceBookingSearchParsed = z.infer<typeof spaceBookingSearchSchema>;
+export type SpaceBookingActionParsed = z.infer<typeof spaceBookingActionSchema>;
+export type SpaceRequestInputParsed = z.infer<typeof spaceRequestInputSchema>;
+export type SpaceRequestActionParsed = z.infer<typeof spaceRequestActionSchema>;

@@ -17,6 +17,7 @@ export const DEMO_PASSWORD = 'Sanchay@Demo1';
 
 export const DEMO_OPERATORS: Array<{ username: string; displayName: string; role: Role; orgCode: string | null; stationCode: string | null; phone?: string }> = [
   { username: 'admin', displayName: 'Platform Administrator', role: 'ADMIN', orgCode: null, stationCode: null },
+  { username: 'dm.gwalior', displayName: 'District Magistrate, Gwalior (IAS) — approving authority', role: 'ADMIN', orgCode: 'GWL-DISTRICT', stationCode: null },
   { username: 'org.police', displayName: 'SP Gwalior Fleet Desk (Dharamveer Singh, IPS)', role: 'ORG_ADMIN', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10800' },
   { username: 'dept.officer', displayName: 'ASP City Fleet Control (Akhilesh Rainwal)', role: 'DEPT_OFFICER', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10801' },
   { username: 'dept.health', displayName: 'CMHO Health Fleet Officer (Dr. Sachin Srivastava)', role: 'DEPT_OFFICER', orgCode: 'GWL-HEALTH', stationCode: null, phone: '+91 75123 68444' },
@@ -193,6 +194,21 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
       where: { username: op.username },
       update: { organizationId, stationId, role: op.role, displayName: op.displayName, phone: op.phone ?? fakePhone(rng) },
       create: { username: op.username, displayName: op.displayName, email: `${op.username}@sanchay.demo`, phone: op.phone ?? fakePhone(rng), role: op.role, organizationId, stationId, passwordHash, active: true }
+    });
+    operatorCount += 1;
+  }
+
+  // Every police station gets its own station-officer login (ps.<station>), so the
+  // vehicles section demonstrates station-to-station requesting under the right identity.
+  for (const st of STATIONS) {
+    const stId = stationIdByCode.get(st.id);
+    if (!stId) continue;
+    const slug = st.id.replace(/-police-station$/u, '');
+    const username = `ps.${slug}`;
+    await prisma.operator.upsert({
+      where: { username },
+      update: { organizationId: police.id, stationId: stId, role: 'STATION_OFFICER', displayName: `Station Incharge — ${st.name}` },
+      create: { username, displayName: `Station Incharge — ${st.name}`, email: `${username}@sanchay.demo`, role: 'STATION_OFFICER', organizationId: police.id, stationId: stId, passwordHash, active: true }
     });
     operatorCount += 1;
   }

@@ -56,6 +56,8 @@ const REPORT_TITLES: Record<ReportKind, string> = {
   'allocation-history': 'Allocation History',
   'maintenance-history': 'Maintenance History',
   'gem-disposal': 'GeM Disposal (Auction-Ready)',
+  'space-bookings': 'Space Bookings',
+  'space-utilization': 'Space Utilization',
   'audit-events': 'Audit Events'
 };
 
@@ -185,6 +187,81 @@ export async function buildReport(user: SessionUser, kind: ReportKind, filters: 
           { key: 'since', label: 'Marked at' }
         ],
         rows: rows.map((v) => ({ asset: v.assetCode, registration: maskRegistration(v.registrationNumber), makeModel: v.makeModel ?? '', class: v.vehicleClass, ownership: v.ownershipCategory, custodyNote: v.custodyNote ?? '', since: v.custodyUpdatedAt ? v.custodyUpdatedAt.toISOString() : '' })),
+        truncated
+      };
+    }
+
+    case 'space-bookings': {
+      const scoped = orgIds === null ? {} : { space: { organizationId: { in: orgIds } } };
+      const bookings = await prisma.spaceBooking.findMany({
+        where: { AND: [scoped, from ? { startAt: { gte: from } } : {}, to ? { startAt: { lte: to } } : {}].filter((x) => Object.keys(x).length > 0) as Prisma.SpaceBookingWhereInput[] },
+        include: { space: { select: { assetCode: true, name: true, organization: { select: { name: true } } } } },
+        orderBy: { startAt: 'desc' },
+        take: rowCap + 1
+      });
+      const truncated = bookings.length > rowCap;
+      const rows = bookings.slice(0, rowCap);
+      return {
+        ...base,
+        metrics: [
+          metric('count', 'Bookings', rows.length, 'All space bookings in scope and window, by requested start date.'),
+          metric('confirmed', 'Confirmed', rows.filter((b) => b.status === 'CONFIRMED').length, 'Approved bookings.'),
+          metric('pending', 'Pending', rows.filter((b) => b.status === 'PENDING').length, 'Awaiting review.'),
+          metric('cancelled', 'Cancelled', rows.filter((b) => b.status === 'CANCELLED').length, 'Cancelled by requester or officer.')
+        ],
+        columns: [
+          { key: 'code', label: 'Booking' },
+          { key: 'space', label: 'Space' },
+          { key: 'org', label: 'Space organization' },
+          { key: 'by', label: 'Requested by' },
+          { key: 'start', label: 'Start' },
+          { key: 'end', label: 'End' },
+          { key: 'status', label: 'Status' },
+          { key: 'purpose', label: 'Purpose' }
+        ],
+        rows: rows.map((b) => ({ code: b.bookingCode, space: `${b.space.assetCode} ${b.space.name}`, org: b.space.organization?.name ?? '', by: b.requestedBy, start: b.startAt.toISOString(), end: b.endAt.toISOString(), status: b.status, purpose: b.purpose })),
+        truncated
+      };
+    }
+
+    case 'space-utilization': {
+      const scoped = orgIds === null ? {} : { organizationId: { in: orgIds } };
+      const spaces = await prisma.space.findMany({
+        where: { AND: [scoped, { operationalState: { not: 'RETIRED' } }] },
+        include: { organization: { select: { name: true } } },
+        take: rowCap + 1
+      });
+      const truncated = spaces.length > rowCap;
+      const rows = spaces.slice(0, rowCap);
+      const ids = rows.map((s) => s.id);
+      const live = ids.length ? await prisma.spaceBooking.findMany({
+        where: { spaceId: { in: ids }, status: { in: ['CONFIRMED', 'COMPLETED'] }, startAt: { gte: from ?? new Date(now.getTime() - 30 * 86400000) }, endAt: { lte: to ?? now } },
+        select: { spaceId: true, startAt: true, endAt: true }
+      }) : [];
+      return {
+        ...base,
+        metrics: [metric('spaces', 'Spaces in scope', rows.length, 'Non-retired spaces within the report scope and window.')],
+        columns: [
+          { key: 'asset', label: 'Asset' },
+          { key: 'name', label: 'Space' },
+          { key: 'org', label: 'Organization' },
+          { key: 'category', label: 'Category' },
+          { key: 'state', label: 'State' },
+          { key: 'bookedHours', label: 'Booked hours' },
+          { key: 'bookings', label: 'Bookings' }
+        ],
+        rows: rows.map((s) => {
+          const mine = live.filter((b) => b.spaceId === s.id);
+          return {
+            asset: s.assetCode,
+            name: s.name,
+            org: s.organization?.name ?? '',
+            category: s.category,
+            state: s.operationalState,
+            bookedHours: Math.round(mine.reduce((acc, b) => acc + (b.endAt.getTime() - b.startAt.getTime()) / 3_600_000, 0) * 10) / 10,
+            bookings: mine.length
+          };
+        }),
         truncated
       };
     }

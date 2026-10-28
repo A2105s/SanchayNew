@@ -30,6 +30,9 @@ export const ALL_PERMISSIONS: readonly Permission[] = [
   'audit.read',
   'report.read',
   'export',
+  'space.manage',
+  'space.book',
+  'space.review',
   'settings.manage',
   'operators.manage'
 ];
@@ -65,6 +68,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'device.manage',
     'document.read',
     'document.write',
+    'space.manage',
+    'space.book',
+    'space.review',
     'audit.read',
     'report.read',
     'export'
@@ -84,6 +90,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'transfer.create',
     'transfer.review',
     'document.read',
+    'space.manage',
+    'space.book',
+    'space.review',
     'audit.read',
     'report.read',
     'export'
@@ -100,9 +109,10 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'transfer.create',
     'transfer.review',
     'document.read',
+    'space.book',
     'report.read'
   ],
-  FIELD_STAFF: ['fleet.read', 'trip.write', 'incident.write'],
+  FIELD_STAFF: ['fleet.read', 'trip.write', 'incident.write', 'space.book'],
   AUDITOR: ['fleet.read', 'document.read', 'audit.read', 'report.read', 'export']
 };
 

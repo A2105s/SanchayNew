@@ -30,3 +30,14 @@ tsc_errors.txt
 
 # scratch and transcript logs
 Last_Chat_Freebuff
+
+# agent tooling / local harness artifacts
+.agents/
+.claude/
+skills-lock.json
+
+# source GIS data (converted copies live in public/data/)
+*.kmz
+
+# local documents
+Rajshaat Notice.pdf

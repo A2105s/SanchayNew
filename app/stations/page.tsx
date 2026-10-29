@@ -409,7 +409,7 @@ function StationModal({
           <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <strong style={{ fontSize: '0.92rem' }}>Vehicles on roster ({vehicles.length})</strong>
-              <p className="text-muted" style={{ margin: '2px 0 0', fontSize: '0.78rem' }}>Assigned fleet currently in this station's jurisdiction</p>
+              <p className="text-muted" style={{ margin: '2px 0 0', fontSize: '0.78rem' }}>Assigned fleet currently in this station&apos;s jurisdiction</p>
             </div>
             {vehicles.length > 0 ? (
               <ButtonLink href={`/vehicles?station=${station.id}`} variant="ghost" size="sm">

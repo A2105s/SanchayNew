@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { unstable_cache } from 'next/cache';
+import { CLOUD_CACHE_TAGS } from '@/lib/cloud/cached-queries';
 import { prisma } from '@/lib/db/prisma';
 import type {
   AllocationView,
@@ -113,9 +115,21 @@ async function getSettings(): Promise<FleetSettings> {
 
 /**
  * Builds a FleetSnapshot scoped to the caller's organization tree. The identity-dependent
- * scoping means the snapshot CANNOT be a shared cache; it is computed per request.
+ * scoping means the snapshot cannot be a SHARED cache — but it is cached per operator
+ * (keyed by username + role + station) and invalidated by the same tags every write
+ * already calls, so repeat dashboard loads are instant. The 30s bound covers writes that
+ * bypass the ops layer.
  */
 export async function getFleetSnapshot(user: SessionUser): Promise<FleetSnapshot> {
+  const compute = unstable_cache(
+    () => computeFleetSnapshot(user),
+    ['cloud-snapshot', user.username, user.role, user.stationId ?? 'no-station'],
+    { tags: [CLOUD_CACHE_TAGS.fleet, CLOUD_CACHE_TAGS.all], revalidate: 30 }
+  );
+  return compute();
+}
+
+async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnapshot> {
   const settings = await getSettings();
   const now = new Date();
   const tree = await orgTree(user);
@@ -123,7 +137,18 @@ export async function getFleetSnapshot(user: SessionUser): Promise<FleetSnapshot
   const vehicleStationFilter =
     (user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId ? { stationId: user.stationId } : {};
 
-  const [organizations, stations, vehicleRows, vehicleTotal, devices, incidents, maintenance, trips, transfers, notifUnread] = await Promise.all([
+  const requestWhere =
+    tree === null
+      ? {}
+      : { OR: [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }] };
+
+  // Allocations in scope (vehicle org in tree OR requesting org in tree).
+  const allocWhere =
+    tree === null
+      ? {}
+      : { OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] };
+
+  const [organizations, stations, vehicleRows, vehicleTotal, devices, incidents, maintenance, trips, transfers, notifUnread, requestRows, allocRows, dataVersion] = await Promise.all([
     prisma.organization.findMany({ orderBy: { name: 'asc' } }),
     prisma.station.findMany({ where: tree === null ? {} : { OR: [{ organizationId: { in: tree } }, { organizationId: null }] }, include: { inventory: true }, orderBy: { name: 'asc' } }),
     prisma.vehicle.findMany({ where: { AND: [treeOrgFilter, vehicleStationFilter] }, orderBy: { updatedAt: 'desc' }, take: 300 }),
@@ -133,33 +158,27 @@ export async function getFleetSnapshot(user: SessionUser): Promise<FleetSnapshot
     prisma.maintenanceRecord.findMany({ where: { vehicle: treeOrgFilter, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 400 }),
     prisma.trip.findMany({ where: { vehicle: treeOrgFilter }, orderBy: { startedAt: 'desc' }, take: 400 }),
     prisma.transferRequest.findMany({ orderBy: { createdAt: 'desc' }, take: 300 }),
-    countUnreadInternal(user)
+    countUnreadInternal(user),
+    prisma.assetRequest.findMany({ where: requestWhere, orderBy: { createdAt: 'desc' }, take: 200 }),
+    prisma.allocation.findMany({ where: allocWhere, orderBy: { createdAt: 'desc' }, take: 200 }),
+    getDataVersion()
   ]);
 
   const orgNameById = new Map(organizations.map((o) => [o.id, o.name]));
 
   const vehicles: VehicleView[] = vehicleRows.map((v) => mapVehicle(v, orgNameById.get(v.organizationId) ?? 'Unknown', settings.telemetryFreshMinutes));
 
-  // Requests I raised OR that need my org's decision.
-  const requestWhere =
-    tree === null
-      ? {}
-      : { OR: [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }] };
-  const requestRows = await prisma.assetRequest.findMany({ where: requestWhere, orderBy: { createdAt: 'desc' }, take: 200 });
-  const requests = await Promise.all(requestRows.map((r) => buildRequestView(r.id, user, orgNameById)));
-
-  // Allocations in scope (vehicle org in tree OR requesting org in tree).
-  const allocWhere =
-    tree === null
-      ? {}
-      : { OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] };
-  const allocRows = await prisma.allocation.findMany({ where: allocWhere, orderBy: { createdAt: 'desc' }, take: 200 });
-  const allocations = await Promise.all(allocRows.map((a) => buildAllocationView(a.id, user, tree, settings)));
+  // Requests I raised OR that need my org's decision. Their rows loaded in the main
+  // parallel batch above; only the per-row detail fan-out runs as a second stage.
+  const [requests, allocations] = await Promise.all([
+    Promise.all(requestRows.map((r) => buildRequestView(r.id, user, orgNameById, tree))),
+    Promise.all(allocRows.map((a) => buildAllocationView(a.id, user, tree, settings)))
+  ]);
 
   return {
     me: user,
     generatedAt: now.toISOString(),
-    dataVersion: await getDataVersion(),
+    dataVersion,
     settings,
     organizations: organizations.map(mapOrganization),
     stations: stations.map(mapStation),
@@ -185,14 +204,15 @@ async function countUnreadInternal(user: SessionUser): Promise<number> {
   return prisma.notification.count({ where: { AND: [{ OR: or }, { readAt: null }] } });
 }
 
-async function buildRequestView(requestId: string, user: SessionUser, orgNameById: Map<string, string>): Promise<AssetRequestView> {
+async function buildRequestView(requestId: string, user: SessionUser, orgNameById: Map<string, string>, tree: string[] | null): Promise<AssetRequestView> {
   const request = await prisma.assetRequest.findUniqueOrThrow({ where: { id: requestId } });
   const [steps, allocation, vehicle] = await Promise.all([
     prisma.approvalStep.findMany({ where: { requestId }, orderBy: { stepOrder: 'asc' } }),
     prisma.allocation.findUnique({ where: { requestId } }),
     request.vehicleId ? prisma.vehicle.findUnique({ where: { id: request.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null)
   ]);
-  const tree = await orgTree(user);
+  // `tree` is hoisted from the caller — orgTree() inside this loop re-scanned the
+  // whole organization table per request and dominated the snapshot latency.
   const isOwnVehicle = vehicle ? tree === null || tree.includes(vehicle.organizationId) : false;
   const vehicleLabel = vehicle ? (isOwnVehicle ? `${vehicle.displayName} ${vehicle.registrationNumber}`.trim() : maskRegistration(vehicle.registrationNumber)) : null;
   const vehicleOrgName = vehicle ? orgNameById.get(vehicle.organizationId) ?? null : null;

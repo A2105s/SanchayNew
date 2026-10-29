@@ -29,7 +29,7 @@ import {
   updateFleetMarkerElement,
   STATUS_GLOW,
 } from '@/components/vehicles/FleetIcons';
-import { getVehicleSimState } from '@/lib/client/telemetry-sim';
+import { distanceBetween, getVehicleSimState } from '@/lib/client/telemetry-sim';
 import type { Sector, VehicleStatus, VehicleView } from '@/types';
 
 const GWALIOR_CENTER: [number, number] = [78.1828, 26.2183];
@@ -59,7 +59,7 @@ export function LiveMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const mlRef = useRef<MlNs | null>(null);
-  const vehicleMarkersRef = useRef<Map<string, any>>(new Map());
+  const vehicleMarkersRef = useRef<Map<string, { setLngLat: (lnglat: [number, number]) => unknown; remove: () => void; getElement: () => HTMLElement }>>(new Map());
   const stationMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const incidentMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const trailRef = useRef<Record<string, [number, number][]>>({});
@@ -75,6 +75,12 @@ export function LiveMap() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showStations, setShowStations] = useState(true);
+
+  // Police-station pins + city boundary, straight from the provided KMZ/KML files
+  const [mapFeatures, setMapFeatures] = useState<{
+    stations: Array<{ name: string; lng: number; lat: number }>;
+    boundary: [number, number][];
+  } | null>(null);
   const [showTrail, setShowTrail] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
 
@@ -97,6 +103,48 @@ export function LiveMap() {
 
   const simCount = useMemo(() => Object.values(fleet.live).filter((d) => d.simulated).length, [fleet.live]);
   const realCount = useMemo(() => Object.values(fleet.live).filter((d) => !d.simulated).length, [fleet.live]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/data/gwalior-map.geojson')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((gj: { features?: Array<{ properties: { kind?: string; name?: string }; geometry: { coordinates: [number, number] | [number, number, number] } }> } | null) => {
+        if (cancelled || !gj?.features) return;
+        const pinStations = gj.features
+          .filter((f) => f.properties.kind === 'police-station')
+          .map((f) => ({ name: f.properties.name ?? 'Unknown PS', lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }));
+        const boundaryFeature = gj.features.find((f) => f.properties.kind === 'boundary');
+        const boundary = (boundaryFeature?.geometry.coordinates as [number, number][] | undefined) ?? [];
+        setMapFeatures({ stations: pinStations, boundary });
+      })
+      .catch(() => { /* pins simply do not render without the KMZ dataset */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // "Parked" count per KMZ pin: vehicles belong to DB stations; each DB station
+  // contributes to the nearest KMZ pin (within 1.2 km). KMZ names differ from DB
+  // names, so the match is geographic, not textual.
+  const stationPins = useMemo(() => {
+    if (!mapFeatures) return [];
+    const allVehicles = fleet.snapshot?.vehicles ?? [];
+    const stationById = new Map((fleet.snapshot?.stations ?? []).map((st) => [st.id, st]));
+    return mapFeatures.stations.map((pin) => {
+      let parked = 0;
+      for (const v of allVehicles) {
+        if (!v.stationId) continue;
+        const st = stationById.get(v.stationId);
+        if (!st || st.lat == null || st.lng == null) continue;
+        if (distanceBetween([st.lat, st.lng], [pin.lat, pin.lng]) <= 1200) parked += 1;
+      }
+      return { ...pin, parked };
+    });
+  }, [mapFeatures, fleet.snapshot]);
+
+  const stationMatches = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return stationPins.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 4);
+  }, [search, stationPins]);
 
   // Center & smooth fly to vehicle
   const flyTo = useCallback((v: VehicleView) => {
@@ -126,6 +174,17 @@ export function LiveMap() {
         });
         mapRef.current = map;
         map.on('error', (e: { error?: Error }) => console.warn('[live-map]', e.error?.message ?? e));
+
+        // Supabase/NationTrack-style controls: zoom, locate, (fullscreen lives in the panel)
+        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        map.addControl(
+          new maplibregl.GeolocateControl({
+            positionOptions: { enableHighAccuracy: true },
+            trackUserLocation: false,
+            showUserLocation: true,
+          }),
+          'bottom-right'
+        );
 
         const initLayers = () => {
           if (cancelled || !mapRef.current) return;
@@ -191,6 +250,25 @@ export function LiveMap() {
               'line-width': 2.5,
               'line-opacity': 0.9,
               'line-dasharray': [2, 2],
+            },
+          });
+
+          // 3. Gwalior city boundary ring (from gwalior.kmz) — blue dashed outline
+          map.addSource('boundary', {
+            type: 'geojson',
+            data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
+          });
+
+          map.addLayer({
+            id: 'boundary-line',
+            type: 'line',
+            source: 'boundary',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+              'line-color': '#3b82f6',
+              'line-width': 3,
+              'line-opacity': 0.85,
+              'line-dasharray': [3, 2],
             },
           });
 
@@ -299,7 +377,7 @@ export function LiveMap() {
     }
   }, [showTrail, mapReady]);
 
-  // ---- Station markers (sized by fleet count) ----
+  // ---- Police-station red pins (from Police Station.kmz, counts matched geographically) ----
   useEffect(() => {
     const map = mapRef.current;
     const ml = mlRef.current;
@@ -307,34 +385,42 @@ export function LiveMap() {
     stationMarkersRef.current.forEach((m) => m.remove());
     stationMarkersRef.current = [];
     if (!showStations) return;
-    for (const s of stations) {
-      const count = Object.values(s.inventory ?? {}).reduce((a, b) => a + (b ?? 0), 0);
-      const size = Math.max(22, Math.min(44, 20 + count));
+    for (const pin of stationPins) {
       const el = document.createElement('div');
-      el.style.cssText = `padding: 2px 7px; border-radius: 6px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; border: 1px solid rgba(255,255,255,0.22); box-shadow: 0 2px 6px rgba(0,0,0,0.45); cursor: pointer; white-space: nowrap; backdrop-filter: blur(4px);`;
-      el.innerHTML = `<span style="font-size:10px;">🏢</span><span style="color:#38bdf8;">${count}</span>`;
+      el.style.cssText = 'position:relative;width:30px;height:44px;cursor:pointer;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.4));';
+      el.innerHTML = `
+        <div style="width:28px;height:28px;background:#dc2626;border:2px solid #991b1b;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+          <span style="transform:rotate(45deg);color:#fff;font-weight:800;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${pin.parked}</span>
+        </div>`;
 
-      const inchargeInfo = s.inchargeName ? `\nIn-charge: ${s.inchargeName}` : '';
-      const phoneInfo = s.phone ? `\nCUG: ${s.phone}` : '';
-      el.title = `${s.name} (${s.zone} Zone)\nFleet Pool: ${count} vehicles${inchargeInfo}${phoneInfo}\nGPS: ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`;
+      const tooltip = new ml.Popup({ offset: 40, closeButton: false, closeOnClick: false, className: 'ps-tooltip' })
+        .setHTML(`<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12.5px;font-weight:600;color:#0f172a;padding:2px 4px;">${pin.name} | Parked: ${pin.parked}</div>`);
 
-      const inchargeHtml = s.inchargeName ? `<div style="font-size:12px;margin-top:2px;"><b>In-charge:</b> ${s.inchargeName}</div>` : '';
-      const phoneHtml = s.phone ? `<div style="font-size:12px;margin-top:2px;"><b>CUG Contact:</b> <a href="tel:${s.phone}" style="color:#2563eb;text-decoration:none;">${s.phone}</a></div>` : '';
-      const popupHtml = `
-        <div style="font-family:system-ui,-apple-system,sans-serif;color:#0f172a;padding:4px;min-width:180px;">
-          <div style="font-weight:700;font-size:13px;">${s.name}</div>
-          <div style="font-size:11px;color:#64748b;">${s.zone} Zone &bull; ${s.district}</div>
-          ${inchargeHtml}
-          ${phoneHtml}
-          <div style="font-size:11px;color:#475569;margin-top:4px;"><b>Allocatable Fleet:</b> ${count} vehicles</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:3px;font-family:monospace;">${s.lat.toFixed(4)}°N, ${s.lng.toFixed(4)}°E</div>
-        </div>
-      `;
-      const popup = new ml.Popup({ offset: 12, closeButton: true }).setHTML(popupHtml);
-      const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
+      el.addEventListener('mouseenter', () => tooltip.addTo(map));
+      el.addEventListener('mouseleave', () => tooltip.remove());
+      el.addEventListener('click', () => {
+        map.flyTo({ center: [pin.lng, pin.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
+      });
+
+      const marker = new ml.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map);
       stationMarkersRef.current.push(marker);
     }
-  }, [stations, showStations, mapReady]);
+  }, [stationPins, showStations, mapReady]);
+
+  // ---- City boundary ring (gwalior.kmz) ----
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    const src = map.getSource('boundary');
+    if (src?.setData) {
+      src.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: mapFeatures?.boundary ?? [] },
+      });
+    }
+  }, [mapFeatures, mapReady]);
+
 
   // ---- Pulsing open-incident markers ----
   useEffect(() => {
@@ -474,6 +560,26 @@ export function LiveMap() {
               ]}
               ariaLabel="Search vehicles"
             />
+            {stationMatches.length > 0 ? (
+              <div style={{ display: 'grid', gap: 4 }}>
+                {stationMatches.map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    className="veh-map-ctrl-btn"
+                    style={{ justifyContent: 'flex-start', width: '100%', height: 'auto', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}
+                    onClick={() => {
+                      const map = mapRef.current;
+                      if (map) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: '50% 50% 50% 0', background: '#dc2626', transform: 'rotate(45deg)', flex: 'none' }} aria-hidden="true" />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+                    <strong style={{ color: 'var(--color-brand)' }}>{p.parked}</strong>
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <div className="cluster" style={{ gap: '0.4rem' }}>
               <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} ariaLabel="Filter by status" />
               <Select value={sectorFilter} onChange={setSectorFilter} options={SECTOR_OPTIONS} ariaLabel="Filter by sector" />

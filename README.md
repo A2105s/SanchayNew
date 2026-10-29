@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/Sanchay-512.png" alt="Sanchay logo" width="120" />
+  <img src="public/logo.png" alt="Sanchay logo" width="120" />
 </p>
 
 <h1 align="center">Sanchay — Public Asset Intelligence</h1>

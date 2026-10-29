@@ -22,6 +22,7 @@ import {
   type CloudSyncStatus
 } from '@/lib/client/sync-status';
 import { pendingCount as offlinePendingCount, subscribe as subscribeOffline } from '@/lib/client/offline-queue';
+import { useActiveModule } from '@/lib/client/useModule';
 
 const EMPTY_HEALTH: CloudHealthInfo = { checkedAt: null, latencyMs: null, httpStatus: null, error: null };
 const EMPTY_JOBS: ServerJobCounts = { pending: 0, processing: 0, failed: 0, completed: 0 };
@@ -43,7 +44,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const bare = pathname === '/login' || pathname === '/';
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true); // Supabase-style icon rail; expands on hover or via the menu button
+  const shellModule = useActiveModule(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -262,9 +264,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="top-nav__title">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Sanchay logo" className="top-nav__logo" />
-            <div className="top-nav__brand-text">
-              <strong>San</strong><span>chay</span>
-            </div>
+            <span className="top-nav__module">{shellModule === 'spaces' ? 'Civic Spaces' : 'Vehicles'}</span>
           </div>
           <div className="top-nav__actions">
             <AiCopilotModal />

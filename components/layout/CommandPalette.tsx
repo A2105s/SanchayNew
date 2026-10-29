@@ -2,39 +2,45 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Car, CornerDownLeft, LayoutDashboard, Search } from 'lucide-react';
 import { useFleet } from '@/components/providers/FleetProvider';
+import { useActiveModule } from '@/lib/client/useModule';
 import { CLASS_LABEL, SECTOR_LABEL } from '@/lib/fleet/format';
+
+type Domain = 'vehicles' | 'spaces' | 'shared';
 
 interface PageEntry {
   href: string;
   label: string;
+  domain: Domain;
 }
 
+/** Pages are tagged per module so the palette never mixes Vehicles and Spaces content. */
 const PAGES: PageEntry[] = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/vehicles', label: 'Fleet registry' },
-  { href: '/vehicles/discover', label: 'Discover vehicles' },
-  { href: '/vehicles/map', label: 'Live map' },
-  { href: '/requests', label: 'Requests' },
-  { href: '/allocations', label: 'Allocations' },
-  { href: '/operations', label: 'Operations' },
-  { href: '/stations', label: 'Stations' },
-  { href: '/transfers', label: 'Transfers' },
-  { href: '/compliance', label: 'Compliance' },
-  { href: '/maintenance', label: 'Maintenance' },
-  { href: '/idle', label: 'Idle & reuse' },
-  { href: '/incidents', label: 'Incidents' },
-  { href: '/iot', label: 'IoT hub' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/audit', label: 'Audit' },
-  { href: '/settings', label: 'Settings' },
-  { href: '/notifications', label: 'Notifications' },
-  { href: '/spaces', label: 'Spaces' },
-  { href: '/spaces/bookings', label: 'Space bookings' },
-  { href: '/spaces/requests', label: 'Space requests' },
-  { href: '/spaces/settings', label: 'Space booking policy' }
+  { href: '/dashboard', label: 'Dashboard', domain: 'vehicles' },
+  { href: '/vehicles', label: 'Fleet registry', domain: 'vehicles' },
+  { href: '/vehicles/discover', label: 'Discover vehicles', domain: 'vehicles' },
+  { href: '/vehicles/map', label: 'Live map', domain: 'vehicles' },
+  { href: '/requests', label: 'Requests', domain: 'vehicles' },
+  { href: '/allocations', label: 'Allocations', domain: 'vehicles' },
+  { href: '/operations', label: 'Operations', domain: 'vehicles' },
+  { href: '/stations', label: 'Stations', domain: 'vehicles' },
+  { href: '/station', label: 'My station', domain: 'vehicles' },
+  { href: '/transfers', label: 'Transfers', domain: 'vehicles' },
+  { href: '/compliance', label: 'Compliance', domain: 'vehicles' },
+  { href: '/maintenance', label: 'Maintenance', domain: 'vehicles' },
+  { href: '/idle', label: 'Idle & reuse', domain: 'vehicles' },
+  { href: '/incidents', label: 'Incidents', domain: 'vehicles' },
+  { href: '/iot', label: 'IoT hub', domain: 'vehicles' },
+  { href: '/reports', label: 'Reports', domain: 'vehicles' },
+  { href: '/spaces', label: 'Spaces', domain: 'spaces' },
+  { href: '/spaces/bookings', label: 'Space bookings', domain: 'spaces' },
+  { href: '/spaces/requests', label: 'Space requests', domain: 'spaces' },
+  { href: '/spaces/settings', label: 'Space booking policy', domain: 'spaces' },
+  { href: '/audit', label: 'Audit ledger', domain: 'shared' },
+  { href: '/settings', label: 'Settings', domain: 'shared' },
+  { href: '/notifications', label: 'Notifications', domain: 'shared' }
 ];
 
 interface CommandPaletteProps {
@@ -51,11 +57,14 @@ interface Result {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const { snapshot } = useFleet();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
+
+  const domain = useActiveModule(pathname);
 
   useEffect(() => setMounted(true), []);
 
@@ -72,14 +81,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
-    const pageMatches = PAGES.filter((p) => !q || p.label.toLowerCase().includes(q)).map<Result>((p) => ({
+    const pageMatches = PAGES.filter((p) => (p.domain === 'shared' || p.domain === domain) && (!q || p.label.toLowerCase().includes(q))).map<Result>((p) => ({
       kind: 'page',
       href: p.href,
       label: p.label
     }));
 
     let vehicleMatches: Result[] = [];
-    if (q && snapshot) {
+    if (domain === 'vehicles' && q && snapshot) {
       vehicleMatches = snapshot.vehicles
         .filter((v) => {
           const hay = [v.registrationNumber, v.displayName, v.driverName ?? '', v.assetCode]
@@ -97,7 +106,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     }
 
     return [...pageMatches, ...vehicleMatches];
-  }, [query, snapshot]);
+  }, [query, snapshot, domain]);
 
   useEffect(() => {
     if (active >= results.length) setActive(0);

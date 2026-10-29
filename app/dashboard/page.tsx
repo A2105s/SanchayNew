@@ -349,17 +349,6 @@ export default function DashboardPage() {
                   <span className="an-stats__value">{model.offline}</span>
                 </Link>
               </li>
-              <li>
-                <Link href="/spaces">
-                  <span className="an-stats__label">
-                    <strong>Civic Spaces</strong>
-                    <small>Next module: registry, booking and occupancy sensors</small>
-                  </span>
-                  <span className="an-stats__value">
-                    <Radio size={16} aria-hidden="true" />
-                  </span>
-                </Link>
-              </li>
             </ul>
           </ChartCard>
         </div>

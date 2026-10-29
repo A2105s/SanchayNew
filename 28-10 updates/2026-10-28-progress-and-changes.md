@@ -179,3 +179,96 @@ Per the operational model: the requesting loop runs **between two police station
 2. Sign in as **Station B**'s officer (or `dept.officer`) → `/requests` → approve (atomic allocation) → handover → return.
 3. Sign in as **`dm.gwalior`** (IAS) → dashboard/audit oversight; for seized vehicles, record release or auction authorisation in the custody workflow citing the court order.
 4. Spaces flows run at department level (`dept.health`, `org.police`, `dm.gwalior` for policy) — no station logins, by design.
+
+---
+
+# Addendum 3: Landing page, fixed station picker, station profile
+
+## 1. Landing page (`/`, public)
+- The root no longer redirects unauthenticated visitors to /login — it renders a proper **section chooser**: the Sanchay logo, a one-line mission statement, and two large cards:
+  - **Vehicles** — "Station sign-in" → `/login?mode=vehicles` (with live-map, custody/court-cases, idle-reuse highlights).
+  - **Civic Spaces** — "Department sign-in" → `/login?mode=spaces` (with booking calendar, request center, idle-activation highlights).
+- Authenticated visitors still go straight to `/dashboard`.
+
+## 2. Login page — mode-aware, dropdown rebuilt
+- **The broken native `<select>` is gone.** Replaced with a custom searchable **StationPicker** (`components/login/StationPicker.tsx`): themed to the login card, with a search box, scrollable list, checkmark on selection, and keyboard-friendly focus. 37 stations are easy to navigate now.
+- `?mode=vehicles` → "Station sign-in": station picker + password only.
+- `?mode=spaces` → "Department sign-in": username + password (labelled for departments), demo accounts list.
+- No mode → both fields + a "Choose a section instead" link back to the landing page.
+- Each mode shows its own demo helper (station list vs department accounts).
+
+## 3. Station profile page (`/station`)
+- New sidebar entry **"My station"** (visible only to operators attached to a station — station officers and field staff; hidden for department/platform roles).
+- Shows: station identity (code, zone, district, incharge, contact, coordinates), fleet mix KPIs (patrol cars / motorcycles / vans / heavy from `StationInventory`), registered vehicle count, active allocations, officers list.
+- **Logout lives in the page** (Session panel) — posts to `/api/auth/logout` and returns to the landing page. The sidebar's existing logout remains as well.
+- Backed by `GET /api/cloud/station/profile` (session-scoped; 404 with a friendly page for accounts without a station).
+
+## Verified live
+- `/` renders both cards; `/login?mode=vehicles|spaces` render; station profile returns Kotwali's real data (3 vehicles, 3 officers); `dm.gwalior` gets the graceful "no station" state; logout works. Typecheck + ESLint clean.
+
+---
+
+# Addendum 4: real logo everywhere, separated sections, sidebar profile
+
+1. **Logo**: `public/logo.png` (the silver "S" mark, transparent) is now the single logo everywhere — favicon (`app/icon.png`), landing page, README, sidebar and login (which already used it). The hexagon (`Sanchay.png` copy) was removed from all surfaces and `public/Sanchay-512.png` deleted.
+2. **Vehicles and Spaces fully separated in the sidebar**: spaces now live under their own **"Spaces"** heading (Spaces · Space bookings · Space requests · Booking policy — the policy page is now reachable from the nav for admins). The "More" group is back to Settings + My station. The landing page was already two separate cards, and a bare `/login` now redirects back to the landing chooser so the two logins are never shown merged.
+3. **Sidebar profile redone**: the footer is now a proper profile block — initials avatar, operator name, role, and (for station logins) a clickable "Station profile" link that opens `/station`; the logout is an icon button beside it. Station officers therefore have two clear paths to their profile: the nav item and the footer profile.
+4. Runtime-verified: landing uses `/logo.png`, favicon serves the S mark, all spaces pages render, station profile returns Kotwali's live inventory (1 patrol car, 1 motorcycle), DM gets the booking-policy page. Typecheck + ESLint clean.
+
+---
+
+# Addendum 5: hard module separation — no more cross-content
+
+1. **Fleet dashboard**: removed the "Civic Spaces — next module" teaser tile; the dashboard is vehicles-only.
+2. **Command palette (Ctrl+K)**: every page entry is tagged `vehicles` / `spaces` / `shared`; the palette now shows only the current module's pages plus shared ones (Audit, Settings, Notifications), and vehicle search only appears while browsing the vehicles module.
+3. **Sidebar**: fully module-scoped. A **module switcher** (Vehicles ⇄ Spaces tabs) sits under the brand; the nav below shows only the active module's groups — fleet groups (Fleet / Requests / Oversight / Insights) in the vehicles module, the Spaces group in the spaces module; shared groups (Governance/Audit, More/Settings) always show. Groups themselves are domain-tagged so headings never leak.
+4. **Login destination**: signing in from the Spaces card now lands on `/spaces`; from the Vehicles card on the fleet dashboard.
+5. Fixed an `initials()` helper bug (regex had lost its backslash) spotted during the rework. Typecheck + ESLint clean (remaining palette warnings pre-exist).
+
+---
+
+# Addendum 6: login-driven modules + Supabase-style shell
+
+1. **Switcher buttons removed.** The module is now decided by **where you logged in**: the Vehicles card sets a `sanchay_module=vehicles` preference cookie, the Spaces card sets `spaces` (UI-only cookie — authorization still comes from the session role). The sidebar, header title, and Ctrl+K palette all read that cookie (`lib/client/useModule.ts`). A station officer who logged in through the Vehicles card never sees Spaces navigation, and vice versa.
+2. **Supabase-style chrome:**
+   - **Sidebar is an icon rail by default** (~72px: icons only) that **expands on hover** to the full 264px with labels, group headings, and the profile block — pure CSS, overlays the content like Supabase. The hamburger still pins it open if you prefer. (The existing `is-collapsed` mode is now the default.)
+   - **Header redesigned**: brand moved from the sidebar-center to the header — logo mark + module name ("Vehicles" or "Civic Spaces") on the left, actions (Ask AI, Ctrl+K, notifications, theme, cloud status) on the right, mirroring Supabase's logo + org header.
+   - Group headings (Fleet, Requests, Oversight, Spaces…) finally have proper styling (they had none), and hidden content in the collapsed rail (badges, headings, profile) reappears on hover.
+3. Typecheck + ESLint clean (remaining warnings pre-exist in AppShell's subscription effects). All shell pages verified 200 with both module cookies.
+
+---
+
+# Addendum 7: sidebar profile restyled ZCode-style
+
+- The profile block at the sidebar's bottom is now a **flat row** — circular initials avatar, name, and role — with no card background; the foot gets a subtle top separator instead.
+- The "STATION PROFILE" label is gone: for station logins the **whole row is the link** to `/station` (light hover state); for department/platform roles the row is static identity.
+- Logout is a quiet ghost icon on the row's right. In the collapsed rail only the avatar shows; the logout icon appears on hover, matching the rail behavior.
+
+---
+
+# Addendum 8: actual fix for vehicles content leaking into the Spaces sidebar
+
+**Root cause found:** when I domain-tagged the navigation, only the Spaces/shared entries got explicit domains — every vehicle item had `domain: undefined`, and the sidebar filter only rejected items whose domain was *explicitly different*. Undefined passed the filter, and the "append unassigned items" fallback then added the rest — so the Spaces sidebar still showed Fleet, Discover, Live map, Stations, Requests, Allocations, Transfers, Operations, Compliance, Maintenance, Idle, Incidents, IoT hub, Reports, Dashboard and My station.
+
+**Fix:** untagged items now default to the `vehicles` domain (`item.domain ?? 'vehicles'`), so in the Spaces module the sidebar shows only the Spaces group plus the shared entries (Audit, Settings). The Vehicles module is unaffected. Typecheck + lint clean; all Spaces pages verified 200.
+
+---
+
+# Addendum 9: NationTrack-style fleet map from the provided KMZ/KML files
+
+**Simulation status:** the cars simulation itself is healthy — 148 of 149 vehicles are `SIMULATED`, 87 arterial corridors load from the Roads.kml-derived `public/data/gwalior-routes.json`, and the 5-second tick loop drives the A⇄B⇄A motion with dwell parking. No sim code change was needed; the map layer around it is what was rebuilt.
+
+## KMZ/KML files now in use
+- **`Police Station.kmz`** → extracted and converted to `public/data/gwalior-map.geojson` (**31 red station pins** with exact KMZ coordinates; raw KML preserved at `public/data/kml/police-stations.kml`).
+- **`gwalior.kmz`** → the **city boundary ring** (142-point line) rendered as a blue dashed outline around Gwalior, exactly like the old NationTrack map.
+- **`Roads.kml`** → already drives the car simulation corridors (unchanged).
+
+## Live map rebuilt (components/vehicles/LiveMap.tsx)
+- **Red teardrop pins for every police station** with the **vehicle count inside** the pin, drop-shadowed like NationTrack. Counts are matched **geographically**: each DB station contributes its vehicles to the nearest KMZ pin within 1.2 km (KMZ names differ from DB names, so the match is spatial, not textual).
+- **Hover tooltip** on each pin: "<Station name> | Parked: N" — the NationTrack wording.
+- **Click a pin** flies to it at street zoom.
+- **Search box now finds stations too**: type "kotwali" and matching stations appear in the panel with their parked counts; clicking flies to the pin.
+- **Map controls bottom-right**: zoom buttons, geolocate ("use my location" with user dot) — joining the existing fullscreen toggle.
+- The blue dashed **boundary ring** renders on every theme.
+
+Verified: `/vehicles/map` 200, geojson served (31 pins + boundary), 87 sim corridors served; typecheck + ESLint clean (also fixed a pre-existing `any` lint error in the vehicle-marker map).

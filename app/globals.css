@@ -160,7 +160,7 @@ code {
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent),
     #163036;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
-  transition: width var(--transition-normal);
+  transition: width 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .sidebar__brand {
@@ -171,8 +171,8 @@ code {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
+  gap: 14px;
+  padding: 0 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
@@ -309,7 +309,7 @@ code {
   flex: 1;
   min-width: 0;
   margin-left: var(--sidebar-width);
-  transition: margin-left var(--transition-normal);
+  transition: margin-left 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .top-nav {
@@ -361,9 +361,11 @@ code {
 }
 
 .top-nav__logo {
-  height: 28px;
+  height: 32px;
+  width: 32px;
   max-width: 100%;
   object-fit: contain;
+  flex-shrink: 0;
   background: transparent;
 }
 
@@ -3371,7 +3373,8 @@ tr:last-child td {
 
   .top-nav {
     padding: 0 var(--space-3);
-    position: relative;
+    position: sticky;
+    top: 0;
   }
 
   .top-nav__title {
@@ -3822,14 +3825,9 @@ select:focus,
    COLLAPSIBLE SIDEBAR STYLE (DESKTOP)
    ============================================================ */
 @media (min-width: 821px) {
-  /* On desktop, hide top-nav mobile hamburger button so it doesn't get covered when sidebar expands */
+  /* Hamburger button is visible and active on desktop as well as mobile */
   .top-nav__menu {
-    display: none;
-  }
-
-  /* Hide duplicate logo in top-nav on desktop since sidebar already shows the logo */
-  .top-nav__logo {
-    display: none;
+    display: inline-grid;
   }
 
   /* ── Collapsed icon rail base (72px) ── */
@@ -3843,7 +3841,7 @@ select:focus,
 
   .app-shell.is-collapsed .app-shell__content {
     margin-left: 72px;
-    transition: margin-left 280ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: margin-left 260ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Exact 60px height to match top-nav bottom border line seamlessly at y=60px */
@@ -8933,10 +8931,13 @@ a.sidebar__profile-main:hover {
    header carries the brand + module name.
    ============================================================ */
 .top-nav__module {
-  font-size: 1.02rem;
+  display: flex;
+  align-items: center;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--color-text-primary);
-  letter-spacing: 0.01em;
+  letter-spacing: 0;
+  line-height: 1;
   white-space: nowrap;
 }
 

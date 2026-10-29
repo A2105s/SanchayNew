@@ -56,30 +56,53 @@ const SECTOR_OPTIONS = [
 
 function enhanceLightBasemap(map: any) {
   try {
+    if (map.getLayer('background')) {
+      map.setPaintProperty('background', 'background-color', '#f8fafc');
+    }
+    if (map.getLayer('landcover')) {
+      map.setPaintProperty('landcover', 'fill-color', '#d8ebd9');
+      map.setPaintProperty('landcover', 'fill-opacity', 0.78);
+    }
+    if (map.getLayer('water')) {
+      map.setPaintProperty('water', 'fill-color', '#dbeafe');
+    }
+    if (map.getLayer('waterway')) {
+      map.setPaintProperty('waterway', 'line-color', '#93c5fd');
+    }
     if (map.getLayer('road_minor_case')) {
       map.setLayerZoomRange('road_minor_case', 10, 24);
       map.setPaintProperty('road_minor_case', 'line-color', '#94a3b8');
-      map.setPaintProperty('road_minor_case', 'line-opacity', 0.92);
+      map.setPaintProperty('road_minor_case', 'line-opacity', 0.82);
     }
     if (map.getLayer('road_minor_fill')) {
       map.setLayerZoomRange('road_minor_fill', 10, 24);
       map.setPaintProperty('road_minor_fill', 'line-color', '#ffffff');
     }
-    if (map.getLayer('landcover')) {
-      map.setPaintProperty('landcover', 'fill-color', '#cdeedb');
-      map.setPaintProperty('landcover', 'fill-opacity', 0.82);
+    if (map.getLayer('road_sec_case_noramp')) {
+      map.setPaintProperty('road_sec_case_noramp', 'line-color', '#64748b');
+      map.setPaintProperty('road_sec_case_noramp', 'line-opacity', 0.88);
+    }
+    if (map.getLayer('road_sec_fill_noramp')) {
+      map.setPaintProperty('road_sec_fill_noramp', 'line-color', '#ffffff');
+    }
+    if (map.getLayer('road_pri_case_noramp')) {
+      map.setPaintProperty('road_pri_case_noramp', 'line-color', '#f59e0b');
+      map.setPaintProperty('road_pri_case_noramp', 'line-opacity', 0.85);
+    }
+    if (map.getLayer('road_pri_fill_noramp')) {
+      map.setPaintProperty('road_pri_fill_noramp', 'line-color', '#fef9c3');
     }
     if (map.getLayer('building')) {
       map.setLayerZoomRange('building', 12, 24);
-      map.setPaintProperty('building', 'fill-color', '#e2e8f0');
+      map.setPaintProperty('building', 'fill-color', '#f1f5f9');
       map.setPaintProperty('building', 'fill-outline-color', '#cbd5e1');
-      map.setPaintProperty('building', 'fill-opacity', 0.85);
+      map.setPaintProperty('building', 'fill-opacity', 0.8);
     }
     if (map.getLayer('building-top')) {
       map.setLayerZoomRange('building-top', 12, 24);
-      map.setPaintProperty('building-top', 'fill-color', '#f8fafc');
+      map.setPaintProperty('building-top', 'fill-color', '#ffffff');
       map.setPaintProperty('building-top', 'fill-outline-color', '#94a3b8');
-      map.setPaintProperty('building-top', 'fill-opacity', 0.95);
+      map.setPaintProperty('building-top', 'fill-opacity', 0.85);
     }
   } catch {
     /* fallback ignored */

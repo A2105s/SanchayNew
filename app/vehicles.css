@@ -531,7 +531,7 @@
 
 /* High-contrast, rich vibrant rendering for map tiles (eliminates washed-out look) */
 .veh-map-page .veh-map-canvas .maplibregl-canvas {
-  filter: contrast(1.05) saturate(1.12);
+  filter: contrast(1.02);
   transition: filter 0.3s ease;
 }
 

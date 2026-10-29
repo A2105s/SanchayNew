@@ -7,31 +7,32 @@ let cachedLightStyle: Record<string, unknown> | null = null;
 let cachedDarkStyle: Record<string, unknown> | null = null;
 
 /**
- * Ola Maps & Krutrim Mobility Design System:
- * - Earth / Land canvas: #F4F3F0 (warm stone, high readability for dense Indian street grids)
- * - Built-up / Blocks: #EBE8E1 (subtle architectural footprint)
- * - Greenery & Parks: #E2EFE1 (Ola Park soft sage)
- * - Water: #C8E1F3 (Ola Water soft calm pastel) with #85BBE5 waterways
- * - Minor Streets (Colonies, gallis): #D0D5DD casing with #FFFFFF pure white fill
- * - Secondary & Primary Urban Corridors: Crisp prominent #FFFFFF boulevards with #98A2B3 casing
- * - Highways & Expressways: Signature Ola Marigold (#FFAE42 / #FFC57E) with #E08D23 casing
- * - Typography: Deep charcoal #212121 / #333333 with clean white halo
+ * Authentic Ola Maps Mobile Cartography Style:
+ * Extracted directly from Ola's live navigation UI:
+ * - Canvas Background: Crisp porcelain #F4F7FB
+ * - Buildings & City Blocks: Pastel periwinkle/slate #EBF1F8 with #D6E0EC outline
+ * - Roads (All Levels): Pure crisp white #FFFFFF ribbons with #D5DFEA cool-slate casing
+ * - Major Corridors: Wider pure white #FFFFFF ribbons with #C2D0E0 casing
+ * - Highways (Motorways/Trunks): Warm amber-peach #FFDFC2 with #F97316 / #E08D23 casing
+ * - Parks & Greenery: Luminous fresh mint green #9BF0B8 / #A7F3D0 (crisp, high visibility)
+ * - Water: Soft radiant sky water #BAE6FD
+ * - Typography: Slate-600 #475569 with pure white halo
  */
 function transformLightStyle(style: any): any {
   const clone = JSON.parse(JSON.stringify(style));
 
   if (Array.isArray(clone.layers)) {
     for (const layer of clone.layers) {
-      // 1. Earth / Base Canvas — Ola Maps warm porcelain canvas (#F4F3F0)
+      // 1. Base Canvas — Ola crisp porcelain (#F4F7FB)
       if (layer.id === 'background') {
         layer.paint = {
           ...(layer.paint || {}),
-          'background-color': '#F4F3F0',
+          'background-color': '#F4F7FB',
           'background-opacity': 1,
         };
       }
 
-      // 2. Parks & Greenery — Ola Maps soft sage (#E2EFE1)
+      // 2. Parks & Greenery — Ola signature fresh luminous mint (#9BF0B8 / #A7F3D0)
       if (
         layer.id === 'landcover' ||
         layer.id === 'park_national_park' ||
@@ -42,20 +43,20 @@ function transformLightStyle(style: any): any {
       ) {
         layer.paint = {
           ...(layer.paint || {}),
-          'fill-color': '#E2EFE1',
-          'fill-opacity': 0.88,
+          'fill-color': '#A7F3D0',
+          'fill-opacity': 0.92,
           'fill-antialias': true,
         };
       }
 
-      // 3. Buildings & Built-up Footprints — Ola built-up urban relief (#EBE8E1)
+      // 3. Buildings & City Blocks — Ola's iconic pastel periwinkle-slate plots (#EBF1F8)
       if (layer.id === 'building') {
         layer.minzoom = 12;
         layer.paint = {
           ...(layer.paint || {}),
-          'fill-color': '#EBE8E1',
-          'fill-outline-color': '#D0D5DD',
-          'fill-opacity': { stops: [[12, 0.45], [14, 0.8], [16, 0.95]] },
+          'fill-color': '#EBF1F8',
+          'fill-outline-color': '#D6E0EC',
+          'fill-opacity': { stops: [[12, 0.6], [14, 0.88], [16, 1]] },
           'fill-antialias': true,
         };
       }
@@ -63,18 +64,25 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 12;
         layer.paint = {
           ...(layer.paint || {}),
-          'fill-color': '#FAF9F6',
-          'fill-outline-color': '#98A2B3',
-          'fill-opacity': { stops: [[12, 0.5], [14, 0.85], [16, 1]] },
+          'fill-color': '#F3F7FC',
+          'fill-outline-color': '#CBD7E6',
+          'fill-opacity': { stops: [[12, 0.65], [14, 0.92], [16, 1]] },
           'fill-antialias': true,
         };
       }
+      if (layer.id === 'landuse_residential') {
+        layer.paint = {
+          ...(layer.paint || {}),
+          'fill-color': '#F0F4FA',
+          'fill-opacity': 0.5,
+        };
+      }
 
-      // 4. Water & Streams — Ola Maps gentle sky water (#C8E1F3)
+      // 4. Water & Streams — clear radiant sky blue
       if (layer.id === 'water' || layer.id === 'water_shadow') {
         layer.paint = {
           ...(layer.paint || {}),
-          'fill-color': '#C8E1F3',
+          'fill-color': '#BAE6FD',
           'fill-opacity': 1,
           'fill-antialias': true,
         };
@@ -82,14 +90,14 @@ function transformLightStyle(style: any): any {
       if (layer.id === 'waterway') {
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#85BBE5',
-          'line-width': { stops: [[8, 1], [11, 1.8], [14, 3], [16, 4.2]] },
+          'line-color': '#60A5FA',
+          'line-width': { stops: [[8, 1.2], [11, 2], [14, 3.5], [16, 5]] },
           'line-opacity': 0.95,
         };
       }
 
-      // 5. Minor Residential Streets (Indian neighborhood grid / colony lanes)
-      // Ola style: Clean, crisp Slate casing (#D0D5DD) with pure white core (#FFFFFF)
+      // 5. Minor Residential Streets (Colony lanes, cross roads)
+      // Ola style: Clean, crisp cool-slate casing (#D5DFEA) with pure white core (#FFFFFF)
       if (
         layer.id === 'road_minor_case' ||
         layer.id === 'tunnel_minor_case' ||
@@ -98,9 +106,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 10;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#D0D5DD',
-          'line-opacity': 0.92,
-          'line-width': { stops: [[10, 0.7], [12, 1.3], [14, 2.5], [16, 4.8], [18, 9]] },
+          'line-color': '#D5DFEA',
+          'line-opacity': 0.95,
+          'line-width': { stops: [[10, 0.9], [12, 1.5], [14, 2.8], [16, 5.2], [18, 10]] },
         };
       }
       if (
@@ -113,7 +121,7 @@ function transformLightStyle(style: any): any {
           ...(layer.paint || {}),
           'line-color': '#FFFFFF',
           'line-opacity': 1,
-          'line-width': { stops: [[10, 0.4], [12, 0.9], [14, 1.8], [16, 3.6], [18, 7.5]] },
+          'line-width': { stops: [[10, 0.5], [12, 1.0], [14, 2.0], [16, 4.0], [18, 8.2]] },
         };
       }
 
@@ -126,9 +134,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 11;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#E2E4E9',
-          'line-opacity': 0.8,
-          'line-width': { stops: [[11, 0.6], [13, 1.2], [15, 2.2], [17, 4.5]] },
+          'line-color': '#E0E7F1',
+          'line-opacity': 0.85,
+          'line-width': { stops: [[11, 0.7], [13, 1.3], [15, 2.4], [17, 5]] },
         };
       }
       if (
@@ -139,12 +147,12 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 11;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#FAFAFA',
+          'line-color': '#FFFFFF',
           'line-opacity': 1,
         };
       }
 
-      // 7. Secondary Roads (Main city thoroughfares) — crisp white avenue with Slate-400 casing
+      // 7. Secondary Urban Roads (City Main Roads)
       if (
         layer.id === 'road_sec_case_noramp' ||
         layer.id === 'tunnel_sec_case' ||
@@ -153,9 +161,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 9;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#98A2B3',
-          'line-opacity': 0.95,
-          'line-width': { stops: [[9, 0.9], [11, 1.8], [13, 3.4], [15, 6.2], [18, 12]] },
+          'line-color': '#BACAD9',
+          'line-opacity': 0.98,
+          'line-width': { stops: [[9, 1.1], [11, 2.0], [13, 3.8], [15, 7.0], [18, 13.5]] },
         };
       }
       if (
@@ -168,12 +176,12 @@ function transformLightStyle(style: any): any {
           ...(layer.paint || {}),
           'line-color': '#FFFFFF',
           'line-opacity': 1,
-          'line-width': { stops: [[9, 0.5], [11, 1.2], [13, 2.4], [15, 4.8], [18, 9.5]] },
+          'line-width': { stops: [[9, 0.7], [11, 1.4], [13, 2.8], [15, 5.5], [18, 11]] },
         };
       }
 
-      // 8. Primary Arterial Roads — prominent white boulevard with solid #98A2B3 casing
-      // (Ola Maps uses pure white for urban arterial roads to keep city navigation clean)
+      // 8. Primary Arterial Roads (Major City Corridors)
+      // Pure white prominent ribbons with clean slate borders
       if (
         layer.id === 'road_pri_case_noramp' ||
         layer.id === 'road_pri_case_ramp' ||
@@ -183,9 +191,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 7;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#98A2B3',
-          'line-opacity': 0.95,
-          'line-width': { stops: [[7, 1.1], [10, 2.0], [13, 3.8], [16, 7.2], [18, 14]] },
+          'line-color': '#BACAD9',
+          'line-opacity': 1,
+          'line-width': { stops: [[7, 1.2], [10, 2.4], [13, 4.5], [16, 8.2], [18, 15.5]] },
         };
       }
       if (
@@ -199,11 +207,12 @@ function transformLightStyle(style: any): any {
           ...(layer.paint || {}),
           'line-color': '#FFFFFF',
           'line-opacity': 1,
-          'line-width': { stops: [[7, 0.7], [10, 1.4], [13, 2.8], [16, 5.6], [18, 11]] },
+          'line-width': { stops: [[7, 0.8], [10, 1.7], [13, 3.4], [16, 6.6], [18, 13]] },
         };
       }
 
-      // 9. National Highways & Expressways — Signature Ola Marigold Amber (#FFAE42 / #FFC57E)
+      // 9. Motorways & National Highways (Intercity Routes)
+      // Soft warm peach-amber with crisp orange casing
       if (
         layer.id === 'road_trunk_case_noramp' ||
         layer.id === 'road_mot_case_noramp' ||
@@ -214,7 +223,7 @@ function transformLightStyle(style: any): any {
       ) {
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#E08D23',
+          'line-color': '#F97316',
           'line-opacity': 0.95,
           'line-width': { stops: [[5, 1.2], [8, 2.2], [11, 4.2], [14, 8], [17, 16]] },
         };
@@ -229,19 +238,19 @@ function transformLightStyle(style: any): any {
       ) {
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#FFAE42',
+          'line-color': '#FED7AA',
           'line-opacity': 1,
           'line-width': { stops: [[5, 0.8], [8, 1.6], [11, 3.2], [14, 6.4], [17, 13]] },
         };
       }
 
-      // 10. Typography — Ola Maps dark charcoal #212121 / #333333 with crisp white halo
+      // 10. Street & Place Typography — Ola Maps slate #475569 with thick pure white halo
       if (layer.id && layer.id.startsWith('roadname_')) {
         layer.paint = {
           ...(layer.paint || {}),
-          'text-color': '#212121',
+          'text-color': '#475569',
           'text-halo-color': '#FFFFFF',
-          'text-halo-width': 1.8,
+          'text-halo-width': 2,
         };
       }
     }

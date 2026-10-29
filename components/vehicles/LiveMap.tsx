@@ -71,22 +71,26 @@ function enhanceLightBasemap(map: any) {
     }
     if (map.getLayer('road_minor_case')) {
       map.setLayerZoomRange('road_minor_case', 10, 24);
-      map.setPaintProperty('road_minor_case', 'line-color', '#d4dde6');
-      map.setPaintProperty('road_minor_case', 'line-opacity', 0.92);
+      map.setPaintProperty('road_minor_case', 'line-color', '#64748b');
+      map.setPaintProperty('road_minor_case', 'line-opacity', 0.95);
     }
     if (map.getLayer('road_minor_fill')) {
       map.setLayerZoomRange('road_minor_fill', 10, 24);
       map.setPaintProperty('road_minor_fill', 'line-color', '#ffffff');
     }
+    if (map.getLayer('road_service_case')) {
+      map.setPaintProperty('road_service_case', 'line-color', '#94a3b8');
+      map.setPaintProperty('road_service_case', 'line-opacity', 0.9);
+    }
     if (map.getLayer('road_sec_case_noramp')) {
-      map.setPaintProperty('road_sec_case_noramp', 'line-color', '#b5c1cd');
-      map.setPaintProperty('road_sec_case_noramp', 'line-opacity', 0.95);
+      map.setPaintProperty('road_sec_case_noramp', 'line-color', '#475569');
+      map.setPaintProperty('road_sec_case_noramp', 'line-opacity', 0.98);
     }
     if (map.getLayer('road_sec_fill_noramp')) {
       map.setPaintProperty('road_sec_fill_noramp', 'line-color', '#ffffff');
     }
     if (map.getLayer('road_pri_case_noramp')) {
-      map.setPaintProperty('road_pri_case_noramp', 'line-color', '#9aaec1');
+      map.setPaintProperty('road_pri_case_noramp', 'line-color', '#64748b');
       map.setPaintProperty('road_pri_case_noramp', 'line-opacity', 1);
     }
     if (map.getLayer('road_pri_fill_noramp')) {

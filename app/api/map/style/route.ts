@@ -10,9 +10,9 @@ let cachedDarkStyle: Record<string, unknown> | null = null;
  * Pixel-Perfect Ola Maps Gwalior Cartography:
  * Sampled directly from user's live Ola Maps screenshots in Gwalior (Thatipur, DD Nagar):
  * - Land Canvas: #eaeaf6 (cool soothing lavender-porcelain)
- * - Minor Streets (Colonies & Gallis): Pure crisp white #ffffff with subtle slate border #d4dde6
- * - Secondary City Roads: Pure white #ffffff with defined slate border #b5c1cd
- * - Primary Arterials / Transit Corridors: Iconic Ola steel-slate blue #b9c9d8 with #9aaec1 casing
+ * - Minor Streets (Colonies & Gallis): Darker, crisper Slate-500 casing (#64748b) with pure white fill (#ffffff)
+ * - Secondary City Roads: Pure white #ffffff with defined slate border #475569
+ * - Primary Arterials / Transit Corridors: Iconic Ola steel-slate blue #b9c9d8 with #64748b casing
  * - Highways (Trunks / Motorways): Warm peach-amber #ffc57e with #e08d23 casing
  * - Parks & Greenery: Luminous Thatipur mint-emerald #99eabf (95% opacity)
  * - Institutional / Special Zones: Soft periwinkle-slate #dbe3ee
@@ -98,7 +98,7 @@ function transformLightStyle(style: any): any {
       }
 
       // 5. Minor Residential Streets (Indian colony grid, cross roads, gallis)
-      // Ola style: Crisp, pure white ribbons (#ffffff) on lavender canvas with subtle #d4dde6 casing
+      // Darker, high-visibility Slate-500 casing (#64748b) with crisp pure white core (#ffffff)
       if (
         layer.id === 'road_minor_case' ||
         layer.id === 'tunnel_minor_case' ||
@@ -107,9 +107,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 10;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#d4dde6',
-          'line-opacity': 0.92,
-          'line-width': { stops: [[10, 0.9], [12, 1.5], [14, 2.8], [16, 5.2], [18, 10]] },
+          'line-color': '#64748b',
+          'line-opacity': 0.95,
+          'line-width': { stops: [[10, 1.1], [12, 1.8], [14, 3.2], [16, 5.8], [18, 11]] },
         };
       }
       if (
@@ -122,11 +122,11 @@ function transformLightStyle(style: any): any {
           ...(layer.paint || {}),
           'line-color': '#ffffff',
           'line-opacity': 1,
-          'line-width': { stops: [[10, 0.5], [12, 1.0], [14, 2.0], [16, 4.0], [18, 8.2]] },
+          'line-width': { stops: [[10, 0.5], [12, 1.0], [14, 2.0], [16, 4.0], [18, 8.5]] },
         };
       }
 
-      // 6. Alleys and Service Roads
+      // 6. Alleys and Service Roads — Slate-400 casing (#94a3b8)
       if (
         layer.id === 'road_service_case' ||
         layer.id === 'tunnel_service_case' ||
@@ -135,9 +135,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 11;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#e0e7f1',
-          'line-opacity': 0.85,
-          'line-width': { stops: [[11, 0.7], [13, 1.3], [15, 2.4], [17, 5]] },
+          'line-color': '#94a3b8',
+          'line-opacity': 0.9,
+          'line-width': { stops: [[11, 0.8], [13, 1.5], [15, 2.6], [17, 5.2]] },
         };
       }
       if (
@@ -153,7 +153,7 @@ function transformLightStyle(style: any): any {
         };
       }
 
-      // 7. Secondary Urban Roads (City Main Streets) — pure white with crisp #b5c1cd border
+      // 7. Secondary Urban Roads (City Main Streets) — pure white with solid Slate-600 (#475569) border
       if (
         layer.id === 'road_sec_case_noramp' ||
         layer.id === 'tunnel_sec_case' ||
@@ -162,9 +162,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 9;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#b5c1cd',
-          'line-opacity': 0.95,
-          'line-width': { stops: [[9, 1.1], [11, 2.0], [13, 3.8], [15, 7.0], [18, 13.5]] },
+          'line-color': '#475569',
+          'line-opacity': 0.98,
+          'line-width': { stops: [[9, 1.2], [11, 2.2], [13, 4.0], [15, 7.2], [18, 14]] },
         };
       }
       if (
@@ -182,7 +182,7 @@ function transformLightStyle(style: any): any {
       }
 
       // 8. Primary Arterial Roads (Major City Corridors, e.g. DD Nagar & Thatipur transit roads)
-      // Ola's iconic signature steel-slate blue (#b9c9d8) ribbon with #9aaec1 casing!
+      // Steel-slate blue (#b9c9d8) ribbon with darker casing (#64748b)
       if (
         layer.id === 'road_pri_case_noramp' ||
         layer.id === 'road_pri_case_ramp' ||
@@ -192,9 +192,9 @@ function transformLightStyle(style: any): any {
         layer.minzoom = 7;
         layer.paint = {
           ...(layer.paint || {}),
-          'line-color': '#9aaec1',
+          'line-color': '#64748b',
           'line-opacity': 1,
-          'line-width': { stops: [[7, 1.2], [10, 2.4], [13, 4.6], [16, 8.5], [18, 16]] },
+          'line-width': { stops: [[7, 1.3], [10, 2.5], [13, 4.8], [16, 8.8], [18, 16.5]] },
         };
       }
       if (
@@ -244,11 +244,11 @@ function transformLightStyle(style: any): any {
         };
       }
 
-      // 10. Street & Place Typography — Slate-600 with clean white halo
+      // 10. Street & Place Typography — Slate-700 with clean white halo
       if (layer.id && layer.id.startsWith('roadname_')) {
         layer.paint = {
           ...(layer.paint || {}),
-          'text-color': '#475569',
+          'text-color': '#334155',
           'text-halo-color': '#ffffff',
           'text-halo-width': 2,
         };

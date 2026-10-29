@@ -54,6 +54,38 @@ const SECTOR_OPTIONS = [
   ...(Object.keys(SECTOR_LABEL) as Sector[]).map((s) => ({ value: s, label: SECTOR_LABEL[s] })),
 ];
 
+function enhanceLightBasemap(map: any) {
+  try {
+    if (map.getLayer('road_minor_case')) {
+      map.setLayerZoomRange('road_minor_case', 10, 24);
+      map.setPaintProperty('road_minor_case', 'line-color', '#94a3b8');
+      map.setPaintProperty('road_minor_case', 'line-opacity', 0.92);
+    }
+    if (map.getLayer('road_minor_fill')) {
+      map.setLayerZoomRange('road_minor_fill', 10, 24);
+      map.setPaintProperty('road_minor_fill', 'line-color', '#ffffff');
+    }
+    if (map.getLayer('landcover')) {
+      map.setPaintProperty('landcover', 'fill-color', '#cdeedb');
+      map.setPaintProperty('landcover', 'fill-opacity', 0.82);
+    }
+    if (map.getLayer('building')) {
+      map.setLayerZoomRange('building', 12, 24);
+      map.setPaintProperty('building', 'fill-color', '#e2e8f0');
+      map.setPaintProperty('building', 'fill-outline-color', '#cbd5e1');
+      map.setPaintProperty('building', 'fill-opacity', 0.85);
+    }
+    if (map.getLayer('building-top')) {
+      map.setLayerZoomRange('building-top', 12, 24);
+      map.setPaintProperty('building-top', 'fill-color', '#f8fafc');
+      map.setPaintProperty('building-top', 'fill-outline-color', '#94a3b8');
+      map.setPaintProperty('building-top', 'fill-opacity', 0.95);
+    }
+  } catch {
+    /* fallback ignored */
+  }
+}
+
 export function LiveMap() {
   const fleet = useFleet();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -272,6 +304,8 @@ export function LiveMap() {
             },
           });
 
+          const isDark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+          if (!isDark) enhanceLightBasemap(map);
           readyRef.current = true;
           setMapReady(true);
         };

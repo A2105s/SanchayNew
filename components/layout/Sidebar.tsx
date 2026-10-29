@@ -197,6 +197,7 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
             <Link
               href={item.href}
               prefetch
+              title={item.label}
               className={`${active ? 'is-active' : ''} ${pending ? 'is-pending' : ''}`.trim()}
               aria-current={active ? 'page' : undefined}
               aria-busy={pending || undefined}

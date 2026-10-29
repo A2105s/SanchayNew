@@ -44,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const bare = pathname === '/login' || pathname === '/';
 
-  const [collapsed, setCollapsed] = useState(true); // Supabase-style icon rail; expands on hover or via the menu button
+  const [collapsed, setCollapsed] = useState(false); // Clean desktop sidebar; toggleable via menu button
   const shellModule = useActiveModule(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);

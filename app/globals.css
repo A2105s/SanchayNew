@@ -234,9 +234,7 @@ code {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.sidebar__nav a:hover {
-  transform: translateX(2px);
-}
+/* .sidebar__nav a:hover - clean, no jitter */
 
 .sidebar__nav a.is-pending {
   color: #ffffff;
@@ -5715,6 +5713,81 @@ select:focus,
   margin: 0;
 }
 
+/* Role Switcher Pill */
+.login-role-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px;
+  margin: var(--space-2) 0;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--brand-border);
+  border-radius: 9999px;
+}
+
+.login-role-pill__btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.login-role-pill__btn:hover:not(.is-active) {
+  color: var(--color-text-primary);
+  background: rgba(10, 127, 140, 0.08);
+}
+
+.login-role-pill__btn.is-active {
+  background: var(--color-brand);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(10, 127, 140, 0.28);
+}
+
+.login-role-pill__btn:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Tooltip on hover */
+.login-role-pill__btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--brand-border);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  z-index: 30;
+}
+
+.login-role-pill__btn:hover::after,
+.login-role-pill__btn:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
 /* Form Styles */
 .login-form {
   display: flex;
@@ -8804,63 +8877,7 @@ a.sidebar__profile-main:hover {
     align-items: center;
   }
 
-  .app-shell.is-collapsed .sidebar:hover {
-    width: var(--sidebar-width);
-    padding: var(--space-5);
-    align-items: stretch;
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
-    overflow-y: auto;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__brand {
-    justify-content: flex-start;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__brand-text {
-    display: flex;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__group {
-    display: block;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__nav {
-    align-items: stretch;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__nav a {
-    justify-content: flex-start;
-    width: 100%;
-    min-height: 42px;
-    padding: 0 var(--space-3);
-    border-radius: var(--radius-lg);
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__nav a span {
-    display: inline;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__nav-badge {
-    display: inline-flex;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__foot {
-    align-items: stretch;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__profile-text {
-    display: flex;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__profile {
-    flex-direction: row;
-    justify-content: space-between;
-  }
-
-  .app-shell.is-collapsed .sidebar:hover .sidebar__logout {
-    width: 34px;
-    min-height: 34px;
-  }
+  /* Auto-expand on hover removed for professional, stable sidebar */
 }
 
 /* ============================================================

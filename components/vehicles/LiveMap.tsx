@@ -202,9 +202,9 @@ export function LiveMap() {
             source: 'trail',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#10b981',
-              'line-width': 7,
-              'line-opacity': 0.35,
+              'line-color': '#059669',
+              'line-width': 8,
+              'line-opacity': 0.45,
               'line-blur': 2,
             },
           });
@@ -215,9 +215,9 @@ export function LiveMap() {
             source: 'trail',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#34d399',
-              'line-width': 3.5,
-              'line-opacity': 0.95,
+              'line-color': '#10b981',
+              'line-width': 4,
+              'line-opacity': 1,
             },
           });
 
@@ -234,9 +234,9 @@ export function LiveMap() {
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
               'line-color': '#0284c7',
-              'line-width': 6,
-              'line-opacity': 0.3,
-              'line-blur': 1.5,
+              'line-width': 8,
+              'line-opacity': 0.4,
+              'line-blur': 2,
             },
           });
 
@@ -246,9 +246,9 @@ export function LiveMap() {
             source: 'route',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#38bdf8',
-              'line-width': 2.5,
-              'line-opacity': 0.9,
+              'line-color': '#0ea5e9',
+              'line-width': 3.5,
+              'line-opacity': 1,
               'line-dasharray': [2, 2],
             },
           });
@@ -265,9 +265,9 @@ export function LiveMap() {
             source: 'boundary',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#3b82f6',
-              'line-width': 3,
-              'line-opacity': 0.85,
+              'line-color': '#2563eb',
+              'line-width': 3.5,
+              'line-opacity': 0.95,
               'line-dasharray': [3, 2],
             },
           });
@@ -387,10 +387,10 @@ export function LiveMap() {
     if (!showStations) return;
     for (const pin of stationPins) {
       const el = document.createElement('div');
-      el.style.cssText = 'position:relative;width:30px;height:44px;cursor:pointer;filter:drop-shadow(0 3px 4px rgba(0,0,0,0.4));';
+      el.style.cssText = 'position:relative;width:32px;height:46px;cursor:pointer;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.45));';
       el.innerHTML = `
-        <div style="width:28px;height:28px;background:#dc2626;border:2px solid #991b1b;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-          <span style="transform:rotate(45deg);color:#fff;font-weight:800;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${pin.parked}</span>
+        <div style="width:30px;height:30px;background:#dc2626;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+          <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${pin.parked}</span>
         </div>`;
 
       const tooltip = new ml.Popup({ offset: 40, closeButton: false, closeOnClick: false, className: 'ps-tooltip' })

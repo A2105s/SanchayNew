@@ -31,8 +31,8 @@ describe('Nominatim (OpenStreetMap) Safe Integration', () => {
     assert.ok(res.places.length > 0);
     const top = res.places[0];
     assert.equal(top.id, 'local-station-kotwali-police-station');
-    assert.equal(top.lat, 26.2183);
-    assert.equal(top.lng, 78.1828);
+    assert.equal(top.lat, 26.196897);
+    assert.equal(top.lng, 78.152689);
     assert.equal(top.type, 'police_station');
     assert.equal(top.relevance, 1.0);
   });
@@ -46,8 +46,8 @@ describe('Nominatim (OpenStreetMap) Safe Integration', () => {
 
   it('safely performs reverse geocoding with caching', async () => {
     // Kotwali Gwalior coordinates
-    const lat = 26.2183;
-    const lng = 78.1828;
+    const lat = 26.196897;
+    const lng = 78.152689;
 
     const t0 = Date.now();
     const first = await reverseGeocodeNominatim(lat, lng);

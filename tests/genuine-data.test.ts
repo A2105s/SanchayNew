@@ -43,8 +43,8 @@ describe('Genuine Gwalior Government Data Integrity', () => {
       assert.ok(kotwali, 'Kotwali station must exist in DB');
       assert.equal(kotwali.inchargeName, 'Insp. Vinod Vinayak Karkare');
       assert.equal(kotwali.phone, '+91 77010 46916');
-      assert.equal(kotwali.lat, 26.2183);
-      assert.equal(kotwali.lng, 78.1828);
+      assert.equal(kotwali.lat, 26.196897);
+      assert.equal(kotwali.lng, 78.152689);
 
       const university = await prisma.station.findUnique({
         where: { code: 'university-police-station' }

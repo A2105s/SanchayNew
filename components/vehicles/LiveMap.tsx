@@ -211,14 +211,31 @@ export function LiveMap() {
     return stationPins.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 4);
   }, [search, stationPins]);
 
-  // Center & smooth fly to vehicle
-  const flyTo = useCallback((v: VehicleView) => {
+  // Center & smooth fly to vehicle's actual live coordinates
+  const flyTo = useCallback((v: { id: string; lat?: number | null; lng?: number | null }) => {
     setSelectedId(v.id);
     const map = mapRef.current;
-    if (map && v.lat != null && v.lng != null) {
-      map.flyTo({ center: [v.lng, v.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
+    if (!map) return;
+
+    // Check if the marker currently exists on the map (most accurate live coordinate)
+    const marker = vehicleMarkersRef.current.get(v.id);
+    let targetLng: number | null | undefined = null;
+    let targetLat: number | null | undefined = null;
+
+    if (marker && typeof (marker as any).getLngLat === 'function') {
+      const pos = (marker as any).getLngLat();
+      targetLng = pos.lng;
+      targetLat = pos.lat;
+    } else {
+      const latest = liveVehicles.find((x) => x.id === v.id);
+      targetLng = latest?.lng ?? v.lng;
+      targetLat = latest?.lat ?? v.lat;
     }
-  }, []);
+
+    if (targetLng != null && targetLat != null) {
+      map.flyTo({ center: [targetLng, targetLat], zoom: Math.max(map.getZoom(), 15), duration: 800 });
+    }
+  }, [liveVehicles]);
 
   // ---- Initialise the map once ----
   useEffect(() => {
@@ -409,12 +426,16 @@ export function LiveMap() {
           heading: v.heading,
           isSelected,
         });
+        const el = existing.getElement();
+        el.onclick = (e) => {
+          e.stopPropagation();
+          flyTo(v);
+        };
       } else {
         const el = createFleetMarkerElement(v, {
           heading: v.heading,
           isSelected,
           onClick: () => {
-            setSelectedId(v.id);
             flyTo(v);
           },
         });
@@ -444,34 +465,128 @@ export function LiveMap() {
     }
   }, [showTrail, mapReady]);
 
-  // ---- Police-station red pins (from Police Station.kmz, counts matched geographically) ----
+  // ---- Police-station pins with smart zoom clustering (prevents stacking glitch when zoomed out) ----
   useEffect(() => {
     const map = mapRef.current;
     const ml = mlRef.current;
     if (!map || !ml || !readyRef.current) return;
-    stationMarkersRef.current.forEach((m) => m.remove());
-    stationMarkersRef.current = [];
-    if (!showStations) return;
-    for (const pin of stationPins) {
-      const el = document.createElement('div');
-      el.style.cssText = 'position:relative;width:32px;height:46px;cursor:pointer;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.45));';
-      el.innerHTML = `
-        <div style="width:30px;height:30px;background:#dc2626;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-          <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${pin.parked}</span>
-        </div>`;
 
-      const tooltip = new ml.Popup({ offset: 40, closeButton: false, closeOnClick: false, className: 'ps-tooltip' })
-        .setHTML(`<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12.5px;font-weight:600;color:#0f172a;padding:2px 4px;">${pin.name} | Parked: ${pin.parked}</div>`);
+    const renderStations = () => {
+      stationMarkersRef.current.forEach((m) => m.remove());
+      stationMarkersRef.current = [];
+      if (!showStations || stationPins.length === 0) return;
 
-      el.addEventListener('mouseenter', () => tooltip.addTo(map));
-      el.addEventListener('mouseleave', () => tooltip.remove());
-      el.addEventListener('click', () => {
-        map.flyTo({ center: [pin.lng, pin.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
-      });
+      const zoom = map.getZoom();
 
-      const marker = new ml.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map);
-      stationMarkersRef.current.push(marker);
-    }
+      // When zoomed out to regional view (zoom < 11.2):
+      // Consolidate all Gwalior stations into 1 clean summary badge so pins don't overlap into a giant column!
+      if (zoom < 11.2) {
+        const totalParked = stationPins.reduce((sum, p) => sum + p.parked, 0);
+        const centerLng = stationPins.reduce((sum, p) => sum + p.lng, 0) / stationPins.length;
+        const centerLat = stationPins.reduce((sum, p) => sum + p.lat, 0) / stationPins.length;
+
+        const el = document.createElement('div');
+        el.style.cssText =
+          'cursor:pointer;background:#dc2626;color:#ffffff;border:2.5px solid #ffffff;border-radius:24px;padding:5px 12px;font-family:system-ui,sans-serif;font-weight:800;font-size:12px;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;gap:6px;white-space:nowrap;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.3));';
+        el.innerHTML = `<span>🚨 Gwalior Police (${stationPins.length} Stations)</span><span style="background:rgba(255,255,255,0.28);padding:1px 7px;border-radius:12px;font-weight:900;">${totalParked}</span>`;
+
+        el.onclick = (e) => {
+          e.stopPropagation();
+          map.flyTo({ center: [centerLng, centerLat], zoom: 12.5, duration: 800 });
+        };
+
+        const marker = new ml.Marker({ element: el, anchor: 'center' })
+          .setLngLat([centerLng, centerLat])
+          .addTo(map);
+        stationMarkersRef.current.push(marker);
+        return;
+      }
+
+      // At city zoom level (zoom >= 11.2): cluster any pins whose screen coordinates collide (< 38px)
+      type StationCluster = {
+        pins: typeof stationPins;
+        lng: number;
+        lat: number;
+        parked: number;
+      };
+
+      const clusters: StationCluster[] = [];
+      const COLLISION_PX = 38;
+
+      for (const pin of stationPins) {
+        const pt = map.project([pin.lng, pin.lat]);
+        let merged = false;
+
+        for (const c of clusters) {
+          const cpt = map.project([c.lng, c.lat]);
+          const dist = Math.hypot(pt.x - cpt.x, pt.y - cpt.y);
+          if (dist < COLLISION_PX) {
+            c.pins.push(pin);
+            c.parked += pin.parked;
+            c.lng = c.pins.reduce((s, x) => s + x.lng, 0) / c.pins.length;
+            c.lat = c.pins.reduce((s, x) => s + x.lat, 0) / c.pins.length;
+            merged = true;
+            break;
+          }
+        }
+
+        if (!merged) {
+          clusters.push({
+            pins: [pin],
+            lng: pin.lng,
+            lat: pin.lat,
+            parked: pin.parked,
+          });
+        }
+      }
+
+      for (const c of clusters) {
+        const isMulti = c.pins.length > 1;
+        const el = document.createElement('div');
+        el.style.cssText =
+          'position:relative;width:32px;height:46px;cursor:pointer;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.45));';
+
+        if (isMulti) {
+          el.innerHTML = `
+            <div style="width:34px;height:34px;background:#b91c1c;border:2.5px solid #ffffff;outline:2px solid #ef4444;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+              <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${c.parked}</span>
+            </div>`;
+        } else {
+          el.innerHTML = `
+            <div style="width:30px;height:30px;background:#dc2626;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
+              <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${c.parked}</span>
+            </div>`;
+        }
+
+        const titleText = isMulti
+          ? `${c.pins.length} Stations: ${c.pins.map((p) => p.name).join(', ')} | Parked: ${c.parked}`
+          : `${c.pins[0].name} | Parked: ${c.parked}`;
+
+        const tooltip = new ml.Popup({ offset: 40, closeButton: false, closeOnClick: false, className: 'ps-tooltip' })
+          .setHTML(`<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;font-weight:600;color:#0f172a;padding:2px 4px;max-width:240px;">${titleText}</div>`);
+
+        el.addEventListener('mouseenter', () => tooltip.addTo(map));
+        el.addEventListener('mouseleave', () => tooltip.remove());
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (isMulti) {
+            map.flyTo({ center: [c.lng, c.lat], zoom: Math.min(map.getZoom() + 1.8, 15), duration: 600 });
+          } else {
+            map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
+          }
+        });
+
+        const marker = new ml.Marker({ element: el, anchor: 'bottom' }).setLngLat([c.lng, c.lat]).addTo(map);
+        stationMarkersRef.current.push(marker);
+      }
+    };
+
+    renderStations();
+
+    map.on('zoomend', renderStations);
+    return () => {
+      map.off('zoomend', renderStations);
+    };
   }, [stationPins, showStations, mapReady]);
 
   // ---- City boundary ring (gwalior.kmz) ----

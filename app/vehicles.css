@@ -531,12 +531,12 @@
 
 /* High-contrast, rich vibrant rendering for map tiles (eliminates washed-out look) */
 .veh-map-page .veh-map-canvas .maplibregl-canvas {
-  filter: contrast(1.18) saturate(1.25) brightness(0.97);
+  filter: contrast(1.05) saturate(1.12);
   transition: filter 0.3s ease;
 }
 
 [data-theme='dark'] .veh-map-page .veh-map-canvas .maplibregl-canvas {
-  filter: contrast(1.22) saturate(1.16) brightness(1.05);
+  filter: contrast(1.18) saturate(1.12) brightness(1.04);
 }
 .veh-map-panel {
   position: absolute;

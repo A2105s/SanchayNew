@@ -172,7 +172,7 @@ In the Vercel **Environment Variables** section, add the following keys for **Pr
 | `NVIDIA_API_KEY` | `nvapi-...` | Optional NVIDIA NIM reasoning key |
 | `NVIDIA_CHAT_MODEL` | `nvidia/nemotron-3.5-super-vl-120b-a12b` | NIM model |
 | `OPENROUTER_API_KEY` | `sk-or-...` | Optional OpenRouter multi-model fallback |
-| `NEXT_PUBLIC_MAP_STYLE_LIGHT` | `https://basemaps.cartocdn.com/gl/positron-gl-style/style.json` | Vector light basemap style |
+| `NEXT_PUBLIC_MAP_STYLE_LIGHT` | `https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json` | Vector light basemap style |
 | `NEXT_PUBLIC_MAP_STYLE_DARK` | `https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json` | Vector dark basemap style |
 
 ---

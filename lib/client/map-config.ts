@@ -11,7 +11,7 @@
  * tile servers block apps that do not follow their usage policy (HTTP 403), so neither is used.
  */
 export const MAP_STYLE_LIGHT =
-  process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT || 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
+  process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT || 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 export const MAP_STYLE_DARK =
   process.env.NEXT_PUBLIC_MAP_STYLE_DARK || 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 

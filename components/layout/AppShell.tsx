@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Clock3, Command, LoaderCircle, Menu, TriangleAlert, X } from 'lucide-react';
 import { useGlobalScrollEdgeSpring } from '@/hooks/useScrollEdgeSpring';
@@ -10,6 +10,8 @@ import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { AiCopilotModal } from '@/components/ai/AiCopilotModal';
+import { useFleet } from '@/components/providers/FleetProvider';
+import { useActiveModule } from '@/lib/client/useModule';
 import {
   CloudStatusPopover,
   type CloudBadgeView,
@@ -22,7 +24,6 @@ import {
   type CloudSyncStatus
 } from '@/lib/client/sync-status';
 import { pendingCount as offlinePendingCount, subscribe as subscribeOffline } from '@/lib/client/offline-queue';
-import { useActiveModule } from '@/lib/client/useModule';
 
 const EMPTY_HEALTH: CloudHealthInfo = { checkedAt: null, latencyMs: null, httpStatus: null, error: null };
 const EMPTY_JOBS: ServerJobCounts = { pending: 0, processing: 0, failed: 0, completed: 0 };
@@ -41,11 +42,11 @@ function describeHealthError(httpStatus: number | null): string {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const bare = pathname === '/login' || pathname === '/';
 
   const [collapsed, setCollapsed] = useState(true); // Industry-standard compact icon rail; smooth auto-expand on hover
-  const shellModule = useActiveModule(usePathname());
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -58,6 +59,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const recheckRef = useRef<() => void>(() => undefined);
   const pendingHref = navigatingTo !== pathname ? navigatingTo : null;
+
+  const { me } = useFleet();
+  const activeModule = useActiveModule(pathname);
+
+  const headerBrand = useMemo(() => {
+    // Platform Administrator has overarching cross-module governance
+    if (me?.role === 'ADMIN') {
+      return { title: 'Sanchay', strong: 'San', rest: 'chay', href: '/dashboard' };
+    }
+    // Police station login / police roles focus strictly on vehicle fleet operations
+    if (me?.role === 'STATION_OFFICER' || me?.stationId || me?.role === 'FIELD_STAFF') {
+      return { title: 'Vehicles', strong: 'Vehi', rest: 'cles', href: '/dashboard' };
+    }
+    // Spaces login or viewing civic spaces pages
+    if (activeModule === 'spaces' || pathname.startsWith('/spaces')) {
+      return { title: 'Spaces', strong: 'Spa', rest: 'ces', href: '/spaces' };
+    }
+    // Default fallback
+    return { title: 'Sanchay', strong: 'San', rest: 'chay', href: '/dashboard' };
+  }, [me?.role, me?.stationId, activeModule, pathname]);
 
   // EasyLife's PaperFlow spring edge physics across the app
   useGlobalScrollEdgeSpring();
@@ -251,20 +272,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="sr-only">Loading page</span>
             </div>
           ) : null}
-          <button
-            className="icon-button top-nav__menu"
-            type="button"
-            aria-label="Toggle navigation"
-            aria-expanded={mobileOpen || !collapsed}
-            aria-controls="primary-navigation"
-            onClick={handleToggle}
-          >
-            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-          <div className="top-nav__title">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Sanchay logo" className="top-nav__logo" />
-            <span className="top-nav__module">{shellModule === 'spaces' ? 'Civic Spaces' : 'Vehicles'}</span>
+          <div className="top-nav__left">
+            <button
+              className="icon-button top-nav__menu"
+              type="button"
+              aria-label="Toggle navigation"
+              aria-expanded={mobileOpen || !collapsed}
+              aria-controls="primary-navigation"
+              onClick={handleToggle}
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+            <div className="top-nav__title">
+              <Link href={headerBrand.href} className="top-nav__brand-link" title={`${headerBrand.title} Home`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo.png" alt={`${headerBrand.title} logo`} className="top-nav__logo" />
+                <div className="top-nav__brand-text">
+                  <strong>{headerBrand.strong}</strong><span>{headerBrand.rest}</span>
+                </div>
+              </Link>
+            </div>
           </div>
           <div className="top-nav__actions">
             <AiCopilotModal />

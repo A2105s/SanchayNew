@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
+import { SpacesNav } from '@/components/spaces/SpacesNav';
+import { PolishButton } from '@/components/ai/PolishButton';
 import type { SpaceRequestView } from '@/types';
 
 export default function SpaceRequestsPage() {
@@ -38,6 +40,8 @@ export default function SpaceRequestsPage() {
           </Button>
         ) : undefined}
       />
+
+      <SpacesNav active="requests" />
 
       <Panel title={reviewMode ? 'Requests in your review scope' : 'My requests'}>
         {loading && requests.length === 0 ? <p className="text-muted">Loading…</p> : error ? (
@@ -155,6 +159,7 @@ function RequestActionDialog({ request, action, onClose, onDone }: { request: Sp
         </details>
         <Field label={action === 'approve' ? 'Note (optional)' : action === 'reject' ? 'Rejection reason' : 'What information is needed?'}>
           <textarea className="input" rows={3} value={text} onChange={(e) => setText(e.target.value)} />
+          <PolishButton kind="space-spec" value={text} onApply={setText} disabled={busy} />
         </Field>
         <div className="cluster" style={{ justifyContent: 'flex-end' }}>
           <Button variant="ghost" onClick={onClose} disabled={busy}>Back</Button>

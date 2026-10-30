@@ -50,7 +50,36 @@ export const ALL_PERMISSIONS: readonly Permission[] = [
  * eligibility, record handovers/returns, or read documents.
  */
 export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
-  ADMIN: ['fleet.read', 'device.manage', 'audit.read', 'report.read', 'export', 'settings.manage', 'operators.manage'],
+  ADMIN: [
+    'fleet.read',
+    'vehicle.register',
+    'vehicle.edit',
+    'vehicle.delete',
+    'eligibility.verify',
+    'restriction.manage',
+    'maintenance.write',
+    'trip.write',
+    'incident.write',
+    'request.create',
+    'request.review',
+    'handover.record',
+    'return.record',
+    'return.inspect',
+    'extension.decide',
+    'transfer.create',
+    'transfer.review',
+    'device.manage',
+    'document.read',
+    'document.write',
+    'space.manage',
+    'space.book',
+    'space.review',
+    'audit.read',
+    'report.read',
+    'export',
+    'settings.manage',
+    'operators.manage'
+  ],
   ORG_ADMIN: [
     'fleet.read',
     'vehicle.register',
@@ -109,10 +138,9 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'transfer.create',
     'transfer.review',
     'document.read',
-    'space.book',
     'report.read'
   ],
-  FIELD_STAFF: ['fleet.read', 'trip.write', 'incident.write', 'space.book'],
+  FIELD_STAFF: ['fleet.read', 'trip.write', 'incident.write'],
   AUDITOR: ['fleet.read', 'document.read', 'audit.read', 'report.read', 'export']
 };
 
@@ -124,7 +152,7 @@ export function permissionsFor(role: Role): readonly Permission[] {
   return ROLE_PERMISSIONS[role] ?? [];
 }
 
-/** Roles that can decide a request (approver roles). ADMIN is deliberately excluded. */
+/** Roles that can decide a request (approver roles). ADMIN and ORG_ADMIN can also approve. */
 export function isApproverRole(role: Role): boolean {
-  return role === 'DEPT_OFFICER';
+  return role === 'DEPT_OFFICER' || role === 'ADMIN' || role === 'ORG_ADMIN';
 }

@@ -451,7 +451,8 @@ export const spaceBookingActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approve'), note: z.string().trim().max(2000).optional() }),
   z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(500) }),
   z.object({ type: z.literal('cancel'), reason: z.string().trim().min(1).max(500) }),
-  z.object({ type: z.literal('complete'), note: z.string().trim().max(2000).optional() })
+  z.object({ type: z.literal('complete'), note: z.string().trim().max(2000).optional() }),
+  z.object({ type: z.literal('relocate'), targetSpaceId: z.string().trim().min(1), reason: z.string().trim().max(500).optional() })
 ]);
 
 const zSpaceRequestPayload = spaceFieldSchema.partial();

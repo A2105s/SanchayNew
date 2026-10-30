@@ -7,7 +7,6 @@ import { LoaderCircle, LogOut, X } from 'lucide-react';
 import type { Role } from '@/types';
 import { canAny, type Permission } from '@/lib/client/permissions';
 import { useFleet } from '@/components/providers/FleetProvider';
-import { useActiveModule } from '@/lib/client/useModule';
 import type { AnimatedIconProps } from '@/components/ui/AnimatedIcons';
 import {
   AnimatedDashboard,
@@ -40,12 +39,10 @@ interface NavItem {
   requiresAny?: Permission[];
   /** Only visible when the signed-in operator has a station attached. */
   showIfStation?: boolean;
-  /** Which module this entry belongs to; 'shared' shows in both. */
-  domain?: 'vehicles' | 'spaces' | 'shared';
   badge?: string;
 }
 
-/** Navigation per BUILD_CONTRACT sidebar order. */
+/** Navigation per BUILD_CONTRACT sidebar order with unified Fleet and Spaces access. */
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: AnimatedDashboard },
   { href: '/vehicles', label: 'Fleet', icon: AnimatedCar, requiresAny: ['fleet.read'] },
@@ -71,27 +68,27 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/idle', label: 'Idle & reuse', icon: AnimatedClock, requiresAny: ['fleet.read'] },
   { href: '/incidents', label: 'Incidents', icon: AnimatedSiren },
   { href: '/iot', label: 'IoT hub', icon: AnimatedRadio, requiresAny: ['device.manage', 'fleet.read'] },
-  { href: '/station', label: 'My station', icon: AnimatedBuilding, showIfStation: true },
+  { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, requiresAny: ['space.manage', 'space.book', 'space.review'] },
+  { href: '/spaces/bookings', label: 'Space bookings', icon: AnimatedClipboard, requiresAny: ['space.manage', 'space.book'] },
+  { href: '/spaces/requests', label: 'Space requests', icon: AnimatedLedger, requiresAny: ['space.manage', 'space.review'] },
+  { href: '/spaces/settings', label: 'Booking policy', icon: AnimatedGear, requiresAny: ['space.manage'] },
   { href: '/reports', label: 'Reports', icon: AnimatedBarChart, requiresAny: ['report.read'] },
-  { href: '/audit', label: 'Audit', icon: AnimatedLedger, requiresAny: ['audit.read'], domain: 'shared' },
-  { href: '/settings', label: 'Settings', icon: AnimatedGear, requiresAny: ['settings.manage'], domain: 'shared' },
-  { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, requiresAny: ['fleet.read'], domain: 'spaces' },
-  { href: '/spaces/bookings', label: 'Space bookings', icon: AnimatedClipboard, requiresAny: ['space.book', 'fleet.read'], domain: 'spaces' },
-  { href: '/spaces/requests', label: 'Space requests', icon: AnimatedLedger, requiresAny: ['space.book', 'fleet.read'], domain: 'spaces' },
-  { href: '/spaces/settings', label: 'Booking policy', icon: AnimatedGear, requiresAny: ['settings.manage'], domain: 'spaces' }
+  { href: '/audit', label: 'Audit', icon: AnimatedLedger, requiresAny: ['audit.read'] },
+  { href: '/settings', label: 'Settings', icon: AnimatedGear, requiresAny: ['settings.manage'] },
+  { href: '/station', label: 'My station', icon: AnimatedBuilding, showIfStation: true }
 ];
 
-/** Sidebar sections. Items keep their permission filtering; this only decides order and headings. */
-const GROUPS: { id: string; heading: string | null; domain: 'vehicles' | 'spaces' | 'shared'; hrefs: string[] }[] = [
-  { id: 'overview', heading: null, domain: 'vehicles', hrefs: ['/dashboard'] },
-  { id: 'fleet', heading: 'Fleet', domain: 'vehicles', hrefs: ['/vehicles', '/vehicles/discover', '/vehicles/map', '/stations'] },
-  { id: 'requests', heading: 'Requests', domain: 'vehicles', hrefs: ['/requests', '/allocations', '/transfers'] },
-  { id: 'oversight', heading: 'Oversight', domain: 'vehicles', hrefs: ['/operations', '/compliance', '/maintenance', '/idle', '/incidents', '/iot'] },
-  { id: 'reports-group', heading: 'Insights', domain: 'vehicles', hrefs: ['/reports'] },
-  { id: 'spaces', heading: 'Spaces', domain: 'spaces', hrefs: ['/spaces', '/spaces/bookings', '/spaces/requests', '/spaces/settings'] },
-  { id: 'governance', heading: 'Governance', domain: 'shared', hrefs: ['/audit'] },
-  { id: 'more', heading: 'More', domain: 'shared', hrefs: ['/settings', '/station'] }
+/** Sidebar sections. Items keep their permission filtering; this decides order and headings. */
+const GROUPS: { id: string; heading: string | null; hrefs: string[] }[] = [
+  { id: 'overview', heading: null, hrefs: ['/dashboard'] },
+  { id: 'fleet', heading: 'Fleet', hrefs: ['/vehicles', '/vehicles/discover', '/vehicles/map', '/stations'] },
+  { id: 'requests', heading: 'Requests', hrefs: ['/requests', '/allocations', '/transfers'] },
+  { id: 'oversight', heading: 'Oversight', hrefs: ['/operations', '/compliance', '/maintenance', '/idle', '/incidents', '/iot'] },
+  { id: 'spaces', heading: 'Spaces', hrefs: ['/spaces', '/spaces/bookings', '/spaces/requests', '/spaces/settings'] },
+  { id: 'insights', heading: 'Insights', hrefs: ['/reports', '/audit'] },
+  { id: 'more', heading: 'More', hrefs: ['/settings', '/station'] }
 ];
+
 /** FIELD_STAFF sees a reduced set: Dashboard, Fleet, Live map, Incidents. */
 const FIELD_STAFF_HREFS = new Set(['/dashboard', '/vehicles', '/vehicles/map', '/incidents', '/station']);
 
@@ -126,27 +123,23 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
   const pathname = usePathname();
   const { me } = useFleet();
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
-  // The module follows the login (landing-page choice), not the current path.
-  const activeModule = useActiveModule(pathname);
 
   const items = useMemo(() => {
     const role = me?.role ?? null;
     return NAV_ITEMS.filter((item) => {
-      // Untagged items belong to the vehicles module by default — they must be
-      // filtered out when the operator is browsing the Spaces module.
-      const domain = item.domain ?? 'vehicles';
-      if (domain !== 'shared' && domain !== activeModule) return false;
+      // Station link is strictly for operators with an assigned station.
+      // Platform admin, org admin, auditor, etc. have no station and should never see it.
+      if (item.showIfStation && !me?.stationId) return false;
       if (role === 'FIELD_STAFF' && !FIELD_STAFF_HREFS.has(item.href)) return false;
       if (item.requiresAny && !canAny(role, item.requiresAny)) return false;
       return true;
     });
-  }, [me, activeModule]);
+  }, [me]);
 
   // Group the permitted items under headings (a heading only shows when at least one of its items is visible).
   const grouped = useMemo(() => {
     const out: { item: NavItem; heading: string | null }[] = [];
     for (const group of GROUPS) {
-      if (group.domain !== 'shared' && group.domain !== activeModule) continue;
       let first = true;
       for (const href of group.hrefs) {
         const item = items.find((i) => i.href === href);
@@ -158,7 +151,7 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
     // Anything not assigned to a group (future pages) is appended so it never disappears.
     for (const item of items) if (!out.some((o) => o.item.href === item.href)) out.push({ item, heading: null });
     return out;
-  }, [items, activeModule]);
+  }, [items]);
 
   function isActive(href: string): boolean {
     if (href === '/vehicles') {

@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Plus, Building2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Plus, Building2, Sparkles } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
@@ -17,6 +18,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { KpiCard, SectionHeading } from '@/components/analytics/AnalyticsKit';
 import { SpaceCard } from '@/components/spaces/SpaceCard';
+import { SpacesNav } from '@/components/spaces/SpacesNav';
+import { SpacePulseSlot } from '@/components/ai/SpacePulseSlot';
+import { DraftSpaceBookingPanel } from '@/components/ai/DraftSpaceBookingPanel';
+import { PolishButton } from '@/components/ai/PolishButton';
 import type { SpaceView } from '@/types';
 
 const CATEGORIES = ['MEETING_ROOM', 'TRAINING_HALL', 'AUDITORIUM', 'OFFICE', 'COMMUNITY_HALL', 'STORE', 'OTHER'];
@@ -28,6 +33,7 @@ interface SpacesResponse {
 }
 
 export default function SpacesPage() {
+  const router = useRouter();
   const { can } = useFleet();
   const { toast } = useToast();
   const [query, setQuery] = useState('');
@@ -58,6 +64,16 @@ export default function SpacesPage() {
     idle: spaces.filter((s) => (s.idleDays ?? 0) >= 14).length
   }), [spaces]);
 
+  function onPickCandidate(cand: { spaceId: string }, draft: { startAt: string | null; endAt: string | null; attendees: number; purpose: string }) {
+    const p = new URLSearchParams();
+    if (draft.startAt) p.set('startAt', draft.startAt);
+    if (draft.endAt) p.set('endAt', draft.endAt);
+    if (draft.attendees) p.set('attendees', String(draft.attendees));
+    if (draft.purpose) p.set('purpose', draft.purpose);
+    p.set('book', '1');
+    router.push(`/spaces/${cand.spaceId}?${p.toString()}`);
+  }
+
   return (
     <div className="page stack">
       <PageTitle
@@ -67,6 +83,12 @@ export default function SpacesPage() {
           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => setRegisterOpen(true)}>Register space</Button>
         ) : undefined}
       />
+
+      <SpacesNav active="spaces" />
+
+      <SpacePulseSlot />
+
+      <DraftSpaceBookingPanel onSelectCandidate={onPickCandidate} />
 
       <section className="an-kpis" aria-label="Spaces summary">
         <KpiCard label="Spaces in scope" value={kpis.total} tone="info" />
@@ -177,7 +199,10 @@ function RegisterModal({ onClose, onDone }: { onClose: () => void; onDone: () =>
           <Field label="Opens (IST)"><input className="input" type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} /></Field>
           <Field label="Closes (IST)"><input className="input" type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} /></Field>
         </div>
-        <Field label="Description"><textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
+        <Field label="Description">
+          <textarea className="input" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Guidelines, access details, equipment available" />
+          <PolishButton kind="space-spec" value={description} onApply={setDescription} disabled={busy} />
+        </Field>
         <p className="text-muted" style={{ fontSize: '0.82rem', margin: 0 }}>
           Registrations go to the Request Center — a reviewing officer approves them; you cannot approve your own request.
         </p>

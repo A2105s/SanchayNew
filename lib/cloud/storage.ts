@@ -179,10 +179,14 @@ let cachedDriver: StorageDriver | null = null;
 
 export function getStorageDriver(): StorageDriver {
   if (cachedDriver) return cachedDriver;
+  if (process.env.STORAGE_BACKEND === 'local') {
+    cachedDriver = new LocalStorageDriver();
+    return cachedDriver;
+  }
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   // New-style sb_secret_... key, with the legacy service-role JWT as a fallback.
   const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (url && serviceKey) {
+  if (url && serviceKey && !url.includes('your-project.supabase.co')) {
     cachedDriver = new SupabaseStorageDriver(url, serviceKey);
   } else {
     cachedDriver = new LocalStorageDriver();

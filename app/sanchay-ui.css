@@ -1779,8 +1779,15 @@ td {
 /* ============================================================
    MODERN FLEET MAP TELEMATICS & TRACE LINE STYLES
    ============================================================ */
+/* Map popups render on top of moving fleet markers */
+.maplibregl-popup,
+.maplibregl-popup-content,
+.ps-station-popup {
+  z-index: 1000 !important;
+}
+
 .fleet-marker {
-  position: relative;
+  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1788,55 +1795,26 @@ td {
   cursor: pointer;
   user-select: none;
   pointer-events: auto;
-  z-index: 5;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
 }
 
 .fleet-marker:hover {
-  z-index: 20;
+  z-index: 12;
 }
 
 .fleet-marker--selected {
-  z-index: 30;
+  z-index: 15;
 }
 
 .fleet-marker__rotator {
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   transform-origin: center center;
   transition: transform 0.35s ease-out;
-}
-
-.fleet-marker--selected .fleet-marker__rotator {
-  transform-origin: center center;
-}
-
-.fleet-marker__radar {
-  position: absolute;
-  bottom: 50%;
-  left: 2px;
-  right: 2px;
-  height: 28px;
-  pointer-events: none;
-  border-radius: 50% 50% 0 0;
-  opacity: 0.55;
-  transform-origin: center bottom;
-  animation: radarBeamPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes radarBeamPulse {
-  0%, 100% {
-    opacity: 0.35;
-    transform: scale(0.95);
-  }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
 }
 
 .fleet-marker__icon-wrap {
@@ -1845,18 +1823,17 @@ td {
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
-  transition: filter 0.2s ease, transform 0.2s ease;
+  filter: none !important;
+  transition: transform 0.18s ease;
 }
 
 .fleet-marker:hover .fleet-marker__icon-wrap {
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.8));
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .fleet-marker--selected .fleet-marker__icon-wrap {
-  filter: drop-shadow(0 0 6px #38bdf8) drop-shadow(0 0 12px rgba(56, 189, 248, 0.7));
   transform: scale(1.18);
+  filter: none !important;
 }
 
 .fleet-marker__pill {
@@ -1874,7 +1851,7 @@ td {
   display: flex;
   gap: 5px;
   align-items: center;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   pointer-events: none;
   z-index: 10;
   opacity: 0;
@@ -1900,5 +1877,57 @@ td {
 }
 
 
+/* Station Pin & Popup Styles */
+.maplibregl-popup,
+.maplibregl-popup-content,
+.ps-station-popup {
+  z-index: 1000 !important;
+}
 
+.ps-station-popup .maplibregl-popup-content {
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
 
+.ps-station-popup-card {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #0f172a;
+  min-width: 190px;
+}
+
+.ps-station-popup-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.ps-station-popup-sub {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.ps-station-popup-fleet {
+  margin-top: 6px;
+}
+
+.ps-fleet-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+}
+
+.ps-station-popup-coords {
+  font-size: 10px;
+  color: #94a3b8;
+  margin-top: 6px;
+  font-family: monospace;
+}

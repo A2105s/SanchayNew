@@ -1,13 +1,25 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, MapPin, Clock3, Wrench, CalendarDays } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import {
+  ArrowLeft,
+  Users,
+  MapPin,
+  Clock3,
+  Wrench,
+  CalendarDays,
+  AlertTriangle,
+  ArrowRightLeft,
+  Building2
+} from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
 import { useApiResource } from '@/hooks/useApiResource';
 import { fmtDateTime } from '@/lib/fleet/format';
+import { toIstWallClock } from '@/lib/fleet/spaces';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
@@ -17,6 +29,9 @@ import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MiniMap } from '@/components/vehicles/MiniMap';
 import { SpaceStateBadge, SpaceCategoryLabel } from '@/components/spaces/SpaceCard';
+import { SpacesNav } from '@/components/spaces/SpacesNav';
+import { SpaceBookingCalendar } from '@/components/spaces/SpaceBookingCalendar';
+import { RelocateDialog } from '@/components/spaces/RelocateDialog';
 import type { SpaceBookingView, SpaceMaintenanceView, SpaceView } from '@/types';
 
 interface SpaceDetailResponse {
@@ -26,13 +41,51 @@ interface SpaceDetailResponse {
   openMaintenanceCount: number;
 }
 
-export default function SpaceDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  // Next.js App Router passes params as a promise to server components; for the client page we
-  // unwrap it via React.use(). See node_modules/next docs on the params convention.
+function SpaceDetailInner({ params }: { params: Promise<{ id: string }> }) {
+  // App Router params unwrapped via React.use()
   const { id } = use(params);
+  const searchParams = useSearchParams();
   const { can } = useFleet();
   const { data, loading, error, refetch } = useApiResource<SpaceDetailResponse>(`/api/cloud/spaces/${id}`);
-  const [bookOpen, setBookOpen] = useState(false);
+
+  // URL search params passed from AI drafter or direct query
+  const rawBook = searchParams.get('book');
+  const rawStartAt = searchParams.get('startAt');
+  const rawEndAt = searchParams.get('endAt');
+  const rawAttendees = searchParams.get('attendees');
+  const rawPurpose = searchParams.get('purpose');
+
+  const queryDefaults = useMemo(() => {
+    let dateStr = '';
+    let startStr = '10:00';
+    let endStr = '12:00';
+    if (rawStartAt) {
+      const sDate = new Date(rawStartAt);
+      if (!Number.isNaN(sDate.getTime())) {
+        const ist = toIstWallClock(sDate);
+        dateStr = ist.toISOString().slice(0, 10);
+        startStr = ist.toISOString().slice(11, 16);
+      }
+    }
+    if (rawEndAt) {
+      const eDate = new Date(rawEndAt);
+      if (!Number.isNaN(eDate.getTime())) {
+        const ist = toIstWallClock(eDate);
+        endStr = ist.toISOString().slice(11, 16);
+      }
+    }
+    return {
+      date: dateStr,
+      start: startStr,
+      end: endStr,
+      attendees: rawAttendees || '',
+      purpose: rawPurpose || ''
+    };
+  }, [rawStartAt, rawEndAt, rawAttendees, rawPurpose]);
+
+  const [bookOpen, setBookOpen] = useState(() => rawBook === '1');
+  const [slotPrefill, setSlotPrefill] = useState<{ date?: string; start?: string; end?: string } | null>(null);
+  const [relocateBooking, setRelocateBooking] = useState<SpaceBookingView | null>(null);
 
   if (loading && !data) return <div className="page"><EmptyState title="Loading space…" /></div>;
   if (error || !data) {
@@ -47,14 +100,26 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
   const canBook = can('space.book') && !space.blockedByMaintenance && space.operationalState !== 'RESTRICTED' && space.operationalState !== 'RETIRED';
   const canManage = can('space.manage');
 
+  function handleSelectSlot(dateStr: string, startIst: string, endIst: string) {
+    setSlotPrefill({ date: dateStr, start: startIst, end: endIst });
+    setBookOpen(true);
+  }
+
   return (
     <div className="page stack">
       <Link href="/spaces" className="back-link"><ArrowLeft size={15} aria-hidden="true" /> Back to spaces</Link>
+      
       <PageTitle
         title={space.name}
         description={`${space.assetCode} · ${SpaceCategoryLabel({ category: space.category })} · ${space.organizationName}`}
-        action={canBook ? <Button variant="primary" icon={<CalendarDays size={14} />} onClick={() => setBookOpen(true)}>Book this space</Button> : undefined}
+        action={canBook ? (
+          <Button variant="primary" icon={<CalendarDays size={14} />} onClick={() => { setSlotPrefill(null); setBookOpen(true); }}>
+            Book this space
+          </Button>
+        ) : undefined}
       />
+
+      <SpacesNav active="spaces" />
 
       <div className="cluster" style={{ flexWrap: 'wrap' }}>
         <SpaceStateBadge space={space} />
@@ -63,6 +128,22 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
         <Badge tone="neutral">{space.minBookingHours}–{space.maxBookingHours} h bookings</Badge>
         <Badge tone="neutral">Lead time {space.bookingLeadDays} d</Badge>
       </div>
+
+      {/* Emergency Relocation Banner when space is blocked by maintenance */}
+      {space.blockedByMaintenance ? (
+        <Panel title="Emergency Relocation Assistance">
+          <div className="stack" style={{ gap: 12 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', color: 'var(--color-danger)' }}>
+              <AlertTriangle size={20} />
+              <strong style={{ fontSize: '0.95rem' }}>Facility Offline — Active Maintenance Block</strong>
+            </div>
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+              Reservations are currently paused for this venue due to unresolved maintenance. Existing bookings should be rescheduled or relocated to matching facilities.
+            </p>
+            <AlternativeVenues currentSpaceId={space.id} minCapacity={space.capacity} />
+          </div>
+        </Panel>
+      ) : null}
 
       <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
         <Panel title="About">
@@ -107,6 +188,13 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
         </Panel>
       </div>
 
+      {/* Live Spec 09 Booking Calendar */}
+      <SpaceBookingCalendar
+        space={space}
+        canBook={canBook}
+        onSelectSlot={handleSelectSlot}
+      />
+
       <Panel title="Maintenance">
         {canManage ? <MaintenanceForm spaceId={space.id} onDone={refetch} /> : null}
         {maintenance.length === 0 ? <p className="text-muted">No maintenance tickets.</p> : (
@@ -131,15 +219,41 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Reference</th><th>When (IST)</th><th>Purpose</th><th>Status</th></tr>
+                <tr>
+                  <th>Reference</th>
+                  <th>When (IST)</th>
+                  <th>Purpose</th>
+                  <th>Status</th>
+                  {canManage ? <th>Actions</th> : null}
+                </tr>
               </thead>
               <tbody>
-                {bookings.slice(0, 12).map((b) => (
+                {bookings.slice(0, 15).map((b) => (
                   <tr key={b.id}>
                     <td className="mono">{b.bookingCode}</td>
                     <td>{fmtDateTime(b.startAt)} → {fmtDateTime(b.endAt)}</td>
                     <td>{b.purpose}</td>
-                    <td><Badge tone={b.status === 'CONFIRMED' ? 'success' : b.status === 'PENDING' ? 'warning' : b.status === 'REJECTED' ? 'danger' : 'neutral'}>{b.status}</Badge></td>
+                    <td>
+                      <Badge tone={b.status === 'CONFIRMED' ? 'success' : b.status === 'PENDING' ? 'warning' : b.status === 'REJECTED' ? 'danger' : 'neutral'}>
+                        {b.status}
+                      </Badge>
+                    </td>
+                    {canManage ? (
+                      <td>
+                        {(b.status === 'CONFIRMED' || b.status === 'PENDING') ? (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            icon={<ArrowRightLeft size={13} />}
+                            onClick={() => setRelocateBooking(b)}
+                          >
+                            Relocate
+                          </Button>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -149,20 +263,102 @@ export default function SpaceDetailPage({ params }: { params: Promise<{ id: stri
       </Panel>
 
       {bookOpen ? (
-        <BookingDialog space={space} onClose={() => setBookOpen(false)} onDone={() => { setBookOpen(false); refetch(); }} />
+        <BookingDialog
+          space={space}
+          initialDate={slotPrefill?.date || queryDefaults.date || undefined}
+          initialStart={slotPrefill?.start || queryDefaults.start}
+          initialEnd={slotPrefill?.end || queryDefaults.end}
+          initialPurpose={queryDefaults.purpose}
+          initialAttendees={queryDefaults.attendees}
+          onClose={() => { setBookOpen(false); setSlotPrefill(null); }}
+          onDone={() => { setBookOpen(false); setSlotPrefill(null); refetch(); }}
+        />
+      ) : null}
+
+      {relocateBooking ? (
+        <RelocateDialog
+          booking={relocateBooking}
+          onClose={() => setRelocateBooking(null)}
+          onDone={() => { setRelocateBooking(null); refetch(); }}
+        />
       ) : null}
     </div>
   );
 }
 
-function BookingDialog({ space, onClose, onDone }: { space: SpaceView; onClose: () => void; onDone: () => void }) {
+function AlternativeVenues({ currentSpaceId, minCapacity }: { currentSpaceId: string; minCapacity: number }) {
+  const url = `/api/cloud/spaces?availableOnly=true&minCapacity=${minCapacity}`;
+  const { data, loading } = useApiResource<{ spaces: SpaceView[] }>(url);
+  const alternatives = (data?.spaces ?? []).filter((s) => s.id !== currentSpaceId).slice(0, 4);
+
+  if (loading) return <p className="text-muted" style={{ fontSize: '0.85rem' }}>Scanning for alternative venues…</p>;
+  if (alternatives.length === 0) {
+    return <p className="text-muted" style={{ fontSize: '0.85rem' }}>No alternate venues with capacity ≥ {minCapacity} currently open.</p>;
+  }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 8 }}>
+      {alternatives.map((alt) => (
+        <div
+          key={alt.id}
+          style={{
+            padding: '10px 12px',
+            borderRadius: 'var(--radius-md)',
+            background: 'var(--color-bg-primary)',
+            border: '1px solid var(--color-border)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <strong style={{ fontSize: '0.88rem' }}>{alt.name}</strong>
+              <div className="mono text-muted" style={{ fontSize: '0.72rem' }}>{alt.assetCode}</div>
+            </div>
+            <Badge tone="success">Open</Badge>
+          </div>
+          <div className="text-muted" style={{ fontSize: '0.78rem' }}>
+            <Users size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+            Capacity {alt.capacity} · {[alt.buildingOrCampus, alt.district].filter(Boolean).join(', ') || 'Main Campus'}
+          </div>
+          <Link href={`/spaces/${alt.id}`}>
+            <Button variant="secondary" size="sm" icon={<Building2 size={13} />} style={{ width: '100%', marginTop: 4 }}>
+              Switch to venue
+            </Button>
+          </Link>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BookingDialog({
+  space,
+  initialDate,
+  initialStart,
+  initialEnd,
+  initialPurpose,
+  initialAttendees,
+  onClose,
+  onDone
+}: {
+  space: SpaceView;
+  initialDate?: string;
+  initialStart?: string;
+  initialEnd?: string;
+  initialPurpose?: string;
+  initialAttendees?: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { toast } = useToast();
   const [today] = useState(() => new Date(Date.now() + space.bookingLeadDays * 86_400_000).toISOString().slice(0, 10));
-  const [date, setDate] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10));
-  const [start, setStart] = useState('10:00');
-  const [end, setEnd] = useState('12:00');
-  const [purpose, setPurpose] = useState('');
-  const [attendees, setAttendees] = useState('');
+  const [date, setDate] = useState(() => initialDate || new Date(Date.now() + 86_400_000).toISOString().slice(0, 10));
+  const [start, setStart] = useState(() => initialStart || '10:00');
+  const [end, setEnd] = useState(() => initialEnd || '12:00');
+  const [purpose, setPurpose] = useState(() => initialPurpose || '');
+  const [attendees, setAttendees] = useState(() => initialAttendees || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -176,7 +372,7 @@ function BookingDialog({ space, onClose, onDone }: { space: SpaceView; onClose: 
     setBusy(true);
     setErr(null);
     try {
-      // Treat the IST wall-clock fields as IST instants: subtract the 5:30 offset before sending UTC.
+      // Treat the IST wall-clock fields as IST instants: subtract 5:30 offset
       const startAt = new Date(new Date(`${date}T${start}:00+05:30`).getTime());
       const endAt = new Date(new Date(`${date}T${end}:00+05:30`).getTime());
       const created = await api.post<SpaceBookingView>('/api/cloud/space-bookings', {
@@ -263,5 +459,13 @@ function MaintenanceForm({ spaceId, onDone }: { spaceId: string; onDone: () => v
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function SpaceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={<div className="page"><EmptyState title="Loading space…" /></div>}>
+      <SpaceDetailInner params={params} />
+    </Suspense>
   );
 }

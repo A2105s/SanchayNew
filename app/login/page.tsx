@@ -24,13 +24,13 @@ interface DemoAccount {
 
 const DEMO_ACCOUNTS: DemoAccount[] = [
   { user: 'dm.gwalior', role: 'District Magistrate (IAS) — platform admin & approving authority', category: 'admin' },
-  { user: 'admin', role: 'Platform administrator', category: 'admin' },
+  { user: 'admin', role: 'Platform administrator (unified access)', category: 'admin' },
   { user: 'org.police', role: 'Police organization admin', category: 'admin' },
-  { user: 'dept.officer', role: 'Police department officer (approver)', category: 'spaces' },
+  { user: 'dept.officer', role: 'Police department officer (approver)', category: 'admin' },
   { user: 'org.health', role: 'Health organization admin', category: 'spaces' },
   { user: 'dept.health', role: 'Health department officer (approver)', category: 'spaces' },
-  { user: 'driver.demo', role: 'Field staff', category: 'spaces' },
-  { user: 'auditor.demo', role: 'Auditor (read-only)', category: 'spaces' }
+  { user: 'driver.demo', role: 'Kotwali FRV Driver (Field staff)', category: 'admin' },
+  { user: 'auditor.demo', role: 'Auditor (read-only)', category: 'admin' }
 ];
 
 interface RoleConfig {

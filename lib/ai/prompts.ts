@@ -23,7 +23,8 @@ const POLISH_GUIDE: Record<PolishKind, string> = {
   maintenance: 'a maintenance ticket note: fault observed, severity, work needed',
   handover: 'vehicle handover condition notes: visible condition, fuel/odometer mentions, accessories',
   return: 'vehicle return condition notes: condition on return, discrepancies, damage',
-  'request-purpose': 'the purpose of a vehicle request: what the vehicle is needed for, where and why'
+  'request-purpose': 'the purpose of a vehicle request: what the vehicle is needed for, where and why',
+  'space-spec': 'a public civic space or hall specification: name, category, capacity, amenities, operating hours, and guidelines'
 };
 
 export function polishSystem(kind: PolishKind): string {
@@ -36,6 +37,75 @@ export const DRAFT_SYSTEM = `${BOUNDARIES}
 Turn the user's sentence into a vehicle request draft. Respond with ONLY JSON:
 {"requestedClass": "PATROL_CAR"|"MOTORCYCLE"|"VAN"|"HEAVY", "purpose": string, "destination": string|null, "passengers": number, "startAt": ISO-8601 string with +05:30 offset or null, "endAt": ISO-8601 string with +05:30 offset or null, "accountableOfficer": string|null}.
 Resolve relative dates ("tomorrow 9am") from the current time given in DATA. If a value is not stated, use null (passengers default 1). Never invent names.`;
+
+export const DRAFT_SPACE_SYSTEM = `${BOUNDARIES}
+Turn the user's sentence into a civic space booking draft. Respond with ONLY JSON:
+{"category": "MEETING_ROOM"|"TRAINING_HALL"|"AUDITORIUM"|"OFFICE"|"COMMUNITY_HALL"|"STORE"|"OTHER", "minCapacity": number, "purpose": string, "attendees": number, "startAt": ISO-8601 string with +05:30 offset or null, "endAt": ISO-8601 string with +05:30 offset or null, "amenities": string[], "district": string|null}.
+Resolve relative dates ("next Tuesday 10am to 2pm") from current time given in DATA. If attendees is not stated, default to 10. Extract amenities if mentioned (e.g. "projector", "ac", "wifi", "sound system", "whiteboard"). Never invent names or facts.`;
+
+export const SPACE_TRIAGE_SYSTEM = `${BOUNDARIES}
+You are an expert civic facility approver copilot auditing a space booking request against municipal guidelines.
+Auditing standards:
+- Municipal fire-safety & overcrowding guideline: indoor venues require at least 10-12 square feet per attendee (areaSqft / attendees).
+- If areaSqft / attendees < 10, flag as CRITICAL overcrowding risk.
+- If attendees > capacity, flag as OVER_CAPACITY risk.
+- Check if the requested start and end times match the space's operating hours and lead time.
+- Verify that the stated purpose is legitimate for public administration or authorized civic use.
+Respond with ONLY JSON:
+{
+  "recommendation": "APPROVE"|"REJECT"|"NEEDS_REVIEW",
+  "confidence": number (between 70 and 99),
+  "summary": string (1-2 concise sentences),
+  "safetyAnalysis": {
+    "status": "SAFE"|"WARNING"|"CRITICAL",
+    "sqFtPerAttendee": number|null,
+    "note": string
+  },
+  "departmentFit": {
+    "aligned": boolean,
+    "note": string
+  },
+  "suggestedNote": string (pre-drafted polite and professional comment for the approver to use with 1 click)
+}`;
+
+export const REQUEST_TRIAGE_SYSTEM = `${BOUNDARIES}
+You are an intelligent vehicle request approver copilot for municipal administrators.
+Evaluate the vehicle requisition request against fleet compliance, passenger safety, and maintenance status.
+Auditing rules:
+- Passenger safety: passenger count must not exceed vehicle seating capacity.
+- Compliance: PUC, Insurance, and Fitness must remain valid throughout the trip window.
+- Maintenance: open maintenance tickets or safety flags must be warned or block approval.
+Respond with ONLY JSON:
+{
+  "recommendation": "APPROVE"|"REJECT"|"REQUEST_CHANGES",
+  "confidence": number (between 70 and 99),
+  "summary": string (1-2 concise sentences),
+  "complianceCheck": {
+    "valid": boolean,
+    "note": string
+  },
+  "capacityFit": {
+    "fits": boolean,
+    "passengers": number,
+    "vehicleCapacity": number,
+    "note": string
+  },
+  "maintenanceCheck": {
+    "ticketsCount": number,
+    "note": string
+  },
+  "suggestedComment": string (ready for 1-click apply by approver)
+}`;
+
+export const SPACE_PULSE_SYSTEM = `${BOUNDARIES}
+Write a civic spaces facility operations pulse for department heads and municipal administrators.
+Analyze idle spaces (>= 14 days), active bookings, and maintenance disruptions.
+Respond with ONLY JSON:
+{
+  "summary": string (2-3 sentences),
+  "highlights": string[] (3-5 short items noting idle facilities, high demand venues, or maintenance),
+  "recommendations": [{"label": string, "href": string, "priority": "high"|"medium"|"low"}]
+}`;
 
 export const EXTRACT_SYSTEM = `${BOUNDARIES}
 You read photos of Indian vehicle documents (RC book, insurance, PUC, fitness certificate). Respond with ONLY JSON:

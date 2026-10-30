@@ -10,6 +10,7 @@ import { CLOUD_CACHE_TAGS, invalidateCloudData } from '@/lib/cloud/cached-querie
 import { mapSpace, mapSpaceBooking, mapSpaceMaintenance } from '@/lib/cloud/mappers';
 import { nextSpaceCode } from '@/lib/cloud/codes';
 import { orgTree } from '@/lib/auth/scope';
+import { notify } from '@/lib/cloud/notifications';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -245,6 +246,24 @@ export async function applySpaceAction(user: SessionUser, id: string, action: Sp
         reportedBy: user.username
       } });
       await writeAudit(tx, { entityType: 'SpaceMaintenance', entityId: row.id, action: 'SpaceMaintenanceRaised', newValue: `${action.severity} ${action.title}`, performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId, reason: blocks ? 'Blocks booking' : undefined });
+
+      if (blocks) {
+        const affected = await tx.spaceBooking.findMany({
+          where: { spaceId: id, status: { in: ['CONFIRMED', 'PENDING'] }, endAt: { gt: new Date() } },
+          select: { id: true, bookingCode: true, requestedBy: true }
+        });
+        for (const b of affected) {
+          await notify({
+            eventKey: `space_maintenance_conflict:${b.id}:${row.id}`,
+            kind: 'SPACE_MAINTENANCE_BLOCKING',
+            title: `Maintenance blocking ${current.name}`,
+            body: `Emergency maintenance "${action.title}" was raised for ${current.name}. Affects booking ${b.bookingCode}.`,
+            href: '/spaces/bookings',
+            recipientUsername: b.requestedBy
+          }, tx);
+        }
+      }
+
       return row;
     });
     invalidate();
@@ -267,5 +286,23 @@ export async function applySpaceAction(user: SessionUser, id: string, action: Sp
   });
   invalidate();
   return { space: mapSpace(current), ticket: updated };
+}
+
+/** Emergency venue finder: finds equivalent unbooked spaces matching window & capacity */
+export async function findRelocationAlternatives(
+  user: SessionUser,
+  spaceId: string,
+  startAtISO: string,
+  endAtISO: string,
+  minCapacity?: number
+): Promise<SpaceView[]> {
+  const current = await loadSpace(spaceId);
+  const found = await searchSpaces(user, {
+    minCapacity: minCapacity ?? current.capacity,
+    from: startAtISO,
+    to: endAtISO,
+    availableOnly: true
+  });
+  return found.spaces.filter((s) => s.id !== spaceId);
 }
 

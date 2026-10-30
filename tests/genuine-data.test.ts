@@ -65,4 +65,32 @@ describe('Genuine Gwalior Government Data Integrity', () => {
       await prisma.$disconnect();
     }
   });
+
+  it('exposes all active police stations via /api/auth/stations directory', async () => {
+    const { GET: getStations } = await import('../app/api/auth/stations/route');
+    const res = await getStations();
+    const json = await res.json();
+    assert.equal(res.status, 200);
+    assert.ok(json.success);
+    assert.ok(Array.isArray(json.data));
+    assert.ok(json.data.length >= 20, `Must list 20+ police stations, found: ${json.data.length}`);
+    const kotwali = json.data.find((d: { station: string }) => d.station.includes('Kotwali'));
+    assert.ok(kotwali, 'Kotwali station must be listed');
+    assert.ok(kotwali.username, 'Kotwali station must have username');
+  });
+
+  it('allows police station sign-in for any station with demo password', async () => {
+    const { POST: login } = await import('../app/api/auth/login/route');
+    const req = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'station.thatipur', password: 'Sanchay@Demo1' })
+    });
+    const res = await login(req);
+    const json = await res.json();
+    assert.equal(res.status, 200);
+    assert.ok(json.success);
+    assert.equal(json.data.role, 'STATION_OFFICER');
+    assert.ok(json.data.stationId);
+  });
 });

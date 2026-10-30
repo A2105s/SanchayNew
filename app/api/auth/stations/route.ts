@@ -8,22 +8,41 @@ export const dynamic = 'force-dynamic';
  * GET /api/auth/stations
  *
  * Public, read-only: the police-station login directory for the login page's
- * "Sign in as police station" picker. Exposes only station names and their
- * operator usernames — no emails, phones or hashes. Actual authentication is
- * still username + password with the brute-force throttle applied.
+ * "Sign in as police station" picker. Exposes all active police stations from
+ * the database so operators can choose any station to sign into.
  */
 export async function GET() {
   try {
-    const officers = await prisma.operator.findMany({
-      where: { role: 'STATION_OFFICER', active: true, station: { isNot: null } },
-      select: { username: true, displayName: true, station: { select: { name: true, code: true } } },
-      orderBy: { username: 'asc' }
+    const stations = await prisma.station.findMany({
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        operators: {
+          where: { role: 'STATION_OFFICER', active: true },
+          select: { username: true },
+          take: 1
+        }
+      },
+      orderBy: { name: 'asc' }
     });
+
+    const data = stations.map((s) => {
+      const assignedUsername = s.operators[0]?.username;
+      const slug = s.code.replace(/-police-station$/i, '').toLowerCase();
+      const username = assignedUsername ?? `station.${slug}`;
+      return {
+        username,
+        station: s.name
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      data: officers.map((o) => ({ username: o.username, station: o.station?.name ?? o.displayName }))
+      data
     });
-  } catch {
+  } catch (error) {
+    console.error('[auth/stations]', error);
     return NextResponse.json({ success: false, error: 'Could not load the station directory.' }, { status: 500 });
   }
 }

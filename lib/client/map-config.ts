@@ -6,7 +6,7 @@
  * visible building footprints, and lush green parks for light mode.
  */
 export const MAP_STYLE_LIGHT =
-  process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT || '/api/map/style?theme=light';
+  process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT || '/api/map/style?theme=light&v=gm-v2';
 export const MAP_STYLE_DARK =
   process.env.NEXT_PUBLIC_MAP_STYLE_DARK || 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 

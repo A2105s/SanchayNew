@@ -310,7 +310,6 @@ export function createFleetMarkerElement(
 
   el.innerHTML = `
     <div class="fleet-marker__rotator" style="transform: rotate(${heading}deg);">
-      <div class="fleet-marker__radar" style="background: radial-gradient(circle at 50% 100%, ${statusColor}44 0%, transparent 70%); display: ${isMoving ? 'block' : 'none'};"></div>
       <div class="fleet-marker__icon-wrap">
         ${getFleetIconSvg(vehicle.sector, vehicle.vehicleClass)}
       </div>
@@ -360,12 +359,6 @@ export function updateFleetMarkerElement(
     rotator.style.transform = `rotate(${heading}deg)`;
   }
 
-  const radar = el.querySelector<HTMLElement>('.fleet-marker__radar');
-  if (radar) {
-    radar.style.display = isMoving ? 'block' : 'none';
-    radar.style.background = `radial-gradient(circle at 50% 100%, ${statusColor}44 0%, transparent 70%)`;
-  }
-
   const speedEl = el.querySelector<HTMLElement>('.fleet-marker__speed');
   if (speedEl) {
     speedEl.style.display = isMoving && speed > 0 ? 'inline-block' : 'none';
@@ -404,14 +397,6 @@ export function FleetVehicleMarker({
           transition: 'transform 0.35s ease-out',
         }}
       >
-        {isMoving && (
-          <div
-            className="fleet-marker__radar"
-            style={{
-              background: `radial-gradient(circle at 50% 100%, ${glowColor}44 0%, transparent 70%)`,
-            }}
-          />
-        )}
         <div className="fleet-marker__icon-wrap">
           {getFleetIcon(sector, vehicleClass)}
         </div>

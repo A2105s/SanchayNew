@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const body = z.object({
-  kind: z.enum(['incident', 'maintenance', 'handover', 'return', 'request-purpose']),
+  kind: z.enum(['incident', 'maintenance', 'handover', 'return', 'request-purpose', 'space-spec']),
   text: z.string().trim().min(5, 'Write a few words first.').max(2000),
   provider: z.enum(['auto', 'gemini', 'nvidia', 'openrouter', 'groq', 'mistral']).optional()
 });

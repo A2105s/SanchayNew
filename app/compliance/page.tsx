@@ -18,6 +18,7 @@ import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { KpiCard } from '@/components/analytics/AnalyticsKit';
+import { DocumentScanPanel } from '@/components/ai/DocumentScanPanel';
 import type { VehicleView } from '@/types';
 
 type Severity = 'EXPIRED' | 'CRITICAL' | 'WARNING' | 'OK';
@@ -286,6 +287,17 @@ export default function CompliancePage() {
           }
         >
           <div className="stack">
+            <DocumentScanPanel
+              onApply={(fields) => {
+                if (fields.expiryDate) {
+                  setNewExpiry(fields.expiryDate);
+                  toast(`Extracted expiry date: ${fields.expiryDate}`, 'success');
+                }
+                if (fields.registrationNumber) {
+                  setReference((prev) => prev || `Slip verified (${fields.registrationNumber})`);
+                }
+              }}
+            />
             <Field label="New expiry date" required>
               <input className="input" type="date" value={newExpiry} onChange={(e) => setNewExpiry(e.target.value)} />
             </Field>

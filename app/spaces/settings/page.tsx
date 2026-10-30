@@ -10,6 +10,7 @@ import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SpacesNav } from '@/components/spaces/SpacesNav';
 import type { SpaceSettings } from '@/types';
 
 export default function SpaceSettingsPage() {
@@ -29,6 +30,7 @@ export default function SpaceSettingsPage() {
   return (
     <div className="page stack">
       <PageTitle title="Space booking policy" description="Platform-wide defaults for the Civic Spaces booking engine. Every change is versioned in the audit ledger." />
+      <SpacesNav active="settings" />
       {loading ? <EmptyState title="Loading policy…" /> : error ? <EmptyState title={`Could not load policy: ${error}`} action={<Button variant="secondary" onClick={refetch}>Retry</Button>} /> : data ? (
         <PolicyForm initial={data} />
       ) : null}

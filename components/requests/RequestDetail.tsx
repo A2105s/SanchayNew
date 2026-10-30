@@ -17,6 +17,7 @@ import { useApiResource } from '@/hooks/useApiResource';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
 import { CLASS_LABEL, REQUEST_STATE_LABEL, requestStateTone, fmtDateTime } from '@/lib/fleet/format';
+import { AiRequestTriagePanel } from '@/components/requests/AiRequestTriagePanel';
 import type { AssetRequestView, RequestAction } from '@/types';
 
 type ActionKind = RequestAction['type'];
@@ -220,6 +221,24 @@ export function RequestDetail({ id }: { id: string }) {
           <Timeline entries={timeline} />
         </Panel>
       </div>
+
+      {canReview && !reviewBlockedReason && (state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') ? (
+        <AiRequestTriagePanel
+          requestId={request.id}
+          onApplyDecision={(actionType, suggestedComment) => {
+            if (actionType === 'approve') {
+              openAction({ kind: 'approve', title: 'Approve request', needsComment: true, commentLabel: 'Comment (optional)', confirmLabel: 'Approve' });
+              setComment(suggestedComment);
+            } else if (actionType === 'requestChanges') {
+              openAction({ kind: 'requestChanges', title: 'Request changes', needsComment: true, commentRequired: true, commentLabel: 'What needs changing', confirmLabel: 'Request changes' });
+              setComment(suggestedComment);
+            } else if (actionType === 'reject') {
+              openAction({ kind: 'reject', title: 'Reject request', needsComment: true, commentRequired: true, commentLabel: 'Reason', confirmLabel: 'Reject', tone: 'danger' });
+              setComment(suggestedComment);
+            }
+          }}
+        />
+      ) : null}
 
       <Panel title="Actions">
         {reviewBlockedReason && canReview === false ? null : null}

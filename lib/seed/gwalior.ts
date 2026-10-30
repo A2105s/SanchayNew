@@ -198,19 +198,35 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     operatorCount += 1;
   }
 
-  // Every police station gets its own station-officer login (ps.<station>), so the
-  // vehicles section demonstrates station-to-station requesting under the right identity.
+  // Every police station gets its own station-officer login (station.<station> and ps.<station>),
+  // so the vehicles section demonstrates station-to-station requesting under the right identity.
   for (const st of STATIONS) {
     const stId = stationIdByCode.get(st.id);
     if (!stId) continue;
     const slug = st.id.replace(/-police-station$/u, '');
-    const username = `ps.${slug}`;
-    await prisma.operator.upsert({
-      where: { username },
-      update: { organizationId: police.id, stationId: stId, role: 'STATION_OFFICER', displayName: `Station Incharge — ${st.name}` },
-      create: { username, displayName: `Station Incharge — ${st.name}`, email: `${username}@sanchay.demo`, role: 'STATION_OFFICER', organizationId: police.id, stationId: stId, passwordHash, active: true }
-    });
-    operatorCount += 1;
+    const usernames = [`station.${slug}`, `ps.${slug}`];
+    for (const username of usernames) {
+      await prisma.operator.upsert({
+        where: { username },
+        update: {
+          organizationId: police.id,
+          stationId: stId,
+          role: 'STATION_OFFICER',
+          displayName: st.inchargeName ? `${st.inchargeName} (${st.name})` : `Station Incharge — ${st.name}`
+        },
+        create: {
+          username,
+          displayName: st.inchargeName ? `${st.inchargeName} (${st.name})` : `Station Incharge — ${st.name}`,
+          email: `${username}@sanchay.demo`,
+          role: 'STATION_OFFICER',
+          organizationId: police.id,
+          stationId: stId,
+          passwordHash,
+          active: true
+        }
+      });
+      operatorCount += 1;
+    }
   }
 
   // 4. Vehicles ----------------------------------------------------------------

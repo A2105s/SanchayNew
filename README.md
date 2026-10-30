@@ -52,13 +52,12 @@ Next.js 16 (App Router) · React 19 · TypeScript strict · vanilla-CSS design t
 ```bash
 npm install                      # also runs prisma generate + copies the MapLibre worker
 cp .env.example .env.local       # fill DATABASE_URL / DIRECT_URL (Supabase), SANCHAY_AUTH_SECRET, admin creds
-npm run db:push                  # create tables (loads .env.local)
-npm run db:seed                  # Gwalior demo fleet: stations, vehicles, devices, demo operators
-npm run db:rls                   # recommended on Supabase: enable RLS + revoke anon/authenticated (server-only access)
-npm run dev                      # http://localhost:3000
+npm run dev                      # boots local Postgres if needed, pushes schema, seeds an empty DB, then starts Next
 ```
 
-No Supabase yet? `npm run db:local` starts a throwaway local Postgres (port 54329, no Docker). Point `DATABASE_URL` / `DIRECT_URL` at `postgresql://postgres:postgres@localhost:54329/sanchay`, then `db:push` + `db:seed`.
+`npm run dev` manages the local database automatically: when `DATABASE_URL` points at `postgresql://postgres:postgres@localhost:54329/sanchay`, it starts the embedded Postgres (no Docker), applies the schema, and seeds the Gwalior demo fleet only when the database is empty. Set `SANCHAY_SKIP_SEED=1` to skip seeding. Use `npm run dev:next` to run Next.js without the database bootstrap.
+
+For Supabase: point `DATABASE_URL` / `DIRECT_URL` at your project, run `npm run db:push`, `npm run db:seed`, then `npm run db:rls` (recommended: enable RLS + revoke anon/authenticated server-only access).
 
 Demo operators (created by the seed, shared password printed by the seed CLI):
 `admin`, `dept.officer`, `station.kotwali`, `driver.demo`, `auditor.demo`.

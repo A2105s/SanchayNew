@@ -1543,57 +1543,26 @@ a.an-quote__tile:focus-visible {
   font-weight: 600;
 }
 
-/* ── AI Operations Pulse Card: Exact Ask-AI Beam Animation (Strictly No Glow) ── */
+/* ── AI Operations Pulse Card: Clean Enterprise Institutional Panel (Strictly No Glows / Animations) ── */
 .ai-pulse-card-wrap {
   position: relative;
   display: flex;
   border-radius: var(--radius-lg);
-  padding: 1.5px;
   overflow: hidden;
-  background: var(--color-border);
   margin: var(--space-4) 0;
   box-sizing: border-box;
-}
-
-.ai-pulse-card-wrap::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 300%;
-  aspect-ratio: 1 / 1;
-  background: conic-gradient(
-    transparent 0deg,
-    transparent 280deg,
-    var(--color-brand) 320deg,
-    transparent 360deg
-  );
-  animation: copilot-card-spin 4s linear infinite;
-  z-index: 1;
-  pointer-events: none;
-}
-
-@keyframes copilot-card-spin {
-  0% { transform: translate(-50%, -50%) rotate(0deg); }
-  100% { transform: translate(-50%, -50%) rotate(360deg); }
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
 }
 
 .ai-pulse-card-inner {
   position: relative;
-  z-index: 2;
   width: 100%;
-  border-radius: calc(var(--radius-lg) - 1.5px);
+  border-radius: var(--radius-lg);
   background: var(--color-bg-primary);
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   box-sizing: border-box;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ai-pulse-card-wrap::before {
-    animation: none;
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
 }

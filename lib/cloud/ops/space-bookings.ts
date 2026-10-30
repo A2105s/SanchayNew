@@ -12,6 +12,7 @@ import { nextSpaceBookingCode } from '@/lib/cloud/codes';
 import { orgTree } from '@/lib/auth/scope';
 import { bookingPolicyRejection, hoursBetween } from '@/lib/fleet/spaces';
 import { loadSpaceSettings } from '@/lib/cloud/ops/space-settings';
+import { notify } from '@/lib/cloud/notifications';
 
 function invalidate() {
   invalidateCloudData(CLOUD_CACHE_TAGS.fleet, CLOUD_CACHE_TAGS.ops, CLOUD_CACHE_TAGS.all);
@@ -89,6 +90,28 @@ export async function createSpaceBooking(user: SessionUser, input: SpaceBookingI
       include: { space: { select: { name: true, assetCode: true } } }
     });
     await writeAudit(tx, { entityType: 'SpaceBooking', entityId: row.id, action: 'SpaceBookingCreated', newValue: row.bookingCode, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: `${space.assetCode} ${startAt.toISOString()} → ${endAt.toISOString()}` });
+
+    if (autoConfirm) {
+      await notify({
+        eventKey: `space_booking:${row.id}:CONFIRMED`,
+        kind: 'SPACE_BOOKING_CONFIRMED',
+        title: 'Space booking auto-confirmed',
+        body: `Booking ${row.bookingCode} for ${space.name} has been confirmed.`,
+        href: '/spaces/bookings',
+        recipientUsername: user.username
+      }, tx);
+    } else {
+      await notify({
+        eventKey: `space_booking:${row.id}:PENDING`,
+        kind: 'SPACE_BOOKING_PENDING',
+        title: 'New space booking request',
+        body: `Booking ${row.bookingCode} requested by ${user.username} for ${space.name} (${input.attendees ?? 'unspecified'} attendees).`,
+        href: '/spaces/bookings',
+        recipientOrgId: space.organizationId,
+        recipientRole: 'DEPT_OFFICER'
+      }, tx);
+    }
+
     return row;
   }, { timeout: 20000, maxWait: 10000 }).catch((error) => {
     if (isOverlapViolation(error)) throw new DomainError('That slot was just taken by another request. Pick a different time.', 409);
@@ -118,6 +141,14 @@ export async function applySpaceBookingAction(user: SessionUser, id: string, act
       await assertSlotFree(tx, current.spaceId, current.startAt, current.endAt, current.id);
       const row = await tx.spaceBooking.update({ where: { id }, data: { status: 'CONFIRMED', approvedBy: user.username, approvedAt: new Date(), reviewNote: action.note ?? null }, include: { space: { select: { name: true, assetCode: true } } } });
       await writeAudit(tx, { entityType: 'SpaceBooking', entityId: id, action: 'SpaceBookingApproved', fieldName: 'status', oldValue: 'PENDING', newValue: 'CONFIRMED', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId });
+      await notify({
+        eventKey: `space_booking:${id}:APPROVED`,
+        kind: 'SPACE_BOOKING_APPROVED',
+        title: 'Space booking confirmed',
+        body: `Booking ${row.bookingCode} for ${row.space.name} has been approved.${action.note ? ` Note: ${action.note}` : ''}`,
+        href: '/spaces/bookings',
+        recipientUsername: current.requestedBy
+      }, tx);
       return row;
     }
     if (action.type === 'reject') {
@@ -125,6 +156,14 @@ export async function applySpaceBookingAction(user: SessionUser, id: string, act
       await assertCanReview(user, (await tx.space.findUniqueOrThrow({ where: { id: current.spaceId }, select: { organizationId: true } })).organizationId, current.requestedBy);
       const row = await tx.spaceBooking.update({ where: { id }, data: { status: 'REJECTED', rejectionReason: action.reason }, include: { space: { select: { name: true, assetCode: true } } } });
       await writeAudit(tx, { entityType: 'SpaceBooking', entityId: id, action: 'SpaceBookingRejected', fieldName: 'status', oldValue: 'PENDING', newValue: 'REJECTED', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: action.reason });
+      await notify({
+        eventKey: `space_booking:${id}:REJECTED`,
+        kind: 'SPACE_BOOKING_REJECTED',
+        title: 'Space booking rejected',
+        body: `Booking ${row.bookingCode} for ${row.space.name} was rejected: ${action.reason}`,
+        href: '/spaces/bookings',
+        recipientUsername: current.requestedBy
+      }, tx);
       return row;
     }
     if (action.type === 'cancel') {
@@ -133,6 +172,54 @@ export async function applySpaceBookingAction(user: SessionUser, id: string, act
       if (!mayCancel) throw new DomainError('Only the requester or a reviewing officer can cancel this booking.', 403);
       const row = await tx.spaceBooking.update({ where: { id }, data: { status: 'CANCELLED', cancelledBy: user.username, cancelledAt: new Date(), cancellationReason: action.reason }, include: { space: { select: { name: true, assetCode: true } } } });
       await writeAudit(tx, { entityType: 'SpaceBooking', entityId: id, action: 'SpaceBookingCancelled', fieldName: 'status', oldValue: current.status, newValue: 'CANCELLED', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: action.reason });
+
+      const cancelledByRequester = current.requestedBy === user.username;
+      if (cancelledByRequester) {
+        const spaceOrg = (await tx.space.findUnique({ where: { id: current.spaceId }, select: { organizationId: true } }))?.organizationId;
+        if (spaceOrg) {
+          await notify({
+            eventKey: `space_booking:${id}:CANCELLED:${Date.now()}`,
+            kind: 'SPACE_BOOKING_CANCELLED',
+            title: 'Space booking cancelled',
+            body: `Booking ${row.bookingCode} for ${row.space.name} was cancelled by ${user.username}.${action.reason ? ` Reason: ${action.reason}` : ''}`,
+            href: '/spaces/bookings',
+            recipientOrgId: spaceOrg,
+            recipientRole: 'DEPT_OFFICER'
+          }, tx);
+        }
+      } else {
+        await notify({
+          eventKey: `space_booking:${id}:CANCELLED_BY_ADMIN:${Date.now()}`,
+          kind: 'SPACE_BOOKING_CANCELLED',
+          title: 'Space booking cancelled',
+          body: `Booking ${row.bookingCode} for ${row.space.name} was cancelled: ${action.reason}`,
+          href: '/spaces/bookings',
+          recipientUsername: current.requestedBy
+        }, tx);
+      }
+
+      return row;
+    }
+    if (action.type === 'relocate') {
+      await assertCanReview(user, (await tx.space.findUniqueOrThrow({ where: { id: current.spaceId }, select: { organizationId: true } })).organizationId, current.requestedBy);
+      const newSpace = await tx.space.findUnique({ where: { id: action.targetSpaceId } });
+      if (!newSpace) throw new DomainError('Target space not found.', 404);
+      await assertSlotFree(tx, newSpace.id, current.startAt, current.endAt, current.id);
+      const note = action.reason ? `Relocated from ${current.space.name}: ${action.reason}` : `Relocated from ${current.space.name}`;
+      const row = await tx.spaceBooking.update({
+        where: { id },
+        data: { spaceId: newSpace.id, reviewNote: note },
+        include: { space: { select: { name: true, assetCode: true } } }
+      });
+      await writeAudit(tx, { entityType: 'SpaceBooking', entityId: id, action: 'SpaceBookingRelocated', fieldName: 'spaceId', oldValue: current.spaceId, newValue: newSpace.id, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: action.reason ?? `Relocated from ${current.space.name} to ${newSpace.name}` });
+      await notify({
+        eventKey: `space_booking:${id}:RELOCATED:${Date.now()}`,
+        kind: 'SPACE_BOOKING_RELOCATED',
+        title: 'Space booking relocated',
+        body: `Booking ${row.bookingCode} was relocated to ${newSpace.name} (${newSpace.assetCode}).${action.reason ? ` Reason: ${action.reason}` : ''}`,
+        href: '/spaces/bookings',
+        recipientUsername: current.requestedBy
+      }, tx);
       return row;
     }
     // complete

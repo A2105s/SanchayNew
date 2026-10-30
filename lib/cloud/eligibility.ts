@@ -2,6 +2,7 @@ import 'server-only';
 
 import type { Prisma, Vehicle } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
+import { notify } from '@/lib/cloud/notifications';
 import { DEFAULT_FLEET_SETTINGS, FLEET_SETTINGS_KEY, mergeFleetSettings } from '@/lib/cloud/errors';
 import type {
   AvailabilityState,
@@ -270,11 +271,58 @@ export async function computeAvailability(
 /** Re-evaluates eligibility for a batch of vehicles (used by the periodic sync job). */
 export async function reevaluateAll(tx: TxClient = prisma, now: Date = new Date()): Promise<number> {
   const settings = await loadSettings(tx);
-  const vehicles = await tx.vehicle.findMany({ select: { id: true } });
+  const vehicles = await tx.vehicle.findMany({
+    select: {
+      id: true,
+      assetCode: true,
+      registrationNumber: true,
+      stationId: true,
+      organizationId: true,
+      pucExpiry: true,
+      insuranceExpiry: true,
+      fitnessExpiry: true
+    }
+  });
   let count = 0;
   for (const v of vehicles) {
     await reevaluateEligibility(v.id, tx, settings, now);
     count += 1;
+
+    // AI Automation Blueprint Section 4.1: Proactive Compliance Scanner
+    const checkComplianceDoc = async (doc: 'PUC' | 'INSURANCE' | 'FITNESS', expiry: Date | null) => {
+      if (!expiry) return;
+      const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / 86400000);
+      let severity: 'critical' | 'warn' | 'expired' | null = null;
+      if (daysLeft < 0) severity = 'expired';
+      else if (daysLeft <= 7) severity = 'critical';
+      else if (daysLeft <= settings.complianceWarnDays) severity = 'warn';
+
+      if (severity) {
+        const eventKey = `compliance:${v.id}:${doc}:${severity}:${expiry.toISOString().slice(0, 10)}`;
+        const title = severity === 'expired'
+          ? `${doc} expired for ${v.registrationNumber}`
+          : severity === 'critical'
+            ? `${doc} expires in ${daysLeft}d for ${v.registrationNumber}`
+            : `${doc} expiring soon for ${v.registrationNumber}`;
+        const body = severity === 'expired'
+          ? `${doc} certificate for vehicle ${v.registrationNumber} (${v.assetCode}) expired on ${expiry.toISOString().slice(0, 10)}. Renewal required.`
+          : `${doc} certificate for vehicle ${v.registrationNumber} (${v.assetCode}) expires in ${daysLeft} days. Click to upload renewed slip.`;
+
+        await notify({
+          eventKey,
+          kind: 'COMPLIANCE_EXPIRY_ALERT',
+          title,
+          body,
+          href: '/compliance',
+          recipientOrgId: v.stationId ?? v.organizationId,
+          recipientRole: 'STATION_OFFICER'
+        }, tx);
+      }
+    };
+
+    await checkComplianceDoc('PUC', v.pucExpiry);
+    await checkComplianceDoc('INSURANCE', v.insuranceExpiry);
+    await checkComplianceDoc('FITNESS', v.fitnessExpiry);
   }
   return count;
 }

@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       // Best-effort lastLoginAt bump for real operators (skip the env bootstrap admin).
       if (session.source === 'operator') {
         prisma.operator
-          .update({ where: { username: session.input.username }, data: { lastLoginAt: new Date() } })
+          .updateMany({ where: { username: session.input.username }, data: { lastLoginAt: new Date() } })
           .catch(() => undefined);
       }
 
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
   }
 }
 
-type AuthOutcome = { source: 'operator' | 'bootstrap'; input: SessionInput };
+type AuthOutcome = { source: 'operator' | 'bootstrap' | 'station'; input: SessionInput };
 
 /**
  * Operators in the DB take precedence; when no matching active operator exists, we fall
@@ -163,6 +163,41 @@ async function authenticate(username: string, password: string): Promise<AuthOut
         stationId: operator.stationId ?? null
       }
     };
+  }
+
+  // Support police station authentication for any station in the directory
+  if (username.startsWith('station.') || username.startsWith('ps.')) {
+    const slug = username.replace(/^(station|ps)\./i, '').toLowerCase();
+    const station = await prisma.station.findFirst({
+      where: {
+        OR: [
+          { code: slug },
+          { code: `${slug}-police-station` },
+          { id: slug },
+          { id: `${slug}-police-station` }
+        ]
+      }
+    }).catch(() => null);
+
+    if (station) {
+      const demoPass = 'Sanchay@Demo1';
+      const validDemo = timingSafeEqualString(password, demoPass);
+      const adminPass = getAdminPassword();
+      const validAdmin = adminPass ? timingSafeEqualString(password, adminPass) : false;
+
+      if (validDemo || validAdmin) {
+        return {
+          source: 'station',
+          input: {
+            username,
+            displayName: station.inchargeName ? `${station.inchargeName} (${station.name})` : station.name,
+            role: 'STATION_OFFICER' as Role,
+            organizationId: station.organizationId ?? null,
+            stationId: station.id
+          }
+        };
+      }
+    }
   }
 
   const adminUser = getAdminUsername();

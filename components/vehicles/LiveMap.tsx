@@ -29,7 +29,7 @@ import {
   updateFleetMarkerElement,
   STATUS_GLOW,
 } from '@/components/vehicles/FleetIcons';
-import { distanceBetween, getVehicleSimState } from '@/lib/client/telemetry-sim';
+import { getVehicleSimState } from '@/lib/client/telemetry-sim';
 import type { Sector, VehicleStatus, VehicleView } from '@/types';
 
 const GWALIOR_CENTER: [number, number] = [78.1828, 26.2183];
@@ -54,77 +54,12 @@ const SECTOR_OPTIONS = [
   ...(Object.keys(SECTOR_LABEL) as Sector[]).map((s) => ({ value: s, label: SECTOR_LABEL[s] })),
 ];
 
-function enhanceLightBasemap(map: any) {
-  try {
-    if (map.getLayer('background')) {
-      map.setPaintProperty('background', 'background-color', '#eaeaf6');
-    }
-    if (map.getLayer('landcover')) {
-      map.setPaintProperty('landcover', 'fill-color', '#99eabf');
-      map.setPaintProperty('landcover', 'fill-opacity', 0.95);
-    }
-    if (map.getLayer('water')) {
-      map.setPaintProperty('water', 'fill-color', '#bae6fd');
-    }
-    if (map.getLayer('waterway')) {
-      map.setPaintProperty('waterway', 'line-color', '#60a5fa');
-    }
-    if (map.getLayer('road_minor_case')) {
-      map.setLayerZoomRange('road_minor_case', 10, 24);
-      map.setPaintProperty('road_minor_case', 'line-color', '#64748b');
-      map.setPaintProperty('road_minor_case', 'line-opacity', 0.95);
-    }
-    if (map.getLayer('road_minor_fill')) {
-      map.setLayerZoomRange('road_minor_fill', 10, 24);
-      map.setPaintProperty('road_minor_fill', 'line-color', '#ffffff');
-    }
-    if (map.getLayer('road_service_case')) {
-      map.setPaintProperty('road_service_case', 'line-color', '#94a3b8');
-      map.setPaintProperty('road_service_case', 'line-opacity', 0.9);
-    }
-    if (map.getLayer('road_sec_case_noramp')) {
-      map.setPaintProperty('road_sec_case_noramp', 'line-color', '#475569');
-      map.setPaintProperty('road_sec_case_noramp', 'line-opacity', 0.98);
-    }
-    if (map.getLayer('road_sec_fill_noramp')) {
-      map.setPaintProperty('road_sec_fill_noramp', 'line-color', '#ffffff');
-    }
-    if (map.getLayer('road_pri_case_noramp')) {
-      map.setPaintProperty('road_pri_case_noramp', 'line-color', '#64748b');
-      map.setPaintProperty('road_pri_case_noramp', 'line-opacity', 1);
-    }
-    if (map.getLayer('road_pri_fill_noramp')) {
-      map.setPaintProperty('road_pri_fill_noramp', 'line-color', '#b9c9d8');
-    }
-    if (map.getLayer('road_trunk_case_noramp')) {
-      map.setPaintProperty('road_trunk_case_noramp', 'line-color', '#e08d23');
-    }
-    if (map.getLayer('road_trunk_fill_noramp')) {
-      map.setPaintProperty('road_trunk_fill_noramp', 'line-color', '#ffc57e');
-    }
-    if (map.getLayer('building')) {
-      map.setLayerZoomRange('building', 12, 24);
-      map.setPaintProperty('building', 'fill-color', '#dbe3ee');
-      map.setPaintProperty('building', 'fill-outline-color', '#c4d0df');
-      map.setPaintProperty('building', 'fill-opacity', 0.88);
-    }
-    if (map.getLayer('building-top')) {
-      map.setLayerZoomRange('building-top', 12, 24);
-      map.setPaintProperty('building-top', 'fill-color', '#edf3fb');
-      map.setPaintProperty('building-top', 'fill-outline-color', '#b8c6d7');
-      map.setPaintProperty('building-top', 'fill-opacity', 0.92);
-    }
-  } catch {
-    /* fallback ignored */
-  }
-}
-
 export function LiveMap() {
   const fleet = useFleet();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const mlRef = useRef<MlNs | null>(null);
-  const vehicleMarkersRef = useRef<Map<string, { setLngLat: (lnglat: [number, number]) => unknown; remove: () => void; getElement: () => HTMLElement }>>(new Map());
+  const vehicleMarkersRef = useRef<Map<string, any>>(new Map());
   const stationMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const incidentMarkersRef = useRef<Array<{ remove: () => void }>>([]);
   const trailRef = useRef<Record<string, [number, number][]>>({});
@@ -140,12 +75,6 @@ export function LiveMap() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showStations, setShowStations] = useState(true);
-
-  // Police-station pins + city boundary, straight from the provided KMZ/KML files
-  const [mapFeatures, setMapFeatures] = useState<{
-    stations: Array<{ name: string; lng: number; lat: number }>;
-    boundary: [number, number][];
-  } | null>(null);
   const [showTrail, setShowTrail] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
 
@@ -169,73 +98,23 @@ export function LiveMap() {
   const simCount = useMemo(() => Object.values(fleet.live).filter((d) => d.simulated).length, [fleet.live]);
   const realCount = useMemo(() => Object.values(fleet.live).filter((d) => !d.simulated).length, [fleet.live]);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/data/gwalior-map.geojson')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((gj: { features?: Array<{ properties: { kind?: string; name?: string }; geometry: { coordinates: [number, number] | [number, number, number] } }> } | null) => {
-        if (cancelled || !gj?.features) return;
-        const pinStations = gj.features
-          .filter((f) => f.properties.kind === 'police-station')
-          .map((f) => ({ name: f.properties.name ?? 'Unknown PS', lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }));
-        const boundaryFeature = gj.features.find((f) => f.properties.kind === 'boundary');
-        const boundary = (boundaryFeature?.geometry.coordinates as [number, number][] | undefined) ?? [];
-        setMapFeatures({ stations: pinStations, boundary });
-      })
-      .catch(() => { /* pins simply do not render without the KMZ dataset */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  // "Parked" count per KMZ pin: vehicles belong to DB stations; each DB station
-  // contributes to the nearest KMZ pin (within 1.2 km). KMZ names differ from DB
-  // names, so the match is geographic, not textual.
-  const stationPins = useMemo(() => {
-    if (!mapFeatures) return [];
-    const allVehicles = fleet.snapshot?.vehicles ?? [];
-    const stationById = new Map((fleet.snapshot?.stations ?? []).map((st) => [st.id, st]));
-    return mapFeatures.stations.map((pin) => {
-      let parked = 0;
-      for (const v of allVehicles) {
-        if (!v.stationId) continue;
-        const st = stationById.get(v.stationId);
-        if (!st || st.lat == null || st.lng == null) continue;
-        if (distanceBetween([st.lat, st.lng], [pin.lat, pin.lng]) <= 1200) parked += 1;
-      }
-      return { ...pin, parked };
-    });
-  }, [mapFeatures, fleet.snapshot]);
-
-  const stationMatches = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return stationPins.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 4);
-  }, [search, stationPins]);
-
-  // Center & smooth fly to vehicle's actual live coordinates
-  const flyTo = useCallback((v: { id: string; lat?: number | null; lng?: number | null }) => {
+  // Center & smooth fly to vehicle (always uses latest live coordinates)
+  const flyTo = useCallback((v: VehicleView) => {
     setSelectedId(v.id);
     const map = mapRef.current;
     if (!map) return;
-
-    // Check if the marker currently exists on the map (most accurate live coordinate)
-    const marker = vehicleMarkersRef.current.get(v.id);
-    let targetLng: number | null | undefined = null;
-    let targetLat: number | null | undefined = null;
-
-    if (marker && typeof (marker as any).getLngLat === 'function') {
-      const pos = (marker as any).getLngLat();
-      targetLng = pos.lng;
-      targetLat = pos.lat;
-    } else {
-      const latest = liveVehicles.find((x) => x.id === v.id);
-      targetLng = latest?.lng ?? v.lng;
-      targetLat = latest?.lat ?? v.lat;
-    }
-
+    const latest = fleet.liveVehicles.find((item) => item.id === v.id) ?? v;
+    const targetLng = latest.lng ?? v.lng;
+    const targetLat = latest.lat ?? v.lat;
     if (targetLng != null && targetLat != null) {
-      map.flyTo({ center: [targetLng, targetLat], zoom: Math.max(map.getZoom(), 15), duration: 800 });
+      map.flyTo({
+        center: [targetLng, targetLat],
+        zoom: Math.max(map.getZoom(), 15),
+        duration: 700,
+        essential: true,
+      });
     }
-  }, [liveVehicles]);
+  }, [fleet.liveVehicles]);
 
   // ---- Initialise the map once ----
   useEffect(() => {
@@ -257,17 +136,6 @@ export function LiveMap() {
         mapRef.current = map;
         map.on('error', (e: { error?: Error }) => console.warn('[live-map]', e.error?.message ?? e));
 
-        // Supabase/NationTrack-style controls: zoom, locate, (fullscreen lives in the panel)
-        map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-        map.addControl(
-          new maplibregl.GeolocateControl({
-            positionOptions: { enableHighAccuracy: true },
-            trackUserLocation: false,
-            showUserLocation: true,
-          }),
-          'bottom-right'
-        );
-
         const initLayers = () => {
           if (cancelled || !mapRef.current) return;
           if (map.getSource('route')) return;
@@ -284,9 +152,9 @@ export function LiveMap() {
             source: 'trail',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#059669',
-              'line-width': 8,
-              'line-opacity': 0.45,
+              'line-color': '#10b981',
+              'line-width': 7,
+              'line-opacity': 0.35,
               'line-blur': 2,
             },
           });
@@ -297,9 +165,9 @@ export function LiveMap() {
             source: 'trail',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#10b981',
-              'line-width': 4,
-              'line-opacity': 1,
+              'line-color': '#34d399',
+              'line-width': 3.5,
+              'line-opacity': 0.95,
             },
           });
 
@@ -316,9 +184,9 @@ export function LiveMap() {
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
               'line-color': '#0284c7',
-              'line-width': 8,
-              'line-opacity': 0.4,
-              'line-blur': 2,
+              'line-width': 6,
+              'line-opacity': 0.3,
+              'line-blur': 1.5,
             },
           });
 
@@ -328,34 +196,13 @@ export function LiveMap() {
             source: 'route',
             layout: { 'line-cap': 'round', 'line-join': 'round' },
             paint: {
-              'line-color': '#0ea5e9',
-              'line-width': 3.5,
-              'line-opacity': 1,
+              'line-color': '#38bdf8',
+              'line-width': 2.5,
+              'line-opacity': 0.9,
               'line-dasharray': [2, 2],
             },
           });
 
-          // 3. Gwalior city boundary ring (from gwalior.kmz) — blue dashed outline
-          map.addSource('boundary', {
-            type: 'geojson',
-            data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
-          });
-
-          map.addLayer({
-            id: 'boundary-line',
-            type: 'line',
-            source: 'boundary',
-            layout: { 'line-cap': 'round', 'line-join': 'round' },
-            paint: {
-              'line-color': '#2563eb',
-              'line-width': 3.5,
-              'line-opacity': 0.95,
-              'line-dasharray': [3, 2],
-            },
-          });
-
-          const isDark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
-          if (!isDark) enhanceLightBasemap(map);
           readyRef.current = true;
           setMapReady(true);
         };
@@ -426,17 +273,26 @@ export function LiveMap() {
           heading: v.heading,
           isSelected,
         });
-        const el = existing.getElement();
-        el.onclick = (e) => {
-          e.stopPropagation();
-          flyTo(v);
-        };
       } else {
         const el = createFleetMarkerElement(v, {
           heading: v.heading,
           isSelected,
           onClick: () => {
-            flyTo(v);
+            setSelectedId(v.id);
+            const map = mapRef.current;
+            if (!map) return;
+            const marker = vehicleMarkersRef.current.get(v.id);
+            const pos = marker?.getLngLat();
+            const centerLng = pos ? pos.lng : v.lng;
+            const centerLat = pos ? pos.lat : v.lat;
+            if (centerLng != null && centerLat != null) {
+              map.flyTo({
+                center: [centerLng, centerLat],
+                zoom: Math.max(map.getZoom(), 15),
+                duration: 700,
+                essential: true,
+              });
+            }
           },
         });
         const marker = new ml.Marker({ element: el, anchor: 'center' })
@@ -465,144 +321,98 @@ export function LiveMap() {
     }
   }, [showTrail, mapReady]);
 
-  // ---- Police-station pins with smart zoom clustering (prevents stacking glitch when zoomed out) ----
+  // ---- Station markers (Police Shield Crest with Golden Star & Vehicle Count) ----
   useEffect(() => {
     const map = mapRef.current;
     const ml = mlRef.current;
     if (!map || !ml || !readyRef.current) return;
+    stationMarkersRef.current.forEach((m) => m.remove());
+    stationMarkersRef.current = [];
+    if (!showStations) return;
 
-    const renderStations = () => {
-      stationMarkersRef.current.forEach((m) => m.remove());
-      stationMarkersRef.current = [];
-      if (!showStations || stationPins.length === 0) return;
+    const myStationId = fleet.me?.stationId;
 
-      const zoom = map.getZoom();
+    for (const s of stations) {
+      const count = Object.values(s.inventory ?? {}).reduce((a, b) => a + (b ?? 0), 0);
+      const isMyStation = Boolean(myStationId && (s.id === myStationId || s.code === myStationId));
+      const uid = s.id.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-      // When zoomed out to regional view (zoom < 11.2):
-      // Consolidate all Gwalior stations into 1 clean summary badge so pins don't overlap into a giant column!
-      if (zoom < 11.2) {
-        const totalParked = stationPins.reduce((sum, p) => sum + p.parked, 0);
-        const centerLng = stationPins.reduce((sum, p) => sum + p.lng, 0) / stationPins.length;
-        const centerLat = stationPins.reduce((sum, p) => sum + p.lat, 0) / stationPins.length;
+      const el = document.createElement('div');
+      el.className = 'ps-station-marker';
+      el.style.cssText = 'cursor: pointer; user-select: none; z-index: ' + (isMyStation ? '40' : '30') + '; display: flex; align-items: center; justify-content: center; line-height: 0;';
 
-        const el = document.createElement('div');
-        el.style.cssText =
-          'cursor:pointer;background:#dc2626;color:#ffffff;border:2.5px solid #ffffff;border-radius:24px;padding:5px 12px;font-family:system-ui,sans-serif;font-weight:800;font-size:12px;box-shadow:0 3px 10px rgba(0,0,0,0.35);display:flex;align-items:center;gap:6px;white-space:nowrap;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.3));';
-        el.innerHTML = `<span>🚨 Gwalior Police (${stationPins.length} Stations)</span><span style="background:rgba(255,255,255,0.28);padding:1px 7px;border-radius:12px;font-weight:900;">${totalParked}</span>`;
+      const borderColor = isMyStation ? '#fbbf24' : '#ffffff';
+      const borderWidth = isMyStation ? '2' : '1.5';
+      const filter = isMyStation ? ('url(#psGlow_' + uid + ')') : ('url(#psShadow_' + uid + ')');
+      const goldStroke = isMyStation ? '#b45309' : '#854d0e';
+      const fontSize = count > 9 ? '9' : '10';
+      const textY = count > 9 ? '20.2' : '20.5';
 
-        el.onclick = (e) => {
-          e.stopPropagation();
-          map.flyTo({ center: [centerLng, centerLat], zoom: 12.5, duration: 800 });
-        };
+      el.innerHTML = [
+        '<svg width="32" height="34" viewBox="0 0 30 32" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;">',
+        '  <defs>',
+        '    <filter id="psShadow_' + uid + '" x="-20%" y="-20%" width="140%" height="140%">',
+        '      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.4"/>',
+        '    </filter>',
+        '    <filter id="psGlow_' + uid + '" x="-40%" y="-40%" width="180%" height="180%">',
+        '      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#f59e0b" flood-opacity="0.95"/>',
+        '      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>',
+        '    </filter>',
+        '    <linearGradient id="psRedGrad_' + uid + '" x1="0%" y1="0%" x2="100%" y2="100%">',
+        '      <stop offset="0%" stop-color="#ef4444"/>',
+        '      <stop offset="100%" stop-color="#b91c1c"/>',
+        '    </linearGradient>',
+        '    <linearGradient id="psGoldGrad_' + uid + '" x1="0%" y1="0%" x2="100%" y2="100%">',
+        '      <stop offset="0%" stop-color="#fef08a"/>',
+        '      <stop offset="50%" stop-color="#eab308"/>',
+        '      <stop offset="100%" stop-color="#ca8a04"/>',
+        '    </linearGradient>',
+        '  </defs>',
+        '  <g filter="' + filter + '">',
+        '    <!-- Police Shield Body -->',
+        '    <path d="M 15 29 C 7 25 5 19 5 9 C 5 7 15 4 15 4 C 15 4 25 7 25 9 C 25 19 23 25 15 29 Z" fill="url(#psRedGrad_' + uid + ')" stroke="' + borderColor + '" stroke-width="' + borderWidth + '" stroke-linejoin="round"/>',
+        '    <!-- Central White Dial -->',
+        '    <circle cx="15" cy="17.2" r="6.8" fill="#ffffff" stroke="' + (isMyStation ? '#f59e0b' : 'rgba(220,38,38,0.2)') + '" stroke-width="0.8"/>',
+        '    <!-- Vehicle Count Number -->',
+        '    <text x="15" y="' + textY + '" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-weight="900" font-size="' + fontSize + '" fill="#0f172a">' + count + '</text>',
+        '    <!-- Crowning Golden Police Star at Top Apex -->',
+        '    <g transform="translate(15, 7.2)">',
+        '      <polygon points="0,-4 1.1,-1.2 4.1,-1 2,1.1 2.6,4.1 0,2.5 -2.6,4.1 -2,1.1 -4.1,-1 -1.1,-1.2" fill="url(#psGoldGrad_' + uid + ')" stroke="' + goldStroke + '" stroke-width="' + goldStroke + '" stroke-linejoin="round"/>',
+        '      <circle cx="0" cy="0" r="0.7" fill="#ffffff" opacity="0.95"/>',
+        '    </g>',
+        '  </g>',
+        '</svg>'
+      ].join('\n');
 
-        const marker = new ml.Marker({ element: el, anchor: 'center' })
-          .setLngLat([centerLng, centerLat])
-          .addTo(map);
-        stationMarkersRef.current.push(marker);
-        return;
-      }
+      const inchargeInfo = s.inchargeName ? ('\nIn-charge: ' + s.inchargeName) : '';
+      const phoneInfo = s.phone ? ('\nCUG: ' + s.phone) : '';
+      el.title = s.name + ' (' + s.zone + ' Zone)\nFleet Pool: ' + count + ' vehicles' + inchargeInfo + phoneInfo + '\nGPS: ' + s.lat.toFixed(4) + ', ' + s.lng.toFixed(4);
 
-      // At city zoom level (zoom >= 11.2): cluster any pins whose screen coordinates collide (< 38px)
-      type StationCluster = {
-        pins: typeof stationPins;
-        lng: number;
-        lat: number;
-        parked: number;
-      };
+      const inchargeHtml = s.inchargeName ? ('<div style="font-size:12px;margin-top:2px;"><b>In-charge:</b> ' + s.inchargeName + '</div>') : '';
+      const phoneHtml = s.phone ? ('<div style="font-size:12px;margin-top:2px;"><b>CUG Contact:</b> <a href="tel:' + s.phone + '" style="color:#2563eb;text-decoration:none;">' + s.phone + '</a></div>') : '';
+      const myStationBanner = isMyStation
+        ? '<div style="display:inline-block;margin-bottom:6px;background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;">YOUR ASSIGNED STATION</div>'
+        : '';
 
-      const clusters: StationCluster[] = [];
-      const COLLISION_PX = 38;
+      const popupHtml = [
+        '<div class="ps-station-popup-card">',
+        '  ' + myStationBanner,
+        '  <div class="ps-station-popup-title">' + s.name + '</div>',
+        '  <div class="ps-station-popup-sub">' + s.zone + ' Zone &bull; ' + s.district + '</div>',
+        '  ' + inchargeHtml,
+        '  ' + phoneHtml,
+        '  <div class="ps-station-popup-fleet">',
+        '    <span class="ps-fleet-badge">Allocatable Fleet: ' + count + ' vehicles</span>',
+        '  </div>',
+        '  <div class="ps-station-popup-coords">' + s.lat.toFixed(4) + '°N, ' + s.lng.toFixed(4) + '°E</div>',
+        '</div>'
+      ].join('\n');
 
-      for (const pin of stationPins) {
-        const pt = map.project([pin.lng, pin.lat]);
-        let merged = false;
-
-        for (const c of clusters) {
-          const cpt = map.project([c.lng, c.lat]);
-          const dist = Math.hypot(pt.x - cpt.x, pt.y - cpt.y);
-          if (dist < COLLISION_PX) {
-            c.pins.push(pin);
-            c.parked += pin.parked;
-            c.lng = c.pins.reduce((s, x) => s + x.lng, 0) / c.pins.length;
-            c.lat = c.pins.reduce((s, x) => s + x.lat, 0) / c.pins.length;
-            merged = true;
-            break;
-          }
-        }
-
-        if (!merged) {
-          clusters.push({
-            pins: [pin],
-            lng: pin.lng,
-            lat: pin.lat,
-            parked: pin.parked,
-          });
-        }
-      }
-
-      for (const c of clusters) {
-        const isMulti = c.pins.length > 1;
-        const el = document.createElement('div');
-        el.style.cssText =
-          'position:relative;width:32px;height:46px;cursor:pointer;filter:drop-shadow(0 4px 6px rgba(0,0,0,0.45));';
-
-        if (isMulti) {
-          el.innerHTML = `
-            <div style="width:34px;height:34px;background:#b91c1c;border:2.5px solid #ffffff;outline:2px solid #ef4444;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-              <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${c.parked}</span>
-            </div>`;
-        } else {
-          el.innerHTML = `
-            <div style="width:30px;height:30px;background:#dc2626;border:2.5px solid #ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.35);border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;">
-              <span style="transform:rotate(45deg);color:#fff;font-weight:900;font-size:12px;font-family:system-ui,sans-serif;line-height:1;">${c.parked}</span>
-            </div>`;
-        }
-
-        const titleText = isMulti
-          ? `${c.pins.length} Stations: ${c.pins.map((p) => p.name).join(', ')} | Parked: ${c.parked}`
-          : `${c.pins[0].name} | Parked: ${c.parked}`;
-
-        const tooltip = new ml.Popup({ offset: 40, closeButton: false, closeOnClick: false, className: 'ps-tooltip' })
-          .setHTML(`<div style="font-family:system-ui,-apple-system,sans-serif;font-size:12px;font-weight:600;color:#0f172a;padding:2px 4px;max-width:240px;">${titleText}</div>`);
-
-        el.addEventListener('mouseenter', () => tooltip.addTo(map));
-        el.addEventListener('mouseleave', () => tooltip.remove());
-        el.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (isMulti) {
-            map.flyTo({ center: [c.lng, c.lat], zoom: Math.min(map.getZoom() + 1.8, 15), duration: 600 });
-          } else {
-            map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
-          }
-        });
-
-        const marker = new ml.Marker({ element: el, anchor: 'bottom' }).setLngLat([c.lng, c.lat]).addTo(map);
-        stationMarkersRef.current.push(marker);
-      }
-    };
-
-    renderStations();
-
-    map.on('zoomend', renderStations);
-    return () => {
-      map.off('zoomend', renderStations);
-    };
-  }, [stationPins, showStations, mapReady]);
-
-  // ---- City boundary ring (gwalior.kmz) ----
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !readyRef.current) return;
-    const src = map.getSource('boundary');
-    if (src?.setData) {
-      src.setData({
-        type: 'Feature',
-        properties: {},
-        geometry: { type: 'LineString', coordinates: mapFeatures?.boundary ?? [] },
-      });
+      const popup = new ml.Popup({ offset: 16, closeButton: true, className: 'ps-station-popup' }).setHTML(popupHtml);
+      const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
+      stationMarkersRef.current.push(marker);
     }
-  }, [mapFeatures, mapReady]);
-
+  }, [stations, showStations, mapReady, fleet.me?.stationId]);
 
   // ---- Pulsing open-incident markers ----
   useEffect(() => {
@@ -742,26 +552,6 @@ export function LiveMap() {
               ]}
               ariaLabel="Search vehicles"
             />
-            {stationMatches.length > 0 ? (
-              <div style={{ display: 'grid', gap: 4 }}>
-                {stationMatches.map((p) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    className="veh-map-ctrl-btn"
-                    style={{ justifyContent: 'flex-start', width: '100%', height: 'auto', padding: '7px 10px', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}
-                    onClick={() => {
-                      const map = mapRef.current;
-                      if (map) map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 14.5), duration: 800 });
-                    }}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: '50% 50% 50% 0', background: '#dc2626', transform: 'rotate(45deg)', flex: 'none' }} aria-hidden="true" />
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-                    <strong style={{ color: 'var(--color-brand)' }}>{p.parked}</strong>
-                  </button>
-                ))}
-              </div>
-            ) : null}
             <div className="cluster" style={{ gap: '0.4rem' }}>
               <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} ariaLabel="Filter by status" />
               <Select value={sectorFilter} onChange={setSectorFilter} options={SECTOR_OPTIONS} ariaLabel="Filter by sector" />
@@ -807,7 +597,7 @@ export function LiveMap() {
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontWeight: 750, fontSize: '0.78rem', color: 'var(--color-brand)' }}>
-                  🛣️ {simState.routeName}
+                  {simState.routeName}
                 </span>
                 <span className="badge badge--brand" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
                   {simState.direction === 1 ? 'A → B' : 'B → A'}

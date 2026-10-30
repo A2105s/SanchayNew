@@ -2,21 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Car, CornerDownLeft, LayoutDashboard, Search } from 'lucide-react';
 import { useFleet } from '@/components/providers/FleetProvider';
-import { useActiveModule } from '@/lib/client/useModule';
 import { CLASS_LABEL, SECTOR_LABEL } from '@/lib/fleet/format';
-
-type Domain = 'vehicles' | 'spaces' | 'shared';
 
 interface PageEntry {
   href: string;
   label: string;
-  domain: Domain;
+  domain?: string;
 }
 
-/** Pages are tagged per module so the palette never mixes Vehicles and Spaces content. */
+/** Pages are tagged per module. When searching, all pages across modules are searchable. */
 const PAGES: PageEntry[] = [
   { href: '/dashboard', label: 'Dashboard', domain: 'vehicles' },
   { href: '/vehicles', label: 'Fleet registry', domain: 'vehicles' },
@@ -34,7 +31,7 @@ const PAGES: PageEntry[] = [
   { href: '/incidents', label: 'Incidents', domain: 'vehicles' },
   { href: '/iot', label: 'IoT hub', domain: 'vehicles' },
   { href: '/reports', label: 'Reports', domain: 'vehicles' },
-  { href: '/spaces', label: 'Spaces', domain: 'spaces' },
+  { href: '/spaces', label: 'Spaces overview', domain: 'spaces' },
   { href: '/spaces/bookings', label: 'Space bookings', domain: 'spaces' },
   { href: '/spaces/requests', label: 'Space requests', domain: 'spaces' },
   { href: '/spaces/settings', label: 'Space booking policy', domain: 'spaces' },
@@ -57,14 +54,11 @@ interface Result {
 
 export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const { snapshot } = useFleet();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
-
-  const domain = useActiveModule(pathname);
 
   useEffect(() => setMounted(true), []);
 
@@ -81,14 +75,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
   const results = useMemo<Result[]>(() => {
     const q = query.trim().toLowerCase();
-    const pageMatches = PAGES.filter((p) => (p.domain === 'shared' || p.domain === domain) && (!q || p.label.toLowerCase().includes(q))).map<Result>((p) => ({
+    const pageMatches = PAGES.filter((p) => !q || p.label.toLowerCase().includes(q)).map<Result>((p) => ({
       kind: 'page',
       href: p.href,
       label: p.label
     }));
 
     let vehicleMatches: Result[] = [];
-    if (domain === 'vehicles' && q && snapshot) {
+    if (q && snapshot) {
       vehicleMatches = snapshot.vehicles
         .filter((v) => {
           const hay = [v.registrationNumber, v.displayName, v.driverName ?? '', v.assetCode]
@@ -106,7 +100,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     }
 
     return [...pageMatches, ...vehicleMatches];
-  }, [query, snapshot, domain]);
+  }, [query, snapshot]);
 
   useEffect(() => {
     if (active >= results.length) setActive(0);

@@ -10,6 +10,7 @@ import { mapSpaceRequest } from '@/lib/cloud/mappers';
 import { nextSpaceCode } from '@/lib/cloud/codes';
 import { orgTree } from '@/lib/auth/scope';
 import { spaceFieldSchema } from '@/lib/validation/schemas';
+import { notify } from '@/lib/cloud/notifications';
 
 function invalidate() {
   invalidateCloudData(CLOUD_CACHE_TAGS.fleet, CLOUD_CACHE_TAGS.ops, CLOUD_CACHE_TAGS.all);
@@ -41,11 +42,28 @@ export async function submitSpaceRequest(user: SessionUser, input: SpaceRequestI
   }
 
   const row = await prisma.$transaction(async (tx) => {
+    const targetOrg = input.type === 'UPDATE' && input.spaceId
+      ? (await tx.space.findUnique({ where: { id: input.spaceId }, select: { organizationId: true } }))?.organizationId ?? user.organizationId
+      : user.organizationId;
+
     const created = await tx.spaceRequest.create({
       data: { type: input.type, spaceId: input.spaceId ?? null, requestedBy: user.username, payload: input.payload },
       include: { space: { select: { name: true } } }
     });
     await writeAudit(tx, { entityType: 'SpaceRequest', entityId: created.id, action: input.type === 'REGISTER' ? 'SpaceRegisterRequested' : 'SpaceUpdateRequested', newValue: input.type, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId });
+
+    if (targetOrg) {
+      await notify({
+        eventKey: `space_request:${created.id}:SUBMITTED`,
+        kind: 'SPACE_REQUEST_SUBMITTED',
+        title: `New space ${input.type.toLowerCase()} request`,
+        body: `Space request by ${user.username} requires review.`,
+        href: '/spaces/requests',
+        recipientOrgId: targetOrg,
+        recipientRole: 'DEPT_OFFICER'
+      }, tx);
+    }
+
     return created;
   });
   invalidate();
@@ -101,6 +119,14 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.spaceRequest.update({ where: { id }, data: { status: 'UNDER_REVIEW' }, include: { space: { select: { name: true } } } });
       await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestReviewStarted', fieldName: 'status', oldValue: request.status, newValue: 'UNDER_REVIEW', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId });
+      await notify({
+        eventKey: `space_request:${id}:UNDER_REVIEW`,
+        kind: 'SPACE_REQUEST_UNDER_REVIEW',
+        title: 'Space request under review',
+        body: `Your space request is being reviewed by ${user.username}.`,
+        href: '/spaces/requests',
+        recipientUsername: request.requestedBy
+      }, tx);
       return updated;
     });
     invalidate();
@@ -111,6 +137,14 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.spaceRequest.update({ where: { id }, data: { status: 'NEEDS_INFO', infoRequestReason: action.reason }, include: { space: { select: { name: true } } } });
       await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestInfoRequested', fieldName: 'status', oldValue: request.status, newValue: 'NEEDS_INFO', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: action.reason });
+      await notify({
+        eventKey: `space_request:${id}:NEEDS_INFO:${Date.now()}`,
+        kind: 'SPACE_REQUEST_NEEDS_INFO',
+        title: 'Information requested on space request',
+        body: `Reviewer requested details: ${action.reason}`,
+        href: '/spaces/requests',
+        recipientUsername: request.requestedBy
+      }, tx);
       return updated;
     });
     invalidate();
@@ -121,6 +155,14 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.spaceRequest.update({ where: { id }, data: { status: 'REJECTED', reviewNote: action.reason, reviewedBy: user.username, reviewedAt: new Date() }, include: { space: { select: { name: true } } } });
       await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestRejected', fieldName: 'status', oldValue: request.status, newValue: 'REJECTED', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: action.reason });
+      await notify({
+        eventKey: `space_request:${id}:REJECTED`,
+        kind: 'SPACE_REQUEST_REJECTED',
+        title: 'Space request rejected',
+        body: `Your space request was rejected: ${action.reason}`,
+        href: '/spaces/requests',
+        recipientUsername: request.requestedBy
+      }, tx);
       return updated;
     });
     invalidate();
@@ -168,6 +210,14 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
       await tx.spaceRequest.update({ where: { id }, data: { status: 'APPROVED', reviewNote: action.note ?? null, reviewedBy: user.username, reviewedAt: new Date(), appliedAt: new Date(), spaceId: created.id } });
       await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestApproved', fieldName: 'status', oldValue: request.status, newValue: 'APPROVED', performedBy: user.username, performedByRole: user.role, organizationId: requester.organizationId, correlationId, reason: `Created ${created.assetCode}` });
       await writeAudit(tx, { entityType: 'Space', entityId: created.id, action: 'SpaceRegistered', newValue: created.assetCode, performedBy: user.username, performedByRole: user.role, organizationId: requester.organizationId, correlationId, reason: `Via request ${id}` });
+      await notify({
+        eventKey: `space_request:${id}:APPROVED`,
+        kind: 'SPACE_REQUEST_APPROVED',
+        title: 'Space registration approved',
+        body: `Space "${payload.name}" has been approved and registered (${created.assetCode}).`,
+        href: `/spaces/${created.id}`,
+        recipientUsername: request.requestedBy
+      }, tx);
       return created;
     }, { timeout: 15000, maxWait: 5000 });
     invalidate();
@@ -185,6 +235,14 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
     const updated = await tx.spaceRequest.update({ where: { id }, data: { status: 'APPROVED', reviewNote: action.note ?? null, reviewedBy: user.username, reviewedAt: new Date(), appliedAt: new Date() }, include: { space: { select: { name: true } } } });
     await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestApproved', fieldName: 'status', oldValue: request.status, newValue: 'APPROVED', performedBy: user.username, performedByRole: user.role, organizationId: space.organizationId, correlationId, reason: `Applied update to ${space.assetCode}` });
     await writeAudit(tx, { entityType: 'Space', entityId: spaceId, action: 'SpaceUpdatedViaRequest', oldValue: before as never, newValue: payload as never, performedBy: user.username, performedByRole: user.role, organizationId: space.organizationId, correlationId, reason: `Request ${id}` });
+    await notify({
+      eventKey: `space_request:${id}:APPROVED`,
+      kind: 'SPACE_REQUEST_APPROVED',
+      title: 'Space update approved',
+      body: `Requested updates for "${space.name}" have been approved and applied.`,
+      href: `/spaces/${spaceId}`,
+      recipientUsername: request.requestedBy
+    }, tx);
     return updated;
   }, { timeout: 15000, maxWait: 5000 });
   invalidate();

@@ -95,7 +95,7 @@ export interface PulseResponse extends AiMeta {
 }
 
 // ---- Polish ----
-export type PolishKind = 'incident' | 'maintenance' | 'handover' | 'return' | 'request-purpose';
+export type PolishKind = 'incident' | 'maintenance' | 'handover' | 'return' | 'request-purpose' | 'space-spec';
 export interface PolishRequest {
   kind: PolishKind;
   text: string;
@@ -132,6 +132,101 @@ export interface DraftRequestResponse extends AiMeta {
   draft: DraftRequestFields;
   candidates: DraftCandidate[];
   warnings: string[];
+}
+
+// ---- Space Draft Booking ----
+export interface DraftSpaceBookingBody {
+  text: string;
+  provider?: AiRouting;
+}
+export interface DraftSpaceBookingFields {
+  category: string;
+  minCapacity: number;
+  purpose: string;
+  attendees: number;
+  startAt: string | null;
+  endAt: string | null;
+  amenities: string[];
+  district: string | null;
+}
+export interface DraftSpaceCandidate {
+  spaceId: string;
+  assetCode: string;
+  name: string;
+  buildingOrCampus: string | null;
+  district: string | null;
+  category: string;
+  capacity: number;
+  areaSqft: number | null;
+  score: number;
+  reason: string;
+}
+export interface DraftSpaceBookingResponse extends AiMeta {
+  draft: DraftSpaceBookingFields;
+  candidates: DraftSpaceCandidate[];
+  warnings: string[];
+}
+
+// ---- Space Approver Triage ----
+export interface SpaceTriageBody {
+  bookingId: string;
+  provider?: AiRouting;
+}
+export interface SpaceTriageResponse extends AiMeta {
+  recommendation: 'APPROVE' | 'REJECT' | 'NEEDS_REVIEW';
+  confidence: number;
+  summary: string;
+  safetyAnalysis: {
+    status: 'SAFE' | 'WARNING' | 'CRITICAL';
+    sqFtPerAttendee: number | null;
+    note: string;
+  };
+  departmentFit: {
+    aligned: boolean;
+    note: string;
+  };
+  suggestedNote: string;
+}
+
+// ---- Vehicle Request Approver Triage ----
+export interface RequestTriageBody {
+  provider?: AiRouting;
+}
+export interface RequestTriageResponse extends AiMeta {
+  recommendation: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES';
+  confidence: number;
+  summary: string;
+  complianceCheck: {
+    valid: boolean;
+    note: string;
+  };
+  capacityFit: {
+    fits: boolean;
+    passengers: number;
+    vehicleCapacity: number;
+    note: string;
+  };
+  maintenanceCheck: {
+    ticketsCount: number;
+    note: string;
+  };
+  suggestedComment: string;
+}
+
+// ---- Space Pulse ----
+export interface SpacePulseAction {
+  label: string;
+  href: string;
+  priority: 'high' | 'medium' | 'low';
+}
+export interface SpacePulseResponse extends AiMeta {
+  summary: string;
+  idleCount: number;
+  busyCount: number;
+  blockedCount: number;
+  highlights: string[];
+  recommendations: SpacePulseAction[];
+  generatedAt: string;
 }
 
 // ---- Document extraction ----

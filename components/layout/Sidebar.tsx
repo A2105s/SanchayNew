@@ -2,11 +2,12 @@
 
 import { Fragment, useMemo, useState, type ComponentType } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { LoaderCircle, LogOut, X } from 'lucide-react';
 import type { Role } from '@/types';
 import { canAny, type Permission } from '@/lib/client/permissions';
 import { useFleet } from '@/components/providers/FleetProvider';
+import { useActiveModule, setModuleCookie } from '@/lib/client/useModule';
 import type { AnimatedIconProps } from '@/components/ui/AnimatedIcons';
 import {
   AnimatedDashboard,
@@ -29,65 +30,53 @@ import {
   AnimatedActivity
 } from '@/components/ui/AnimatedIcons';
 
+import {
+  SPACES_HREFS,
+  SHARED_HREFS,
+  VEHICLES_GROUPS,
+  SPACES_GROUPS,
+  NAV_ROUTE_ITEMS,
+  type NavRouteItem
+} from '@/lib/navigation/routes';
+
+export { SPACES_HREFS, SHARED_HREFS, VEHICLES_GROUPS, SPACES_GROUPS };
+
 type IconComponent = ComponentType<AnimatedIconProps>;
 
-interface NavItem {
-  href: string;
-  label: string;
+export interface NavItem extends NavRouteItem {
   icon: IconComponent;
-  /** Visible to any of these permissions (OR). Undefined = always visible when authenticated. */
-  requiresAny?: Permission[];
-  /** Only visible when the signed-in operator has a station attached. */
-  showIfStation?: boolean;
-  badge?: string;
 }
 
-/** Navigation per BUILD_CONTRACT sidebar order with unified Fleet and Spaces access. */
-const NAV_ITEMS: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: AnimatedDashboard },
-  { href: '/vehicles', label: 'Fleet', icon: AnimatedCar, requiresAny: ['fleet.read'] },
-  { href: '/vehicles/discover', label: 'Discover', icon: AnimatedSearch, requiresAny: ['request.create', 'fleet.read'] },
-  { href: '/vehicles/map', label: 'Live map', icon: AnimatedMap, requiresAny: ['fleet.read'] },
-  {
-    href: '/requests',
-    label: 'Requests',
-    icon: AnimatedClipboard,
-    requiresAny: ['request.create', 'request.review', 'fleet.read']
-  },
-  {
-    href: '/allocations',
-    label: 'Allocations',
-    icon: AnimatedKey,
-    requiresAny: ['handover.record', 'return.record', 'request.review', 'fleet.read']
-  },
-  { href: '/operations', label: 'Operations', icon: AnimatedActivity, requiresAny: ['fleet.read', 'report.read'] },
-  { href: '/stations', label: 'Stations', icon: AnimatedBuilding, requiresAny: ['fleet.read'] },
-  { href: '/transfers', label: 'Transfers', icon: AnimatedTransfer, requiresAny: ['transfer.create', 'transfer.review'] },
-  { href: '/compliance', label: 'Compliance', icon: AnimatedShieldCheck, requiresAny: ['fleet.read'] },
-  { href: '/maintenance', label: 'Maintenance', icon: AnimatedWrench, requiresAny: ['maintenance.write', 'fleet.read'] },
-  { href: '/idle', label: 'Idle & reuse', icon: AnimatedClock, requiresAny: ['fleet.read'] },
-  { href: '/incidents', label: 'Incidents', icon: AnimatedSiren },
-  { href: '/iot', label: 'IoT hub', icon: AnimatedRadio, requiresAny: ['device.manage', 'fleet.read'] },
-  { href: '/spaces', label: 'Spaces', icon: AnimatedLayout, requiresAny: ['space.manage', 'space.book', 'space.review'] },
-  { href: '/spaces/bookings', label: 'Space bookings', icon: AnimatedClipboard, requiresAny: ['space.manage', 'space.book'] },
-  { href: '/spaces/requests', label: 'Space requests', icon: AnimatedLedger, requiresAny: ['space.manage', 'space.review'] },
-  { href: '/spaces/settings', label: 'Booking policy', icon: AnimatedGear, requiresAny: ['space.manage'] },
-  { href: '/reports', label: 'Reports', icon: AnimatedBarChart, requiresAny: ['report.read'] },
-  { href: '/audit', label: 'Audit', icon: AnimatedLedger, requiresAny: ['audit.read'] },
-  { href: '/settings', label: 'Settings', icon: AnimatedGear, requiresAny: ['settings.manage'] },
-  { href: '/station', label: 'My station', icon: AnimatedBuilding, showIfStation: true }
-];
+const ICONS: Record<string, IconComponent> = {
+  '/dashboard': AnimatedDashboard,
+  '/vehicles': AnimatedCar,
+  '/vehicles/discover': AnimatedSearch,
+  '/vehicles/map': AnimatedMap,
+  '/requests': AnimatedClipboard,
+  '/allocations': AnimatedKey,
+  '/operations': AnimatedActivity,
+  '/stations': AnimatedBuilding,
+  '/transfers': AnimatedTransfer,
+  '/compliance': AnimatedShieldCheck,
+  '/maintenance': AnimatedWrench,
+  '/idle': AnimatedClock,
+  '/incidents': AnimatedSiren,
+  '/iot': AnimatedRadio,
+  '/spaces': AnimatedLayout,
+  '/spaces/bookings': AnimatedClipboard,
+  '/spaces/requests': AnimatedLedger,
+  '/spaces/settings': AnimatedGear,
+  '/reports': AnimatedBarChart,
+  '/audit': AnimatedLedger,
+  '/settings': AnimatedGear,
+  '/station': AnimatedBuilding
+};
 
-/** Sidebar sections. Items keep their permission filtering; this decides order and headings. */
-const GROUPS: { id: string; heading: string | null; hrefs: string[] }[] = [
-  { id: 'overview', heading: null, hrefs: ['/dashboard'] },
-  { id: 'fleet', heading: 'Fleet', hrefs: ['/vehicles', '/vehicles/discover', '/vehicles/map', '/stations'] },
-  { id: 'requests', heading: 'Requests', hrefs: ['/requests', '/allocations', '/transfers'] },
-  { id: 'oversight', heading: 'Oversight', hrefs: ['/operations', '/compliance', '/maintenance', '/idle', '/incidents', '/iot'] },
-  { id: 'spaces', heading: 'Spaces', hrefs: ['/spaces', '/spaces/bookings', '/spaces/requests', '/spaces/settings'] },
-  { id: 'insights', heading: 'Insights', hrefs: ['/reports', '/audit'] },
-  { id: 'more', heading: 'More', hrefs: ['/settings', '/station'] }
-];
+/** Navigation per BUILD_CONTRACT sidebar order with unified Fleet and Spaces access. */
+export const NAV_ITEMS: NavItem[] = NAV_ROUTE_ITEMS.map((item) => ({
+  ...item,
+  icon: ICONS[item.href] ?? AnimatedDashboard
+}));
 
 /** FIELD_STAFF sees a reduced set: Dashboard, Fleet, Live map, Incidents. */
 const FIELD_STAFF_HREFS = new Set(['/dashboard', '/vehicles', '/vehicles/map', '/incidents', '/station']);
@@ -120,26 +109,35 @@ function initials(name: string): string {
 }
 
 export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, onLogout }: SidebarProps) {
+  const router = useRouter();
   const pathname = usePathname();
   const { me } = useFleet();
+  const activeModule = useActiveModule(pathname);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
 
   const items = useMemo(() => {
     const role = me?.role ?? null;
     return NAV_ITEMS.filter((item) => {
-      // Station link is strictly for operators with an assigned station.
-      // Platform admin, org admin, auditor, etc. have no station and should never see it.
-      if (item.showIfStation && !me?.stationId) return false;
-      if (role === 'FIELD_STAFF' && !FIELD_STAFF_HREFS.has(item.href)) return false;
+      if (activeModule === 'spaces') {
+        // Strictly Spaces navigation items (/spaces, /spaces/bookings, /spaces/requests, /spaces/settings, plus /reports, /audit, /settings)
+        if (!SPACES_HREFS.has(item.href) && !SHARED_HREFS.has(item.href)) return false;
+      } else {
+        // activeModule === 'vehicles': hide all space-specific links
+        if (SPACES_HREFS.has(item.href)) return false;
+        if (item.showIfStation && !me?.stationId) return false;
+        if (role === 'FIELD_STAFF' && !FIELD_STAFF_HREFS.has(item.href)) return false;
+      }
       if (item.requiresAny && !canAny(role, item.requiresAny)) return false;
       return true;
     });
-  }, [me]);
+  }, [me, activeModule]);
+
+  const activeGroups = activeModule === 'spaces' ? SPACES_GROUPS : VEHICLES_GROUPS;
 
   // Group the permitted items under headings (a heading only shows when at least one of its items is visible).
   const grouped = useMemo(() => {
     const out: { item: NavItem; heading: string | null }[] = [];
-    for (const group of GROUPS) {
+    for (const group of activeGroups) {
       let first = true;
       for (const href of group.hrefs) {
         const item = items.find((i) => i.href === href);
@@ -151,7 +149,7 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
     // Anything not assigned to a group (future pages) is appended so it never disappears.
     for (const item of items) if (!out.some((o) => o.item.href === item.href)) out.push({ item, heading: null });
     return out;
-  }, [items]);
+  }, [items, activeGroups]);
 
   function isActive(href: string): boolean {
     if (href === '/vehicles') {
@@ -176,6 +174,37 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
         </div>
         <button className="sidebar__close-btn" type="button" aria-label="Close sidebar" onClick={onMobileClose}>
           <X size={18} />
+        </button>
+      </div>
+
+      <div className="sidebar__modules" role="tablist" aria-label="Active module">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeModule === 'vehicles'}
+          className={`sidebar__module ${activeModule === 'vehicles' ? 'sidebar__module--active' : ''}`}
+          onClick={() => {
+            setModuleCookie('vehicles');
+            onMobileClose();
+            onNavigate('/dashboard');
+            router.push('/dashboard');
+          }}
+        >
+          Fleet
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeModule === 'spaces'}
+          className={`sidebar__module ${activeModule === 'spaces' ? 'sidebar__module--active' : ''}`}
+          onClick={() => {
+            setModuleCookie('spaces');
+            onMobileClose();
+            onNavigate('/spaces');
+            router.push('/spaces');
+          }}
+        >
+          Spaces
         </button>
       </div>
 

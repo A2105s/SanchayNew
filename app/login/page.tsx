@@ -27,6 +27,9 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
   { user: 'admin', role: 'Platform administrator (unified access)', category: 'admin' },
   { user: 'org.police', role: 'Police organization admin', category: 'admin' },
   { user: 'dept.officer', role: 'Police department officer (approver)', category: 'admin' },
+  { user: 'spaces.admin', role: 'Civic Spaces Administrator (Nagar Nigam & PWD)', category: 'spaces' },
+  { user: 'dept.spaces', role: 'Estate Officer, Civic Spaces (Facility Approver & Bookings)', category: 'spaces' },
+  { user: 'spaces.pwd', role: 'PWD Executive Engineer (Civic Auditoriums & Halls)', category: 'spaces' },
   { user: 'org.health', role: 'Health organization admin', category: 'spaces' },
   { user: 'dept.health', role: 'Health department officer (approver)', category: 'spaces' },
   { user: 'driver.demo', role: 'Kotwali FRV Driver (Field staff)', category: 'admin' },
@@ -161,9 +164,13 @@ function LoginForm() {
 
       if (res.ok) {
         // Remember which module this login belongs to (drives the shell navigation)
-        const targetModule = role === 'spaces' ? 'spaces' : 'vehicles';
+        const isSpaces =
+          role === 'spaces' ||
+          ['spaces.admin', 'dept.spaces', 'spaces.pwd'].includes(effectiveUsername.trim().toLowerCase());
+        const targetModule = isSpaces ? 'spaces' : 'vehicles';
         document.cookie = `sanchay_module=${targetModule}; path=/; max-age=2592000; SameSite=Lax`;
-        window.location.href = next;
+        const dest = isSpaces ? (next === '/dashboard' || !next ? '/spaces' : next) : next;
+        window.location.href = dest;
       } else {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
         setError(body?.error ?? 'Authentication failed. Check your credentials and try again.');
@@ -263,7 +270,7 @@ function LoginForm() {
                   type="text"
                   value={username}
                   onChange={(event) => setUsername(event.target.value)}
-                  placeholder="e.g. dept.health or org.health"
+                  placeholder="e.g. spaces.admin or dept.spaces"
                   disabled={loading}
                   autoComplete="username"
                 />
@@ -370,7 +377,7 @@ function LoginForm() {
               <small className="text-muted" style={{ flexBasis: '100%', marginTop: 4 }}>
                 {role === 'admin'
                   ? 'Click a name to fill it in — demo password Sanchay@Demo1 (auto-fills). The DM (IAS) oversees as platform admin.'
-                  : 'Click a name to fill it in — demo password Sanchay@Demo1 (auto-fills). Department officers manage civic spaces.'}
+                  : 'Click a name to fill it in — demo password Sanchay@Demo1 (auto-fills). spaces.admin and dept.spaces oversee civic spaces, halls, and municipal facilities.'}
               </small>
             </div>
           </details>

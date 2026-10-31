@@ -30,7 +30,7 @@ const PAGES: PageEntry[] = [
   { href: '/idle', label: 'Idle & reuse', domain: 'vehicles' },
   { href: '/incidents', label: 'Incidents', domain: 'vehicles' },
   { href: '/iot', label: 'IoT hub', domain: 'vehicles' },
-  { href: '/reports', label: 'Reports', domain: 'vehicles' },
+  { href: '/reports', label: 'Reports', domain: 'shared' },
   { href: '/spaces', label: 'Spaces overview', domain: 'spaces' },
   { href: '/spaces/bookings', label: 'Space bookings', domain: 'spaces' },
   { href: '/spaces/requests', label: 'Space requests', domain: 'spaces' },

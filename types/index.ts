@@ -532,7 +532,17 @@ export interface NotificationView {
 // Other fleet views
 // ---------------------------------------------------------------------------
 
-export type TransferStatus = 'PENDING' | 'ALLOCATED' | 'COMPLETED' | 'REJECTED' | 'CANCELLED';
+export type TransferStatus =
+  | 'PENDING'
+  | 'PENDING_LENDER_REVIEW'
+  | 'PENDING_DISTRICT_SANCTION'
+  | 'ALLOCATED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'REJECTED'
+  | 'REJECTED_BY_LENDER'
+  | 'REJECTED_BY_ADMIN'
+  | 'CANCELLED';
 
 export interface TransferView {
   id: string;

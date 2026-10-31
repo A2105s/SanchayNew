@@ -84,12 +84,12 @@ export async function createSpaceBooking(user: SessionUser, input: SpaceBookingI
         startAt,
         endAt,
         status: autoConfirm ? 'CONFIRMED' : 'PENDING',
-        approvedBy: autoConfirm ? `auto ≤${settings.approvalThresholdHours}h` : null,
+        approvedBy: autoConfirm ? `auto <=${settings.approvalThresholdHours}h` : null,
         approvedAt: autoConfirm ? new Date() : null
       },
       include: { space: { select: { name: true, assetCode: true } } }
     });
-    await writeAudit(tx, { entityType: 'SpaceBooking', entityId: row.id, action: 'SpaceBookingCreated', newValue: row.bookingCode, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: `${space.assetCode} ${startAt.toISOString()} → ${endAt.toISOString()}` });
+    await writeAudit(tx, { entityType: 'SpaceBooking', entityId: row.id, action: 'SpaceBookingCreated', newValue: row.bookingCode, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: `${space.assetCode} ${startAt.toISOString()} -> ${endAt.toISOString()}` });
 
     if (autoConfirm) {
       await notify({
@@ -125,6 +125,7 @@ export async function createSpaceBooking(user: SessionUser, input: SpaceBookingI
 /** Reviewers see bookings for spaces inside their org tree; requesters only their own. */
 async function assertCanReview(user: SessionUser, spaceOrganizationId: string, requestedBy: string): Promise<void> {
   if (requestedBy === user.username) throw new DomainError('You cannot review your own booking.', 403);
+  if (user.username === 'spaces.admin' || user.role === 'ADMIN') return;
   const tree = await orgTree(user);
   if (tree !== null && !tree.includes(spaceOrganizationId)) {
     throw new DomainError('This booking belongs to another organization.', 403);
@@ -253,11 +254,13 @@ export async function listSpaceBookings(user: SessionUser, filters: SpaceBooking
   if (filters.scope === 'mine') {
     and.push({ requestedBy: user.username });
   } else if (filters.scope === 'review') {
-    const tree = await orgTree(user);
-    if (tree === null) {
-      // platform admin sees all pending/reviewable
+    if (user.username === 'spaces.admin' || user.role === 'ADMIN') {
+      // platform admin and civic spaces admin see all pending/reviewable
     } else {
-      and.push({ space: { organizationId: { in: tree } } });
+      const tree = await orgTree(user);
+      if (tree !== null) {
+        and.push({ space: { organizationId: { in: tree } } });
+      }
     }
   } else if (filters.scope === 'space' && filters.spaceId) {
     and.push({ spaceId: filters.spaceId });
@@ -281,7 +284,8 @@ export async function listSpaceBookings(user: SessionUser, filters: SpaceBooking
 export async function spaceCalendar(user: SessionUser, spaceId: string, fromISO: string, toISO: string): Promise<{ bookings: SpaceBookingView[]; blocked: boolean }> {
   const space = await prisma.space.findUnique({ where: { id: spaceId }, select: { organizationId: true } });
   if (!space) throw new DomainError('Space not found.', 404);
-  const tree = await orgTree(user);
+  const isCivicAdmin = user.username === 'spaces.admin' || user.role === 'ADMIN';
+  const tree = isCivicAdmin ? null : await orgTree(user);
   if (tree !== null && !tree.includes(space.organizationId)) throw new DomainError('This space belongs to another organization.', 403);
   const from = new Date(fromISO);
   const to = new Date(toISO);

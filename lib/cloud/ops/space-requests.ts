@@ -18,6 +18,7 @@ function invalidate() {
 
 /** Reviewers act only on requests whose space (or, for REGISTER, requester org) is inside their org tree. */
 async function assertReviewScope(user: SessionUser, spaceOrganizationId: string | null, requesterOrgId: string | null): Promise<void> {
+  if (user.username === 'spaces.admin' || user.role === 'ADMIN') return;
   const tree = await orgTree(user);
   if (tree === null) return; // platform admin
   const target = spaceOrganizationId ?? requesterOrgId;
@@ -33,7 +34,9 @@ export async function submitSpaceRequest(user: SessionUser, input: SpaceRequestI
   if (input.type === 'UPDATE') {
     const space = await prisma.space.findUnique({ where: { id: input.spaceId as string }, select: { organizationId: true } });
     if (!space) throw new DomainError('Space not found.', 404);
-    if (space.organizationId !== user.organizationId) throw new DomainError('You can only request updates for spaces of your own organization.', 403);
+    if (user.role !== 'ADMIN' && user.username !== 'spaces.admin' && space.organizationId !== user.organizationId) {
+      throw new DomainError('You can only request updates for spaces of your own organization.', 403);
+    }
     const openDuplicate = await prisma.spaceRequest.findFirst({
       where: { spaceId: input.spaceId, type: 'UPDATE', status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
       select: { id: true }
@@ -75,6 +78,7 @@ export async function listSpaceRequests(user: SessionUser, scope: 'mine' | 'revi
     scope === 'mine'
       ? { requestedBy: user.username }
       : await (async () => {
+          if (user.username === 'spaces.admin' || user.role === 'ADMIN') return {};
           const tree = await orgTree(user);
           if (tree === null) return {};
           // Review scope: requests on own-org spaces, plus own-org REGISTER requests

@@ -45,6 +45,7 @@ import {
 import { RegisterWizard } from './RegisterWizard';
 import { ImportModal } from './ImportModal';
 import { BulkReassignModal } from './BulkModals';
+import { FleetReadinessTriagePanel } from '@/components/ai/FleetReadinessTriagePanel';
 
 const SEARCH_PLACEHOLDERS = [
   'Search by registration (MP07-AB-1234)',
@@ -161,9 +162,22 @@ export function VehicleRegistry() {
     else update({ sort: field, dir: 'asc' }, false);
   }
 
+  const [triageLane, setTriageLane] = useState<'ready' | 'attention' | 'grounded' | null>(null);
+  const [triageVehicleIds, setTriageVehicleIds] = useState<string[] | null>(null);
+
+  // Reset triage lane filters when station scope changes
+  useEffect(() => {
+    setTriageLane(null);
+    setTriageVehicleIds(null);
+  }, [filters.stationId]);
+
   const rows = result?.items ?? [];
   const total = result?.total ?? 0;
-  const ownRows = useMemo(() => rows.filter(isVehicleView) as VehicleView[], [rows]);
+  const displayedRows = useMemo(
+    () => (triageVehicleIds !== null ? rows.filter((v) => triageVehicleIds.includes(v.id)) : rows),
+    [rows, triageVehicleIds]
+  );
+  const ownRows = useMemo(() => displayedRows.filter(isVehicleView) as VehicleView[], [displayedRows]);
 
   function toggleRow(id: string) {
     setSelected((s) => {
@@ -297,6 +311,22 @@ export function VehicleRegistry() {
         </section>
       ) : null}
 
+      <FleetReadinessTriagePanel
+        stationId={filters.stationId || null}
+        stationName={filters.stationId ? stationName(filters.stationId) : null}
+        activeLaneFilter={triageLane}
+        onFilterLane={(lane, ids) => {
+          setTriageLane(lane);
+          setTriageVehicleIds(ids);
+          if (lane !== null) {
+            update({ page: 1 }, false);
+          }
+        }}
+        onActionCommitted={() => {
+          setFilters((f) => ({ ...f }));
+        }}
+      />
+
       <Panel>
         <div className="stack">
           <div className="veh-toolbar-row">
@@ -395,6 +425,27 @@ export function VehicleRegistry() {
         </Panel>
       ) : rows.length === 0 ? (
         renderEmpty()
+      ) : displayedRows.length === 0 ? (
+        <Panel>
+          <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
+            <p style={{ fontWeight: 600, fontSize: '0.95rem' }}>
+              No vehicles on this page in the {triageLane?.toUpperCase()} lane.
+            </p>
+            <p className="text-muted" style={{ fontSize: '0.82rem', margin: '0.4rem 0 1rem' }}>
+              Try clearing the lane filter or selecting a different page.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setTriageLane(null);
+                setTriageVehicleIds(null);
+              }}
+            >
+              Clear lane filter
+            </Button>
+          </div>
+        </Panel>
       ) : filters.view === 'table' ? (
         <div className="table-wrap" aria-busy={loading || undefined}>
           <table>
@@ -424,7 +475,7 @@ export function VehicleRegistry() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((v) => {
+              {displayedRows.map((v) => {
                 const full = isVehicleView(v);
                 const id = v.id;
                 return (
@@ -488,7 +539,7 @@ export function VehicleRegistry() {
         </div>
       ) : (
         <div className="veh-cards" aria-busy={loading || undefined}>
-          {rows.map((v) => (
+          {displayedRows.map((v) => (
             <VehicleCard key={v.id} vehicle={v} href={`/vehicles/${v.id}`} />
           ))}
         </div>

@@ -175,44 +175,111 @@ export function TransferDrawer({
   const [busy, setBusy] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-  const [confirm, setConfirm] = useState<null | 'approve' | 'complete' | 'cancel'>(null);
+  const [confirm, setConfirm] = useState<null | 'grant_clearance' | 'grant_sanction' | 'handover' | 'complete' | 'cancel'>(null);
 
   const stationName = (id: string) => stations.find((s) => s.id === id)?.name ?? id;
-  const reviewable = canReviewTransfer(me, transfer, canReview);
+  const isLender = me.stationId === transfer.sourceStationId;
+  const isDest = me.stationId === transfer.destinationStationId;
+  const isAdminOrOrgAdmin = me.role === 'ADMIN' || me.role === 'ORG_ADMIN' || canReview;
   const mine = transfer.requestedBy === me.username;
+
+  const canClear = (transfer.status === 'PENDING_LENDER_REVIEW' || transfer.status === 'PENDING') && (isLender || me.role === 'ADMIN');
+  const canSanction = transfer.status === 'PENDING_DISTRICT_SANCTION' && (me.role === 'ADMIN' || me.role === 'ORG_ADMIN');
+  const canHandover = transfer.status === 'ALLOCATED' && (isLender || isAdminOrOrgAdmin);
+  const canComplete = (transfer.status === 'ACTIVE' || (transfer.status === 'ALLOCATED' && !canHandover)) && (isDest || isLender || isAdminOrOrgAdmin);
+  const canCancel = (mine || isAdminOrOrgAdmin) && ['PENDING', 'PENDING_LENDER_REVIEW', 'PENDING_DISTRICT_SANCTION', 'ALLOCATED'].includes(transfer.status);
 
   const steps = useMemo<TimelineStep[]>(() => {
     const s: TimelineStep[] = [
       { label: 'Requested', time: fmtDateTime(transfer.createdAt), state: 'done', detail: `by ${transfer.requestedBy}` },
     ];
-    if (transfer.status === 'REJECTED') {
-      s.push({ label: 'Rejected', time: transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null, state: 'rejected', detail: transfer.rejectionReason ?? undefined });
-    } else if (transfer.status === 'CANCELLED') {
-      s.push({ label: 'Cancelled', state: 'rejected' });
-    } else {
+
+    if (transfer.status === 'REJECTED_BY_LENDER') {
       s.push({
-        label: 'Allocated',
+        label: 'Station Clearance',
         time: transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null,
-        state: transfer.status === 'ALLOCATED' || transfer.status === 'COMPLETED' ? 'done' : 'active',
-        detail: transfer.reviewedBy ? `by ${transfer.reviewedBy}` : undefined,
+        state: 'rejected',
+        detail: transfer.rejectionReason ?? (transfer.reviewedBy ? `Rejected by ${transfer.reviewedBy}` : 'Rejected')
       });
-      s.push({
-        label: 'Completed',
-        time: transfer.completedAt ? fmtDateTime(transfer.completedAt) : null,
-        state: transfer.status === 'COMPLETED' ? 'done' : 'pending',
-      });
+      return s;
     }
+
+    if (transfer.status === 'CANCELLED') {
+      s.push({ label: 'Cancelled', state: 'rejected' });
+      return s;
+    }
+
+    if (transfer.status === 'REJECTED') {
+      s.push({
+        label: 'Rejected',
+        time: transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null,
+        state: 'rejected',
+        detail: transfer.rejectionReason ?? undefined
+      });
+      return s;
+    }
+
+    // Step 2: Station Clearance
+    const clearanceDone = ['PENDING_DISTRICT_SANCTION', 'ALLOCATED', 'ACTIVE', 'COMPLETED', 'REJECTED_BY_ADMIN'].includes(transfer.status);
+    const clearanceActive = transfer.status === 'PENDING_LENDER_REVIEW' || transfer.status === 'PENDING';
+    s.push({
+      label: 'Station Clearance',
+      time: clearanceDone && transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null,
+      state: clearanceDone ? 'done' : clearanceActive ? 'active' : 'pending',
+      detail: clearanceDone && transfer.reviewedBy ? `Granted by ${transfer.reviewedBy}` : undefined,
+    });
+
+    if (transfer.status === 'REJECTED_BY_ADMIN') {
+      s.push({
+        label: 'District Movement Sanction',
+        time: transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null,
+        state: 'rejected',
+        detail: transfer.rejectionReason ?? (transfer.reviewedBy ? `Rejected by ${transfer.reviewedBy}` : 'Rejected')
+      });
+      return s;
+    }
+
+    // Step 3: District Movement Sanction
+    const sanctionDone = ['ALLOCATED', 'ACTIVE', 'COMPLETED'].includes(transfer.status);
+    const sanctionActive = transfer.status === 'PENDING_DISTRICT_SANCTION';
+    s.push({
+      label: 'District Movement Sanction',
+      time: sanctionDone && transfer.reviewedAt ? fmtDateTime(transfer.reviewedAt) : null,
+      state: sanctionDone ? 'done' : sanctionActive ? 'active' : 'pending',
+      detail: sanctionDone && transfer.reviewedBy ? `Sanctioned by ${transfer.reviewedBy}` : undefined,
+    });
+
+    // Step 4: Handover (Depart)
+    const handoverDone = ['ACTIVE', 'COMPLETED'].includes(transfer.status);
+    const handoverActive = transfer.status === 'ALLOCATED';
+    s.push({
+      label: 'Handover & Transit',
+      state: handoverDone ? 'done' : handoverActive ? 'active' : 'pending',
+    });
+
+    // Step 5: Inbound Return & Complete
+    s.push({
+      label: 'Inbound Return & Complete',
+      time: transfer.completedAt ? fmtDateTime(transfer.completedAt) : null,
+      state: transfer.status === 'COMPLETED' ? 'done' : transfer.status === 'ACTIVE' ? 'active' : 'pending',
+      detail: transfer.completedBy ? `by ${transfer.completedBy}` : undefined,
+    });
+
     return s;
   }, [transfer]);
 
-  async function act(type: 'approve' | 'complete' | 'cancel') {
+  async function act(type: 'grant_clearance' | 'grant_sanction' | 'handover' | 'complete' | 'cancel') {
     setBusy(true);
     try {
       await api.post(`/api/cloud/transfers/${transfer.id}/actions`, { type });
-      toast(
-        type === 'approve' ? 'Transfer allocated' : type === 'complete' ? 'Transfer completed' : 'Transfer cancelled',
-        'success'
-      );
+      const messages: Record<string, string> = {
+        grant_clearance: 'Station clearance granted',
+        grant_sanction: 'District movement sanction issued',
+        handover: 'Transfer handed over & active in transit',
+        complete: 'Transfer completed & inventory returned',
+        cancel: 'Transfer cancelled',
+      };
+      toast(messages[type] ?? 'Action successful', 'success');
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
@@ -268,31 +335,64 @@ export function TransferDrawer({
           <Timeline steps={steps} />
         </div>
 
-        {transfer.status === 'PENDING' && reviewable && (
+        {canClear && (
           <div className="cluster">
-            <Button variant="primary" loading={busy} onClick={() => setConfirm('approve')}>Approve (allocate)</Button>
+            <Button variant="primary" loading={busy} onClick={() => setConfirm('grant_clearance')}>Grant Station Clearance</Button>
             <Button variant="danger" onClick={() => setRejectOpen(true)}>Reject</Button>
           </div>
         )}
-        {transfer.status === 'ALLOCATED' && reviewable && (
-          <Button variant="primary" loading={busy} onClick={() => setConfirm('complete')}>Mark completed</Button>
+        {canSanction && (
+          <div className="cluster">
+            <Button variant="primary" loading={busy} onClick={() => setConfirm('grant_sanction')}>Issue District Movement Sanction</Button>
+            <Button variant="danger" onClick={() => setRejectOpen(true)}>Reject</Button>
+          </div>
         )}
-        {transfer.status === 'PENDING' && mine && (
+        {canHandover && (
+          <Button variant="primary" loading={busy} onClick={() => setConfirm('handover')}>Confirm Handover (Depart)</Button>
+        )}
+        {canComplete && (
+          <Button variant="primary" loading={busy} onClick={() => setConfirm('complete')}>Inbound Return Inspection (Complete)</Button>
+        )}
+        {canCancel && (
           <Button variant="secondary" onClick={() => setConfirm('cancel')}>Cancel request</Button>
         )}
       </div>
 
       {confirm && (
         <ConfirmDialog
-          title={confirm === 'approve' ? 'Allocate vehicles?' : confirm === 'complete' ? 'Mark completed?' : 'Cancel request?'}
-          message={
-            confirm === 'approve'
-              ? 'This moves the requested counts from the source to the destination station.'
+          title={
+            confirm === 'grant_clearance'
+              ? 'Grant Station Clearance?'
+              : confirm === 'grant_sanction'
+              ? 'Issue District Movement Sanction?'
+              : confirm === 'handover'
+              ? 'Confirm Handover & Departure?'
               : confirm === 'complete'
-              ? 'This returns the allocated counts to the source station pool.'
+              ? 'Inbound Return Inspection & Completion?'
+              : 'Cancel request?'
+          }
+          message={
+            confirm === 'grant_clearance'
+              ? 'This certifies that the lending station has local reserve capacity and clears the requisition for SP Fleet Desk review.'
+              : confirm === 'grant_sanction'
+              ? 'This grants SP Fleet Desk district movement sanction and transfers vehicle allocation quotas.'
+              : confirm === 'handover'
+              ? 'This marks vehicles as physically dispatched and active in transit to the destination station.'
+              : confirm === 'complete'
+              ? 'This verifies inbound physical return and restores vehicle inventory to the lending station pool.'
               : 'This withdraws the transfer request.'
           }
-          confirmLabel={confirm === 'approve' ? 'Allocate' : confirm === 'complete' ? 'Complete' : 'Cancel request'}
+          confirmLabel={
+            confirm === 'grant_clearance'
+              ? 'Grant Clearance'
+              : confirm === 'grant_sanction'
+              ? 'Issue Sanction'
+              : confirm === 'handover'
+              ? 'Confirm Handover'
+              : confirm === 'complete'
+              ? 'Complete'
+              : 'Cancel request'
+          }
           tone={confirm === 'cancel' ? 'danger' : 'primary'}
           loading={busy}
           onConfirm={() => act(confirm)}

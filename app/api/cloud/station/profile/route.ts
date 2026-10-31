@@ -16,10 +16,23 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
   try {
     const { user } = auth;
-    if (!user.stationId) throw new DomainError('Your account is not attached to a police station.', 404);
+    const url = new URL(request.url);
+    const queryStationId = url.searchParams.get('stationId');
+
+    let targetStationId: string | null = user.stationId;
+    if (user.role === 'ADMIN') {
+      if (queryStationId) {
+        targetStationId = queryStationId;
+      } else if (!targetStationId) {
+        const first = await prisma.station.findFirst({ orderBy: { name: 'asc' }, select: { id: true } });
+        targetStationId = first?.id ?? null;
+      }
+    }
+
+    if (!targetStationId) throw new DomainError('Your account is not attached to a police station.', 404);
 
     const station = await prisma.station.findUnique({
-      where: { id: user.stationId },
+      where: { id: targetStationId },
       include: {
         inventory: true,
         _count: { select: { vehicles: true } }

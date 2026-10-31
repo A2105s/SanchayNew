@@ -254,7 +254,10 @@ export const transferInputSchema = z.object({
 
 export const transferActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('approve') }),
-  z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(1000) }),
+  z.object({ type: z.literal('grant_clearance') }),
+  z.object({ type: z.literal('grant_sanction') }),
+  z.object({ type: z.literal('handover') }),
+  z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(1000).optional() }),
   z.object({ type: z.literal('complete') }),
   z.object({ type: z.literal('cancel') })
 ]);

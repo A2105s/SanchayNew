@@ -23,6 +23,32 @@ function getStoredModule(): UiModule {
   return 'vehicles';
 }
 
+export function resolveModuleForPath(pathname?: string, fallbackCookie: UiModule = 'vehicles'): UiModule {
+  if (pathname) {
+    if (pathname === '/spaces' || pathname.startsWith('/spaces/')) {
+      return 'spaces';
+    }
+    if (
+      pathname.startsWith('/vehicles') ||
+      pathname.startsWith('/requests') ||
+      pathname.startsWith('/allocations') ||
+      pathname.startsWith('/operations') ||
+      pathname.startsWith('/stations') ||
+      pathname.startsWith('/station') ||
+      pathname.startsWith('/transfers') ||
+      pathname.startsWith('/compliance') ||
+      pathname.startsWith('/maintenance') ||
+      pathname.startsWith('/idle') ||
+      pathname.startsWith('/incidents') ||
+      pathname.startsWith('/iot')
+    ) {
+      return 'vehicles';
+    }
+  }
+
+  return fallbackCookie;
+}
+
 /**
  * Resolves the currently active module:
  * - If the URL path is explicitly within /spaces/*, returns 'spaces'.
@@ -40,29 +66,5 @@ export function useActiveModule(pathname?: string): UiModule {
     return () => window.removeEventListener('module-change', handler);
   }, []);
 
-  if (pathname) {
-    if (pathname === '/spaces' || pathname.startsWith('/spaces/')) {
-      return 'spaces';
-    }
-    if (
-      pathname === '/dashboard' ||
-      pathname.startsWith('/vehicles') ||
-      pathname.startsWith('/requests') ||
-      pathname.startsWith('/allocations') ||
-      pathname.startsWith('/operations') ||
-      pathname.startsWith('/stations') ||
-      pathname.startsWith('/station') ||
-      pathname.startsWith('/transfers') ||
-      pathname.startsWith('/compliance') ||
-      pathname.startsWith('/maintenance') ||
-      pathname.startsWith('/idle') ||
-      pathname.startsWith('/incidents') ||
-      pathname.startsWith('/iot') ||
-      pathname.startsWith('/reports')
-    ) {
-      return 'vehicles';
-    }
-  }
-
-  return cookieModule;
+  return resolveModuleForPath(pathname, cookieModule);
 }

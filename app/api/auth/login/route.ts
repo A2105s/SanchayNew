@@ -165,6 +165,40 @@ async function authenticate(username: string, password: string): Promise<AuthOut
     };
   }
 
+  // Support Civic Spaces authentication (spaces.admin, spaces, dept.spaces, etc.)
+  if (username === 'spaces' || username === 'spaces.admin' || username === 'dept.spaces' || username === 'spaces.officer' || username === 'spaces.pwd') {
+    const demoPass = 'Sanchay@Demo1';
+    const validDemo = timingSafeEqualString(password, demoPass);
+    const adminPass = getAdminPassword();
+    const validAdmin = adminPass ? timingSafeEqualString(password, adminPass) : false;
+
+    if (validDemo || validAdmin) {
+      const gmcOrg = await prisma.organization.findFirst({
+        where: { OR: [{ code: 'GWL-GMC' }, { code: 'GWL-DISTRICT' }] }
+      }).catch(() => null);
+      const pwdOrg = await prisma.organization.findFirst({
+        where: { code: 'GWL-PWD' }
+      }).catch(() => null);
+
+      const isDept = username === 'dept.spaces' || username === 'spaces.officer' || username === 'spaces.pwd';
+      const isPwd = username === 'spaces.pwd';
+      return {
+        source: 'operator',
+        input: {
+          username,
+          displayName: isPwd
+            ? 'PWD Executive Engineer (Civic Auditoriums & Halls)'
+            : isDept
+              ? 'Estate Officer, Civic Spaces (Nagar Nigam Gwalior)'
+              : 'Civic Spaces Administrator (Gwalior Nagar Nigam & PWD)',
+          role: isDept ? ('DEPT_OFFICER' as Role) : ('ORG_ADMIN' as Role),
+          organizationId: isPwd ? pwdOrg?.id ?? null : gmcOrg?.id ?? null,
+          stationId: null
+        }
+      };
+    }
+  }
+
   // Support police station authentication for any station in the directory
   if (username.startsWith('station.') || username.startsWith('ps.')) {
     const slug = username.replace(/^(station|ps)\./i, '').toLowerCase();

@@ -1,5 +1,5 @@
 import { PrismaClient } from '@prisma/client';
-import { seedDemoData, DEMO_PASSWORD, DEMO_OPERATORS } from '@/lib/seed/gwalior';
+import { seedDemoData, seedSpacesData, DEMO_PASSWORD, DEMO_OPERATORS } from '@/lib/seed/gwalior';
 
 /**
  * CLI seed runner (tsx prisma/seed.ts). Loads the deterministic Gwalior demo fleet.
@@ -16,8 +16,10 @@ async function main() {
   try {
     const existing = await prisma.vehicle.count();
     if (existing > 0 && !force) {
-      console.error(`Database already has ${existing} vehicles. Re-run with --force to seed anyway (this does NOT wipe existing rows).`);
-      process.exit(1);
+      console.log(`Database already has ${existing} vehicles. Running idempotent spaces seed...`);
+      const spacesCount = await seedSpacesData(prisma);
+      console.log(`Successfully upserted ${spacesCount} verified Gwalior civic spaces.`);
+      return;
     }
 
     console.log('Seeding Gwalior demo fleet...');

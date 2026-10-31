@@ -12,12 +12,16 @@ import STATIONS_DATA from '@/lib/data/gwalior-police-stations.json';
 import DEPARTMENTS_DATA from '@/lib/data/gwalior-departments.json';
 import FLEET_BLUEPRINTS from '@/lib/data/gwalior-fleet-blueprints.json';
 import LEGAL_CASES_DATA from '@/lib/data/gwalior-legal-cases.json';
+import SPACES_DATA from '@/lib/data/gwalior-spaces.json';
 
 export const DEMO_PASSWORD = 'Sanchay@Demo1';
 
 export const DEMO_OPERATORS: Array<{ username: string; displayName: string; role: Role; orgCode: string | null; stationCode: string | null; phone?: string }> = [
   { username: 'admin', displayName: 'Platform Administrator', role: 'ADMIN', orgCode: null, stationCode: null },
   { username: 'dm.gwalior', displayName: 'District Magistrate, Gwalior (IAS) — approving authority', role: 'ADMIN', orgCode: 'GWL-DISTRICT', stationCode: null },
+  { username: 'spaces.admin', displayName: 'Civic Spaces Administrator (Gwalior Nagar Nigam & PWD)', role: 'ORG_ADMIN', orgCode: 'GWL-GMC', stationCode: null, phone: '+91 75124 38000' },
+  { username: 'dept.spaces', displayName: 'Estate Officer, Civic Spaces (Nagar Nigam Gwalior)', role: 'DEPT_OFFICER', orgCode: 'GWL-GMC', stationCode: null, phone: '+91 75124 38012' },
+  { username: 'spaces.pwd', displayName: 'PWD Executive Engineer (Civic Auditoriums & Halls)', role: 'DEPT_OFFICER', orgCode: 'GWL-PWD', stationCode: null, phone: '+91 75124 45350' },
   { username: 'org.police', displayName: 'SP Gwalior Fleet Desk (Dharamveer Singh, IPS)', role: 'ORG_ADMIN', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10800' },
   { username: 'dept.officer', displayName: 'ASP City Fleet Control (Akhilesh Rainwal)', role: 'DEPT_OFFICER', orgCode: 'GWL-POLICE', stationCode: null, phone: '+91 70491 10801' },
   { username: 'dept.health', displayName: 'CMHO Health Fleet Officer (Dr. Sachin Srivastava)', role: 'DEPT_OFFICER', orgCode: 'GWL-HEALTH', stationCode: null, phone: '+91 75123 68444' },
@@ -144,6 +148,7 @@ export interface SeedResult {
   allocations: number;
   notifications: number;
   documents: number;
+  spaces: number;
 }
 
 export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
@@ -571,6 +576,8 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     reason: 'Gwalior demo fleet seeded'
   });
 
+  const spacesCount = await seedSpacesData(prisma);
+
   return {
     organizations: 6,
     stations: STATIONS.length,
@@ -584,8 +591,73 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
     requests: seedResult.requests,
     allocations: seedResult.allocations,
     notifications: seedResult.notifications,
-    documents: documentCount
+    documents: documentCount,
+    spaces: spacesCount
   };
+}
+
+export async function seedSpacesData(prisma: PrismaClient): Promise<number> {
+  const orgs = await prisma.organization.findMany({ select: { id: true, code: true } });
+  const orgByCode = new Map(orgs.map((o) => [o.code, o.id]));
+
+  let count = 0;
+  for (const sp of SPACES_DATA) {
+    const orgId = orgByCode.get(sp.orgCode);
+    if (!orgId) continue;
+    await prisma.space.upsert({
+      where: { assetCode: sp.assetCode },
+      update: {
+        name: sp.name,
+        category: sp.category,
+        organizationId: orgId,
+        buildingOrCampus: sp.buildingOrCampus,
+        addressLine: sp.addressLine,
+        district: sp.district,
+        city: sp.city ?? 'Gwalior',
+        lat: sp.lat,
+        lng: sp.lng,
+        capacity: sp.capacity,
+        areaSqft: sp.areaSqft,
+        operationalState: sp.operationalState,
+        description: sp.description,
+        contactOfficerName: sp.contactOfficerName,
+        contactPhone: sp.contactPhone,
+        amenities: sp.amenities,
+        accessibility: sp.accessibility,
+        operatingHours: sp.operatingHours,
+        minBookingHours: sp.minBookingHours,
+        maxBookingHours: sp.maxBookingHours,
+        bookingLeadDays: sp.bookingLeadDays
+      },
+      create: {
+        assetCode: sp.assetCode,
+        name: sp.name,
+        category: sp.category,
+        organizationId: orgId,
+        buildingOrCampus: sp.buildingOrCampus,
+        addressLine: sp.addressLine,
+        district: sp.district,
+        city: sp.city ?? 'Gwalior',
+        lat: sp.lat,
+        lng: sp.lng,
+        capacity: sp.capacity,
+        areaSqft: sp.areaSqft,
+        operationalState: sp.operationalState,
+        description: sp.description,
+        contactOfficerName: sp.contactOfficerName,
+        contactPhone: sp.contactPhone,
+        amenities: sp.amenities,
+        accessibility: sp.accessibility,
+        operatingHours: sp.operatingHours,
+        minBookingHours: sp.minBookingHours,
+        maxBookingHours: sp.maxBookingHours,
+        bookingLeadDays: sp.bookingLeadDays,
+        createdBy: 'seed'
+      }
+    });
+    count += 1;
+  }
+  return count;
 }
 
 // ---------------------------------------------------------------------------

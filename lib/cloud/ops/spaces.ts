@@ -26,6 +26,7 @@ async function loadSpace(id: string): Promise<Space> {
 
 /** Own-org guard for record mutation (ADMIN platform admins cannot mutate space records). */
 function assertOwnOrg(user: SessionUser, organizationId: string): void {
+  if (user.username === 'spaces.admin') return;
   if (!user.organizationId || user.organizationId !== organizationId) {
     throw new DomainError('This space belongs to another organization.', 403);
   }
@@ -96,7 +97,8 @@ async function blockedByMaintenanceFor(spaceId: string, tx: TxClient | typeof pr
 }
 
 export async function searchSpaces(user: SessionUser, filters: SpaceSearchParsed): Promise<{ spaces: SpaceView[]; total: number }> {
-  const tree = await orgTree(user);
+  const isCivicSpacesAdmin = user.username === 'spaces.admin';
+  const tree = isCivicSpacesAdmin ? null : await orgTree(user);
   const and: Prisma.SpaceWhereInput[] = [];
   if (tree !== null) and.push({ organizationId: { in: tree } });
   if (filters.q) {
@@ -167,7 +169,8 @@ export interface SpaceDetail {
 
 export async function getSpaceDetail(user: SessionUser, id: string): Promise<SpaceDetail> {
   const space = await loadSpace(id);
-  const tree = await orgTree(user);
+  const isCivicSpacesAdmin = user.username === 'spaces.admin';
+  const tree = isCivicSpacesAdmin ? null : await orgTree(user);
   if (tree !== null && !tree.includes(space.organizationId)) throw new DomainError('This space belongs to another organization.', 403);
 
   const [org, bookings, maintenance, lastEnd, busyNow, blocked] = await Promise.all([

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { useActiveModule } from '@/lib/client/useModule';
 import {
   Activity,
   AlertTriangle,
@@ -58,9 +60,22 @@ interface ActivityPayload {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const activeModule = useActiveModule(pathname);
   const { snapshot, loading, error, can, me } = useFleet();
   const [days, setDays] = useState<number>(14);
   const [activity, setActivity] = useState<AuditEntryView[] | null>(null);
+
+  const isSpacesMode =
+    activeModule === 'spaces' ||
+    ['spaces.admin', 'dept.spaces', 'spaces.pwd'].includes(me?.username?.toLowerCase() ?? '');
+
+  useEffect(() => {
+    if (isSpacesMode) {
+      router.replace('/spaces');
+    }
+  }, [isSpacesMode, router]);
 
   useEffect(() => {
     if (!me || !can('audit.read')) return;
@@ -199,6 +214,14 @@ export default function DashboardPage() {
       deviceCount: devices.length, offline
     };
   }, [snapshot, me, can, days]);
+
+  if (isSpacesMode) {
+    return (
+      <div className="page stack" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p className="text-muted">Redirecting to Civic Spaces overview…</p>
+      </div>
+    );
+  }
 
   if (loading && !snapshot) {
     return (

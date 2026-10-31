@@ -249,3 +249,86 @@ export interface ExtractResponse extends AiMeta {
   confidence: Partial<Record<keyof ExtractedFields, 'high' | 'medium' | 'low'>>;
   notes: string;
 }
+
+// ---- Fleet Readiness Triage ----
+export interface FleetTriageAction {
+  id: string;
+  type: 'COMPLIANCE_RENEWAL' | 'FUEL_ROUTING' | 'MAINTENANCE_SCHEDULE' | 'STATION_TRANSFER' | 'INSPECTION';
+  vehicleId: string;
+  vehicleLabel: string;
+  assetCode: string;
+  stationName?: string;
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  impact: string;
+  /** Action metadata for 1-click execution */
+  actionPayload?: Record<string, unknown>;
+  actionUrl?: string;
+}
+
+export interface FleetReadinessLane {
+  count: number;
+  vehicleIds: string[];
+  description: string;
+}
+
+export interface FleetReadinessResponse extends AiMeta {
+  summary: string;
+  lanes: {
+    ready: FleetReadinessLane;
+    attention: FleetReadinessLane;
+    grounded: FleetReadinessLane;
+  };
+  actions: FleetTriageAction[];
+  stationId: string | null;
+  stationName: string | null;
+  totalVehicles: number;
+  generatedAt: string;
+}
+
+// ---- Auto-Dispatch ----
+export interface AutoDispatchCandidate {
+  vehicleId: string;
+  assetCode: string;
+  registrationNumber: string;
+  displayName: string;
+  vehicleClass: string;
+  suitabilityScore: number;
+  suitabilityReason: string;
+  fuelPercent?: number | null;
+  assignedDriver?: {
+    name: string;
+    phone?: string | null;
+  } | null;
+  stationName: string;
+  complianceStatus: 'OK' | 'EXPIRING' | 'EXPIRED';
+  readinessState: 'READY' | 'ATTENTION' | 'GROUNDED';
+}
+
+export interface AutoDispatchResponse extends AiMeta {
+  missionIntent: string;
+  parsedRequirements: {
+    purpose: string;
+    classNeeded: 'PATROL_CAR' | 'MOTORCYCLE' | 'VAN' | 'HEAVY';
+    passengerCount: number;
+    destination?: string | null;
+    urgency?: 'ROUTINE' | 'URGENT' | 'EMERGENCY';
+  };
+  recommendations: AutoDispatchCandidate[];
+  suggestedAction?: {
+    vehicleId: string;
+    driverName?: string;
+    actionLabel: string;
+    dispatchPayload: {
+      vehicleId: string;
+      purpose: string;
+      startAt: string;
+      endAt?: string | null;
+      passengers: number;
+    };
+  } | null;
+  warnings: string[];
+  generatedAt: string;
+}
+

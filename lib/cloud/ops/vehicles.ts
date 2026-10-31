@@ -527,6 +527,10 @@ export async function logFuel(user: SessionUser, id: string, args: { liters: num
   const current = await loadOwnVehicle(user, id);
   const result = await prisma.$transaction(async (tx) => {
     const fuel = await tx.fuelLog.create({ data: { vehicleId: id, liters: args.liters, costInr: args.costInr ?? null, odometerKm: args.odometerKm ?? null, source: 'MANUAL', loggedBy: user.username } });
+    const currentFuel = current.fuelPercent ?? 25;
+    const addedPct = Math.round((args.liters / 45) * 100);
+    const newFuelPercent = Math.min(100, Math.max(85, Math.round(currentFuel + addedPct)));
+    await tx.vehicle.update({ where: { id }, data: { fuelPercent: newFuelPercent } });
     await writeAudit(tx, { entityType: 'FuelLog', entityId: fuel.id, action: 'FuelLogged', newValue: `${args.liters} L`, performedBy: user.username, performedByRole: user.role, organizationId: current.organizationId, correlationId });
     return fuel;
   });

@@ -83,7 +83,18 @@ function validateWindow(startAt: Date, endAt: Date, settings: FleetSettings, now
 // ---------------------------------------------------------------------------
 
 export async function createRequest(user: SessionUser, input: RequestInputParsed, idempotencyKey: string | null, correlationId: string): Promise<AssetRequestView> {
-  if (!user.organizationId) throw new DomainError('You must belong to an organization to raise a request.', 403);
+  let effectiveOrgId = user.organizationId;
+  if (!effectiveOrgId && user.role === 'ADMIN') {
+    if (input.vehicleId) {
+      const v = await prisma.vehicle.findUnique({ where: { id: input.vehicleId }, select: { organizationId: true } });
+      effectiveOrgId = v?.organizationId ?? null;
+    }
+    if (!effectiveOrgId) {
+      const firstOrg = await prisma.organization.findFirst({ select: { id: true } });
+      effectiveOrgId = firstOrg?.id ?? null;
+    }
+  }
+  if (!effectiveOrgId) throw new DomainError('You must belong to an organization to raise a request.', 403);
   const now = new Date();
   const settings = await loadSettings();
   const startAt = new Date(input.startAt);
@@ -116,7 +127,7 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
     }
     approverOrgId = vehicle.organizationId;
   } else {
-    approverOrgId = user.organizationId;
+    approverOrgId = effectiveOrgId;
   }
 
   const submit = input.submit === true;
@@ -126,7 +137,7 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
     const created = await tx.assetRequest.create({
       data: {
         requestCode,
-        requestingOrgId: user.organizationId as string,
+        requestingOrgId: effectiveOrgId as string,
         requesterUsername: user.username,
         requesterName: user.displayName,
         vehicleId: input.vehicleId ?? null,

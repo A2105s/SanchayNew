@@ -93,4 +93,45 @@ describe('Genuine Gwalior Government Data Integrity', () => {
     assert.equal(json.data.role, 'STATION_OFFICER');
     assert.ok(json.data.stationId);
   });
+
+  it('allows spaces module sign-in for spaces.admin and dept.spaces with demo password', async () => {
+    const { POST: login } = await import('../app/api/auth/login/route');
+    
+    // Test spaces.admin
+    const reqAdmin = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'spaces.admin', password: 'Sanchay@Demo1' })
+    });
+    const resAdmin = await login(reqAdmin);
+    const jsonAdmin = await resAdmin.json();
+    assert.equal(resAdmin.status, 200);
+    assert.ok(jsonAdmin.success);
+    assert.equal(jsonAdmin.data.role, 'ORG_ADMIN');
+    assert.ok(jsonAdmin.data.displayName.includes('Civic Spaces Administrator'));
+
+    // Test dept.spaces
+    const reqDept = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'dept.spaces', password: 'Sanchay@Demo1' })
+    });
+    const resDept = await login(reqDept);
+    const jsonDept = await resDept.json();
+    assert.equal(resDept.status, 200);
+    assert.ok(jsonDept.success);
+    assert.equal(jsonDept.data.role, 'DEPT_OFFICER');
+    // Test spaces.pwd
+    const reqPwd = new Request('http://localhost:3000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'spaces.pwd', password: 'Sanchay@Demo1' })
+    });
+    const resPwd = await login(reqPwd);
+    const jsonPwd = await resPwd.json();
+    assert.equal(resPwd.status, 200);
+    assert.ok(jsonPwd.success);
+    assert.equal(jsonPwd.data.role, 'DEPT_OFFICER');
+    assert.ok(jsonPwd.data.displayName.includes('PWD Executive Engineer'));
+  });
 });

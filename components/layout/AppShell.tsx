@@ -11,7 +11,7 @@ import { NotificationBell } from '@/components/layout/NotificationBell';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { AiCopilotModal } from '@/components/ai/AiCopilotModal';
 import { useFleet } from '@/components/providers/FleetProvider';
-import { useActiveModule } from '@/lib/client/useModule';
+import { useActiveModule, setModuleCookie } from '@/lib/client/useModule';
 import {
   CloudStatusPopover,
   type CloudBadgeView,
@@ -291,6 +291,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <strong>{headerBrand.strong}</strong><span>{headerBrand.rest}</span>
                 </div>
               </Link>
+            </div>
+            <div className="module-toggle-pill" role="tablist" aria-label="Active module">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeModule === 'vehicles'}
+                className={`module-pill-btn ${activeModule === 'vehicles' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setModuleCookie('vehicles');
+                  router.push('/dashboard');
+                }}
+              >
+                Fleet
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeModule === 'spaces'}
+                className={`module-pill-btn ${activeModule === 'spaces' ? 'is-active' : ''}`}
+                onClick={() => {
+                  setModuleCookie('spaces');
+                  router.push('/spaces');
+                }}
+              >
+                Spaces
+              </button>
             </div>
           </div>
           <div className="top-nav__actions">

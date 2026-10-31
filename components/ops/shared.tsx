@@ -168,15 +168,21 @@ export const CHART_COLORS = {
 };
 
 /** Tone for a station-pool transfer status badge. */
-export function transferStatusTone(s: TransferView['status']): 'info' | 'brand' | 'success' | 'danger' | 'neutral' {
+export function transferStatusTone(s: TransferView['status']): 'info' | 'brand' | 'success' | 'danger' | 'warning' | 'neutral' {
   switch (s) {
     case 'PENDING':
+    case 'PENDING_LENDER_REVIEW':
       return 'info';
+    case 'PENDING_DISTRICT_SANCTION':
+      return 'warning';
     case 'ALLOCATED':
       return 'brand';
+    case 'ACTIVE':
     case 'COMPLETED':
       return 'success';
     case 'REJECTED':
+    case 'REJECTED_BY_LENDER':
+    case 'REJECTED_BY_ADMIN':
       return 'danger';
     default:
       return 'neutral';
@@ -184,14 +190,22 @@ export function transferStatusTone(s: TransferView['status']): 'info' | 'brand' 
 }
 
 /**
- * UI affordance only (server is authoritative): may this user review (approve/reject) the transfer?
- * Source-station officers review their own station's pool; department officers / org admins review any in scope.
+ * UI affordance only (server is authoritative): may this user review (clearance/sanction/complete) the transfer?
  */
 export function canReviewTransfer(me: SessionUser, t: TransferView, hasReviewPermission: boolean): boolean {
   if (!hasReviewPermission) return false;
-  if (t.status !== 'PENDING') return false;
-  if (me.role === 'STATION_OFFICER') return me.stationId === t.sourceStationId;
-  return true;
+  if (t.status === 'PENDING' || t.status === 'PENDING_LENDER_REVIEW') {
+    if (me.role === 'STATION_OFFICER') return me.stationId === t.sourceStationId;
+    return me.role === 'ADMIN';
+  }
+  if (t.status === 'PENDING_DISTRICT_SANCTION') {
+    return me.role === 'ADMIN' || me.role === 'ORG_ADMIN';
+  }
+  if (t.status === 'ALLOCATED' || t.status === 'ACTIVE') {
+    if (me.role === 'STATION_OFFICER') return me.stationId === t.sourceStationId || me.stationId === t.destinationStationId;
+    return me.role === 'ADMIN' || me.role === 'ORG_ADMIN';
+  }
+  return false;
 }
 
 /** Organization ids visible to the user: own organization plus all descendants (platform admin: everything). */
@@ -342,8 +356,16 @@ export function renderReportCell(
         return <Badge tone="success">Approved</Badge>;
       case 'ALLOCATED':
         return <Badge tone="brand">Allocated</Badge>;
+      case 'PENDING_LENDER_REVIEW':
+        return <Badge tone="info">Pending clearance</Badge>;
+      case 'PENDING_DISTRICT_SANCTION':
+        return <Badge tone="warning">Pending sanction</Badge>;
       case 'REJECTED':
         return <Badge tone="danger">Rejected</Badge>;
+      case 'REJECTED_BY_LENDER':
+        return <Badge tone="danger">Rejected by lender</Badge>;
+      case 'REJECTED_BY_ADMIN':
+        return <Badge tone="danger">Rejected by admin</Badge>;
       case 'COMPLETED':
         return <Badge tone="success">Completed</Badge>;
       case 'CANCELLED':

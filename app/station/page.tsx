@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { LogOut, MapPin, Phone, ShieldCheck, Car, Bike, Truck, Bus, ArrowLeft } from 'lucide-react';
 import { useFleet } from '@/lib/client/useFleet';
@@ -9,9 +10,11 @@ import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { KpiCard } from '@/components/analytics/AnalyticsKit';
+import { FleetReadinessTriagePanel } from '@/components/ai/FleetReadinessTriagePanel';
 
 interface StationProfile {
   station: {
@@ -31,22 +34,35 @@ interface StationProfile {
 }
 
 export default function StationProfilePage() {
-  const { me } = useFleet();
+  const { me, snapshot, refresh } = useFleet();
   const { toast } = useToast();
-  const { data, loading, error } = useApiResource<StationProfile>(me?.stationId ? '/api/cloud/station/profile' : null);
+  const stations = snapshot?.stations ?? [];
+  const isAdmin = me?.role === 'ADMIN';
+
+  const [selectedStationId, setSelectedStationId] = useState<string>('');
+
+  // Default selected station for admin
+  useEffect(() => {
+    if (isAdmin && stations.length > 0 && !selectedStationId) {
+      setSelectedStationId(stations[0].id);
+    }
+  }, [isAdmin, stations, selectedStationId]);
+
+  const effectiveStationId = isAdmin ? (selectedStationId || (stations[0]?.id ?? null)) : (me?.stationId || null);
+  const resourceUrl = effectiveStationId ? `/api/cloud/station/profile?stationId=${effectiveStationId}` : null;
+  const { data, loading, error, refetch } = useApiResource<StationProfile>(resourceUrl);
 
   async function logout() {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
     } finally {
       toast('Signed out', 'success');
-      // full reload clears all client fleet state
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = '/login';
     }
   }
 
-  if (!me?.stationId) {
+  if (!isAdmin && !me?.stationId) {
     return (
       <div className="page">
         <PageTitle title="My station" />
@@ -60,15 +76,50 @@ export default function StationProfilePage() {
   }
 
   const inv = data?.inventory;
+  const stationOptions = stations.map((s) => ({
+    value: s.id,
+    label: `${s.name} (${s.zone} Zone)`
+  }));
 
   return (
     <div className="page stack">
       <PageTitle
-        title={data?.station.name ?? 'My station'}
-        description={data ? `${data.station.code} · ${data.station.zone} zone · ${data.station.district}` : 'Station profile'}
+        title={data?.station.name ?? (isAdmin ? 'Police Station Command' : 'My station')}
+        description={
+          data
+            ? `${data.station.code} · ${data.station.zone} zone · ${data.station.district}`
+            : isAdmin
+            ? 'Administrator Police Station Inspection & Operational Command'
+            : 'Station profile'
+        }
+        action={
+          isAdmin && stationOptions.length > 0 ? (
+            <div style={{ minWidth: 280 }}>
+              <Select
+                value={selectedStationId || (stations[0]?.id ?? '')}
+                onChange={(id) => setSelectedStationId(id)}
+                options={stationOptions}
+                placeholder="Select Police Station..."
+                ariaLabel="Select police station"
+              />
+            </div>
+          ) : undefined
+        }
       />
 
-      {loading ? <Skeleton height={120} /> : error ? (
+      {/* AI Readiness & Autonomous Mission Dispatch Intelligence */}
+      <FleetReadinessTriagePanel
+        stationId={effectiveStationId}
+        stationName={data?.station.name ?? null}
+        onActionCommitted={() => {
+          refetch();
+          void refresh();
+        }}
+      />
+
+      {loading || (!data && !error && isAdmin) ? (
+        <Skeleton height={120} />
+      ) : error ? (
         <EmptyState title={`Could not load the station profile: ${error}`} />
       ) : data ? (
         <>
@@ -120,8 +171,12 @@ export default function StationProfilePage() {
                 </li>
               </ul>
               <div className="cluster" style={{ marginTop: '0.6rem' }}>
-                <Badge tone="info"><ShieldCheck size={12} aria-hidden="true" /> Scoped access</Badge>
-                <span className="text-muted" style={{ fontSize: '0.8rem' }}>You only see this station&apos;s fleet and requests.</span>
+                <Badge tone="info"><ShieldCheck size={12} aria-hidden="true" /> {isAdmin ? 'District Administrator Command' : 'Scoped access'}</Badge>
+                <span className="text-muted" style={{ fontSize: '0.8rem' }}>
+                  {isAdmin
+                    ? 'Inspecting station fleet and audit trails across Gwalior district.'
+                    : 'You only see this station&apos;s fleet and requests.'}
+                </span>
               </div>
             </Panel>
           </div>
@@ -148,8 +203,8 @@ export default function StationProfilePage() {
           <Panel title="Session">
             <div className="cluster" style={{ justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <div>
-                <strong>{me.displayName}</strong>
-                <div className="text-muted" style={{ fontSize: '0.85rem' }}>Signed in as {me.username} · {me.role.replaceAll('_', ' ')}</div>
+                <strong>{me?.displayName}</strong>
+                <div className="text-muted" style={{ fontSize: '0.85rem' }}>Signed in as {me?.username} · {me?.role.replaceAll('_', ' ')}</div>
               </div>
               <Button variant="secondary" icon={<LogOut size={14} />} onClick={logout}>Log out</Button>
             </div>

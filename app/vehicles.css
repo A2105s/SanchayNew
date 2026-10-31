@@ -637,6 +637,12 @@
 }
 .veh-map-ctrl-btn:hover { border-color: var(--color-brand); color: var(--color-brand); }
 .veh-map-ctrl-btn:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.veh-map-ctrl-btn--active {
+  border-color: var(--color-brand) !important;
+  color: var(--color-brand) !important;
+  background: var(--color-brand-subtle) !important;
+  box-shadow: 0 0 0 1px var(--color-brand) !important;
+}
 
 .veh-map-legend {
   position: absolute;

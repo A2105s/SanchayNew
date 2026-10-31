@@ -14,7 +14,8 @@ function originOf(value: string | undefined, fallback: string): string {
 const MAP_ORIGINS = [
   originOf(process.env.NEXT_PUBLIC_MAP_STYLE_LIGHT, 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json'),
   originOf(process.env.NEXT_PUBLIC_MAP_STYLE_DARK, 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'),
-  'https://*.basemaps.cartocdn.com'
+  'https://*.basemaps.cartocdn.com',
+  'https://*.arcgisonline.com'
 ]
   .filter((origin, index, all) => all.indexOf(origin) === index)
   .join(' ');

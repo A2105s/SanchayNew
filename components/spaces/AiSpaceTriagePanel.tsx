@@ -42,7 +42,8 @@ export function AiSpaceTriagePanel({ bookingId, onApply }: Props) {
   if (!status.ready || !status.enabled || !status.anyConfigured) return null;
 
   return (
-    <div style={{ marginTop: 8, padding: '12px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+    <div className="ai-pulse-card-wrap" style={{ marginTop: 8 }}>
+      <div className="ai-pulse-card-inner" style={{ padding: '14px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ShieldCheck size={16} color="var(--color-brand)" />
@@ -108,7 +109,7 @@ export function AiSpaceTriagePanel({ bookingId, onApply }: Props) {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
-

@@ -7,7 +7,9 @@ import {
   ChevronRight,
   Crosshair,
   Layers,
+  Map as MapIcon,
   Maximize2,
+  Satellite,
   Minimize2,
   Radio,
   X,
@@ -77,6 +79,10 @@ export function LiveMap() {
   const [showStations, setShowStations] = useState(true);
   const [showTrail, setShowTrail] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
+  const [isSatellite, setIsSatellite] = useState(false);
+  const isSatelliteRef = useRef(false);
+  isSatelliteRef.current = isSatellite;
+  const layersPopRef = useRef<HTMLDivElement>(null);
 
   const liveVehicles = fleet.liveVehicles;
   const stations = fleet.snapshot?.stations ?? [];
@@ -202,6 +208,45 @@ export function LiveMap() {
               'line-dasharray': [2, 2],
             },
           });
+
+          // 3. High-Resolution Satellite Basemap Layer (ESRI World Imagery)
+          if (!map.getSource('satellite-source')) {
+            map.addSource('satellite-source', {
+              type: 'raster',
+              tiles: [
+                'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+              ],
+              tileSize: 256,
+              maxzoom: 19,
+            });
+          }
+
+          if (!map.getLayer('satellite-layer')) {
+            const styleLayers = map.getStyle().layers || [];
+            let beforeId: string | undefined = undefined;
+            for (const l of styleLayers) {
+              if (l.type === 'symbol') {
+                beforeId = l.id;
+                break;
+              }
+            }
+
+            map.addLayer(
+              {
+                id: 'satellite-layer',
+                type: 'raster',
+                source: 'satellite-source',
+                layout: {
+                  visibility: isSatelliteRef.current ? 'visible' : 'none',
+                },
+                paint: {
+                  'raster-opacity': 1,
+                  'raster-fade-duration': 300,
+                },
+              },
+              beforeId
+            );
+          }
 
           readyRef.current = true;
           setMapReady(true);
@@ -499,6 +544,27 @@ export function LiveMap() {
     });
   }, []);
 
+  // Sync satellite layer visibility with state
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !readyRef.current) return;
+    if (map.getLayer('satellite-layer')) {
+      map.setLayoutProperty('satellite-layer', 'visibility', isSatellite ? 'visible' : 'none');
+    }
+  }, [isSatellite, mapReady]);
+
+  // Dismiss layers popover on outside click
+  useEffect(() => {
+    if (!layersOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (layersPopRef.current && !layersPopRef.current.contains(e.target as Node)) {
+        setLayersOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [layersOpen]);
+
   if (failed) {
     return (
       <div className="veh-map-page">
@@ -650,26 +716,103 @@ export function LiveMap() {
 
       {/* Controls */}
       <div className="veh-map-controls">
-        <button className="veh-map-ctrl-btn" onClick={() => setFullscreen((v) => !v)} aria-label="Toggle fullscreen">
+        <button className="veh-map-ctrl-btn" onClick={() => setFullscreen((v) => !v)} aria-label="Toggle fullscreen" title={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
           {fullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
         </button>
-        <button className="veh-map-ctrl-btn" onClick={locateMe} aria-label="Locate me">
+        <button className="veh-map-ctrl-btn" onClick={locateMe} aria-label="Locate me" title="Locate my position">
           <Crosshair size={18} />
         </button>
-        <div style={{ position: 'relative' }}>
-          <button className="veh-map-ctrl-btn" onClick={() => setLayersOpen((v) => !v)} aria-label="Layers" aria-expanded={layersOpen}>
+        <button
+          className={`veh-map-ctrl-btn${isSatellite ? ' veh-map-ctrl-btn--active' : ''}`}
+          onClick={() => setIsSatellite((v) => !v)}
+          aria-label="Toggle satellite view"
+          title={isSatellite ? 'Switch to standard map view' : 'Switch to satellite imagery view'}
+        >
+          {isSatellite ? <MapIcon size={18} /> : <Satellite size={18} />}
+        </button>
+        <div style={{ position: 'relative' }} ref={layersPopRef}>
+          <button className={`veh-map-ctrl-btn${layersOpen ? ' veh-map-ctrl-btn--active' : ''}`} onClick={() => setLayersOpen((v) => !v)} aria-label="Layers" aria-expanded={layersOpen} title="Map layers & view modes">
             <Layers size={18} />
           </button>
           {layersOpen ? (
-            <div className="veh-actions-pop" style={{ right: 0, bottom: 'calc(100% + 4px)', top: 'auto' }}>
-              <label className="cluster" style={{ gap: '0.5rem', padding: '0.4rem 0.6rem' }}>
-                <input type="checkbox" checked={showVehicles} onChange={(e) => setShowVehicles(e.target.checked)} /> Vehicles
+            <div
+              className="veh-actions-pop"
+              style={{
+                right: 0,
+                bottom: 'calc(100% + 6px)',
+                top: 'auto',
+                minWidth: 230,
+                padding: '0.6rem',
+                borderRadius: '10px',
+                boxShadow: '0 12px 32px rgba(15, 23, 42, 0.18)',
+              }}
+            >
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '6px', padding: '0 2px' }}>
+                Base Map View
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsSatellite(false)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '8px 4px',
+                    borderRadius: '6px',
+                    border: !isSatellite ? '2px solid var(--color-brand)' : '1px solid var(--color-border, #d8dee9)',
+                    background: !isSatellite ? 'var(--color-brand-subtle)' : 'var(--color-bg-secondary, #fff)',
+                    color: !isSatellite ? 'var(--color-brand)' : 'var(--color-text-primary, #1f2933)',
+                    cursor: 'pointer',
+                    fontWeight: !isSatellite ? 700 : 500,
+                    fontSize: '0.74rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <MapIcon size={16} />
+                  <span>Standard</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSatellite(true)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '8px 4px',
+                    borderRadius: '6px',
+                    border: isSatellite ? '2px solid var(--color-brand)' : '1px solid var(--color-border, #d8dee9)',
+                    background: isSatellite ? 'var(--color-brand-subtle)' : 'var(--color-bg-secondary, #fff)',
+                    color: isSatellite ? 'var(--color-brand)' : 'var(--color-text-primary, #1f2933)',
+                    cursor: 'pointer',
+                    fontWeight: isSatellite ? 700 : 500,
+                    fontSize: '0.74rem',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <Satellite size={16} />
+                  <span>Satellite</span>
+                </button>
+              </div>
+
+              <div style={{ height: 1, background: 'var(--color-border, #e2e8f0)', margin: '4px 0 8px' }} />
+
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '4px', padding: '0 2px' }}>
+                Fleet Overlays
+              </div>
+              <label className="cluster" style={{ gap: '0.5rem', padding: '0.35rem 0.4rem', cursor: 'pointer', borderRadius: '4px' }}>
+                <input type="checkbox" checked={showVehicles} onChange={(e) => setShowVehicles(e.target.checked)} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Live Vehicles</span>
               </label>
-              <label className="cluster" style={{ gap: '0.5rem', padding: '0.4rem 0.6rem' }}>
-                <input type="checkbox" checked={showStations} onChange={(e) => setShowStations(e.target.checked)} /> Stations
+              <label className="cluster" style={{ gap: '0.5rem', padding: '0.35rem 0.4rem', cursor: 'pointer', borderRadius: '4px' }}>
+                <input type="checkbox" checked={showStations} onChange={(e) => setShowStations(e.target.checked)} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Stations & Depots</span>
               </label>
-              <label className="cluster" style={{ gap: '0.5rem', padding: '0.4rem 0.6rem' }}>
-                <input type="checkbox" checked={showTrail} onChange={(e) => setShowTrail(e.target.checked)} /> Trail & Routes
+              <label className="cluster" style={{ gap: '0.5rem', padding: '0.35rem 0.4rem', cursor: 'pointer', borderRadius: '4px' }}>
+                <input type="checkbox" checked={showTrail} onChange={(e) => setShowTrail(e.target.checked)} />
+                <span style={{ fontSize: '0.8rem', fontWeight: 500 }}>Trails & Routes</span>
               </label>
             </div>
           ) : null}
@@ -696,6 +839,12 @@ export function LiveMap() {
           <span style={{ width: 14, height: 3, background: '#10b981', borderRadius: 2 }} aria-hidden="true" />
           <span>Breadcrumb Trail</span>
         </div>
+        {isSatellite ? (
+          <div className="veh-legend-row" style={{ color: 'var(--color-brand)', fontWeight: 600 }}>
+            <Satellite size={12} />
+            <span>Satellite View (Esri)</span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

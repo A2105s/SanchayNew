@@ -249,28 +249,28 @@ void computeProximityColor(uint16_t cm, uint8_t &r, uint8_t &g, uint8_t &b) {
 }
 
 // ---------------------------------------------------------------------------
-// Clean Automotive Acoustic Buzzer Engine
-// Rule: Buzzer sounds ONLY when obstacle is LESS than 50 cm!
-// Completely SILENT when >= 50 cm or DIST_INVALID (zero driver annoyance).
-// Continuous solid STOP tone when <= 20 cm (emergency contact zone).
+// Discrete Step-by-Step Automotive Acoustic Radar Engine (Board 2)
 // ---------------------------------------------------------------------------
-uint16_t getBuzzerPeriod(uint16_t cm) {
-  if (cm >= 50 || cm == DIST_INVALID) return 0; // Completely SILENT >= 50 cm
-  if (cm <= 20) return 1; // Solid unbroken STOP tone (<= 20 cm)
-
-  // Clear, non-frantic warning progression between 20 cm and 50 cm:
-  if (cm > 35) {
-    return (uint16_t)map(cm, 50, 35, 420, 220); // 2.4 Hz to 4.5 Hz
-  } else {
-    return (uint16_t)map(cm, 35, 20, 220, 95);  // 4.5 Hz to 10.5 Hz
-  }
-}
+// Step 0 (> 60 cm or invalid): 100% SILENT (Clear / Safe Buffer)
+// Step 1 (45 cm - 60 cm)      : SLOW STEP (1 pulse every 600 ms)
+// Step 2 (30 cm - 45 cm)      : MEDIUM STEP (1 pulse every 320 ms)
+// Step 3 (15 cm - 30 cm)      : FAST STEP (1 pulse every 140 ms)
+// Step 4 (<= 15 cm)           : SOLID STOP ALARM (Continuous unbroken tone)
+// ---------------------------------------------------------------------------
+enum RadarStep : uint8_t {
+  STEP_0_SILENT = 0,
+  STEP_1_SLOW   = 1,
+  STEP_2_MEDIUM = 2,
+  STEP_3_FAST   = 3,
+  STEP_4_STOP   = 4
+};
 
 const char *getPrecisionZoneName(uint16_t cm) {
-  if (cm == DIST_INVALID || cm >= 200) return "SAFE";
-  if (cm >= 120) return "WATCH";
-  if (cm >= 50)  return "WARN";
-  if (cm >= 20)  return "CLOSE";
+  if (cm == DIST_INVALID || cm >= 120) return "SAFE";
+  if (cm > 60) return "WATCH";
+  if (cm > 45) return "STEP 1";
+  if (cm > 30) return "STEP 2";
+  if (cm > 15) return "STEP 3";
   return "STOP!";
 }
 
@@ -341,15 +341,66 @@ void updateRgb(bool linkUp, const SensorPacket &p) {
 }
 
 // ---------------------------------------------------------------------------
-// Jitter-Free Precision Acoustic State Machine
-// Centimeter-level precision with dynamic microsecond timing
+// Step-by-Step Acoustic Buzzer State Machine (Hysteresis & Anti-Jitter)
 // ---------------------------------------------------------------------------
 void updateBuzzer(bool linkUp, const SensorPacket &p) {
   static unsigned long lastBeepStartMs = 0;
   static bool buzzerActive = false;
+  static RadarStep currentStep = STEP_0_SILENT;
 
-  // 1. Silent when link down, no target, or distance >= 50 cm
-  if (!linkUp || p.distanceCm == DIST_INVALID || p.distanceCm >= 50) {
+  // 1. Silent when RF link is lost, or target is invalid
+  if (!linkUp || p.distanceCm == DIST_INVALID) {
+    if (buzzerActive) {
+      digitalWrite(PIN_BUZZER, LOW);
+      buzzerActive = false;
+    }
+    currentStep = STEP_0_SILENT;
+    return;
+  }
+
+  // 2. Compute target step with 2cm hysteresis to prevent boundary flutter
+  uint16_t cm = p.distanceCm;
+  RadarStep targetStep = STEP_0_SILENT;
+
+  switch (currentStep) {
+    case STEP_0_SILENT:
+      if (cm <= 15) targetStep = STEP_4_STOP;
+      else if (cm <= 30) targetStep = STEP_3_FAST;
+      else if (cm <= 45) targetStep = STEP_2_MEDIUM;
+      else if (cm <= 60) targetStep = STEP_1_SLOW;
+      else targetStep = STEP_0_SILENT;
+      break;
+
+    case STEP_1_SLOW:
+      if (cm <= 15) targetStep = STEP_4_STOP;
+      else if (cm <= 30) targetStep = STEP_3_FAST;
+      else if (cm <= 45) targetStep = STEP_2_MEDIUM;
+      else if (cm > 62) targetStep = STEP_0_SILENT; // 2cm exit buffer
+      else targetStep = STEP_1_SLOW;
+      break;
+
+    case STEP_2_MEDIUM:
+      if (cm <= 15) targetStep = STEP_4_STOP;
+      else if (cm <= 30) targetStep = STEP_3_FAST;
+      else if (cm > 47) targetStep = STEP_1_SLOW;   // 2cm exit buffer
+      else targetStep = STEP_2_MEDIUM;
+      break;
+
+    case STEP_3_FAST:
+      if (cm <= 15) targetStep = STEP_4_STOP;
+      else if (cm > 32) targetStep = STEP_2_MEDIUM; // 2cm exit buffer
+      else targetStep = STEP_3_FAST;
+      break;
+
+    case STEP_4_STOP:
+      if (cm > 17) targetStep = STEP_3_FAST;        // 2cm exit buffer
+      else targetStep = STEP_4_STOP;
+      break;
+  }
+  currentStep = targetStep;
+
+  // 3. Step 0: Clear / Safe -> Silent
+  if (currentStep == STEP_0_SILENT) {
     if (buzzerActive) {
       digitalWrite(PIN_BUZZER, LOW);
       buzzerActive = false;
@@ -357,22 +408,28 @@ void updateBuzzer(bool linkUp, const SensorPacket &p) {
     return;
   }
 
-  // 2. Emergency Collision Stop (<= 20 cm): Continuous solid unbroken tone
-  if (p.distanceCm <= 20) {
+  // 4. Step 4: Emergency Collision Stop (<= 15 cm) -> Solid Unbroken Tone
+  if (currentStep == STEP_4_STOP) {
     digitalWrite(PIN_BUZZER, HIGH);
     buzzerActive = true;
     return;
   }
 
-  uint16_t period = getBuzzerPeriod(p.distanceCm);
-  if (period <= 1) {
-    digitalWrite(PIN_BUZZER, HIGH);
-    buzzerActive = true;
-    return;
+  // 5. Steps 1 to 3: Discrete Cadence Timings
+  uint16_t period = 600;
+  uint16_t onDuration = 45;
+
+  if (currentStep == STEP_1_SLOW) {
+    period = 600;       // Slow distinct step: 1 pulse every 600 ms (~1.6 Hz)
+    onDuration = 50;    // 50 ms crisp chirp
+  } else if (currentStep == STEP_2_MEDIUM) {
+    period = 300;       // Medium warning step: 1 pulse every 300 ms (~3.3 Hz)
+    onDuration = 45;    // 45 ms crisp chirp
+  } else if (currentStep == STEP_3_FAST) {
+    period = 130;       // Rapid urgent step: 1 pulse every 130 ms (~7.7 Hz)
+    onDuration = 40;    // 40 ms crisp chirp
   }
 
-  // 3. Crisp, audible chirp duration: 30-48 ms
-  uint16_t onDuration = constrain(period / 4, 30, 48);
   unsigned long now = millis();
 
   if (buzzerActive) {

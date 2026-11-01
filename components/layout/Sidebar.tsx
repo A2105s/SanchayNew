@@ -250,7 +250,21 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
               <LogOut size={15} aria-hidden="true" />
             </button>
           </div>
-        ) : null}
+        ) : (
+          <div className="sidebar__profile" style={{ justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="sidebar__logout"
+              onClick={onLogout}
+              aria-label="Exit to login"
+              title="Exit to login"
+              style={{ width: '100%', height: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 'var(--radius-md)' }}
+            >
+              <LogOut size={15} aria-hidden="true" />
+              <span className="sidebar__link-text" style={{ fontSize: '0.78rem', fontWeight: 600 }}>Exit to Login</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {mobileOpen ? null : null}

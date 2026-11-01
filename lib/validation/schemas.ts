@@ -372,7 +372,12 @@ export const ingestPayloadSchema = z.object({
   batteryV: z.number().min(0).max(100).optional(),
   batteryPct: z.number().min(0).max(100).optional(),
   signalDbm: z.number().min(-200).max(0).optional(),
-  sos: z.boolean().optional()
+  sos: z.boolean().optional(),
+  tempC: z.number().min(-50).max(120).optional(),
+  humidity: z.number().min(0).max(100).optional(),
+  distanceCm: z.number().min(0).max(1000).optional(),
+  motion: z.boolean().optional(),
+  zone: z.string().max(20).optional()
 });
 
 // ---------------------------------------------------------------------------

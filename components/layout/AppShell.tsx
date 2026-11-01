@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Clock3, Command, LoaderCircle, Menu, TriangleAlert, X } from 'lucide-react';
+import { Building2, Car, Clock3, Command, LoaderCircle, Menu, TriangleAlert, X } from 'lucide-react';
 import { useGlobalScrollEdgeSpring } from '@/hooks/useScrollEdgeSpring';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -294,30 +294,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
             {me?.role === 'ADMIN' ? (
-              <div className="module-toggle-pill" role="tablist" aria-label="Active module">
+              <div className="module-toggle-group" role="tablist" aria-label="Active module">
                 <button
                   type="button"
                   role="tab"
                   aria-selected={activeModule === 'vehicles'}
-                  className={`module-pill-btn ${activeModule === 'vehicles' ? 'is-active' : ''}`}
+                  className={`module-toggle-btn ${activeModule === 'vehicles' ? 'is-active' : ''}`}
                   onClick={() => {
                     setModuleCookie('vehicles');
                     router.push('/dashboard');
                   }}
+                  title="Switch to Fleet Operations"
                 >
-                  Fleet
+                  <Car size={14} aria-hidden="true" />
+                  <span>Fleet</span>
                 </button>
                 <button
                   type="button"
                   role="tab"
                   aria-selected={activeModule === 'spaces'}
-                  className={`module-pill-btn ${activeModule === 'spaces' ? 'is-active' : ''}`}
+                  className={`module-toggle-btn ${activeModule === 'spaces' ? 'is-active' : ''}`}
                   onClick={() => {
                     setModuleCookie('spaces');
                     router.push('/spaces');
                   }}
+                  title="Switch to Spaces and Facilities"
                 >
-                  Spaces
+                  <Building2 size={14} aria-hidden="true" />
+                  <span>Spaces</span>
                 </button>
               </div>
             ) : null}

@@ -322,10 +322,28 @@ export const FLEET_SVG_STRINGS = {
     <rect x="17.5" y="13" width="5" height="13" rx="2.5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1" />
     <line x1="14" y1="12" x2="26" y2="12" stroke="#64748b" stroke-width="2" stroke-linecap="round" />
     <circle cx="20" cy="18" r="3" fill="#ffffff" stroke="#1e293b" stroke-width="1.2" />
+  </svg>`,
+  iotPolice: `<svg viewBox="0 0 40 40" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="15.5" cy="6" r="1.2" fill="#38bdf8" />
+    <circle cx="24.5" cy="6" r="1.2" fill="#38bdf8" />
+    <rect x="13" y="6" width="14" height="28" rx="4.5" fill="#0b132b" stroke="#0ea5e9" stroke-width="1.6" />
+    <rect x="14" y="14.5" width="12" height="12.5" rx="2" fill="#ffffff" stroke="#94a3b8" stroke-width="0.5" />
+    <path d="M15 11C15 9.5 16.5 8 20 8C23.5 8 25 9.5 25 11L24 14.5H16L15 11Z" fill="#0284c7" fill-opacity="0.85" />
+    <rect x="15.5" y="27.5" width="9" height="2" rx="0.75" fill="#1e293b" />
+    <polygon points="20,18.5 21.2,21.8 24.8,21.8 21.9,23.8 23,27 20,25 17,27 18.1,23.8 15.2,21.8 18.8,21.8" fill="#eab308" />
+    <rect x="15" y="13.5" width="4.5" height="2.2" rx="1" fill="#ef4444" />
+    <rect x="20.5" y="13.5" width="4.5" height="2.2" rx="1" fill="#3b82f6" />
+    <circle cx="20" cy="11.5" r="1.5" fill="#06b6d4" />
+    <circle cx="20" cy="11.5" r="2.8" stroke="#06b6d4" stroke-width="0.75" stroke-dasharray="1.5 1" />
+    <circle cx="15.5" cy="34" r="0.9" fill="#10b981" />
+    <circle cx="24.5" cy="34" r="0.9" fill="#10b981" />
+    <rect x="11.2" y="12" width="1.8" height="3.2" rx="0.9" fill="#38bdf8" />
+    <rect x="27" y="12" width="1.8" height="3.2" rx="0.9" fill="#38bdf8" />
   </svg>`
 };
 
-export function getFleetIconSvg(sector?: string, vehicleClass?: string): string {
+export function getFleetIconSvg(sector?: string, vehicleClass?: string, isIot: boolean = false): string {
+  if (isIot) return FLEET_SVG_STRINGS.iotPolice;
   if (sector === 'AMBULANCE_108') return FLEET_SVG_STRINGS.ambulance;
   if (sector === 'POLICE_PATROL') return FLEET_SVG_STRINGS.police;
   if (sector === 'GMC_WASTE') return FLEET_SVG_STRINGS.wasteTruck;
@@ -358,31 +376,41 @@ export function createFleetMarkerElement(
     heading?: number;
     speedKmph?: number;
     registrationNumber?: string;
+    registrationNormalized?: string;
+    notes?: string | null;
   },
   opts: {
     heading?: number;
     isSelected: boolean;
+    isIot?: boolean;
     onClick: () => void;
   }
 ): HTMLElement {
   const el = document.createElement('div');
-  el.className = `fleet-marker${opts.isSelected ? ' fleet-marker--selected' : ''}`;
+  const isOurIot =
+    Boolean(opts.isIot) ||
+    vehicle.registrationNumber === 'MP07-DG-6386' ||
+    vehicle.registrationNormalized === 'MP07DG6386' ||
+    Boolean(vehicle.notes && vehicle.notes.includes('SANCHAY-IOT'));
+
+  el.className = `fleet-marker${opts.isSelected ? ' fleet-marker--selected' : ''}${isOurIot ? ' fleet-marker--iot' : ''}`;
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');
 
-  const statusColor = STATUS_GLOW[vehicle.status] || STATUS_GLOW.OFFLINE;
   const isMoving = vehicle.status === 'MOVING';
   const heading = opts.heading ?? vehicle.heading ?? 0;
   const speed = Math.round(vehicle.speedKmph || 0);
   const reg = vehicle.registrationNumber || 'Vehicle';
 
   el.innerHTML = `
+    ${isOurIot ? '<div class="fleet-marker__iot-pulse"></div>' : ''}
     <div class="fleet-marker__rotator" style="transform: rotate(${heading}deg);">
       <div class="fleet-marker__icon-wrap">
-        ${getFleetIconSvg(vehicle.sector, vehicle.vehicleClass)}
+        ${getFleetIconSvg(vehicle.sector, vehicle.vehicleClass, isOurIot)}
       </div>
     </div>
     <div class="fleet-marker__pill">
+      ${isOurIot ? '<span class="fleet-marker__iot-badge">IOT</span>' : ''}
       <span class="mono fleet-marker__reg">${reg}</span>
       <span class="mono fleet-marker__speed" style="display: ${isMoving && speed > 0 ? 'inline-block' : 'none'};">${speed} km/h</span>
     </div>
@@ -405,14 +433,30 @@ export function updateFleetMarkerElement(
     status: VehicleStatus;
     heading?: number;
     speedKmph?: number;
+    registrationNumber?: string;
+    registrationNormalized?: string;
   },
   opts: {
     heading?: number;
     isSelected: boolean;
+    isIot?: boolean;
   }
 ): void {
+  const isOurIot =
+    Boolean(opts.isIot) ||
+    vehicle.registrationNumber === 'MP07-DG-6386' ||
+    vehicle.registrationNormalized === 'MP07DG6386';
+
+  if (isOurIot && !el.classList.contains('fleet-marker--iot')) {
+    el.classList.add('fleet-marker--iot');
+    if (!el.querySelector('.fleet-marker__iot-pulse')) {
+      const pulse = document.createElement('div');
+      pulse.className = 'fleet-marker__iot-pulse';
+      el.insertBefore(pulse, el.firstChild);
+    }
+  }
+
   const isMoving = vehicle.status === 'MOVING';
-  const statusColor = STATUS_GLOW[vehicle.status] || STATUS_GLOW.OFFLINE;
   const heading = opts.heading ?? vehicle.heading ?? 0;
   const speed = Math.round(vehicle.speedKmph || 0);
 

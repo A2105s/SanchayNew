@@ -102,10 +102,12 @@ uint8_t motion = 0;
 uint8_t dhtValid = 0;
 float lastTempC = NAN;
 float lastHumidity = NAN;
+const int32_t DEFAULT_LAT_E7 = 262452630L; // 26.245263 N (Default base location when no GPS lock)
+const int32_t DEFAULT_LNG_E7 = 783129140L; // 78.312914 E
 uint8_t gpsFix = 0;
 uint8_t satellites = 0;
-int32_t latE7 = 0;
-int32_t lngE7 = 0;
+int32_t latE7 = DEFAULT_LAT_E7;
+int32_t lngE7 = DEFAULT_LNG_E7;
 
 unsigned long lastDistanceMs = 0;
 unsigned long lastDhtMs = 0;
@@ -138,7 +140,7 @@ void onSent(uint8_t *mac, uint8_t status) {
 // ---------------------------------------------------------------------------
 // One 10 us trigger pulse, then measure the ECHO HIGH time.
 // distance_cm = duration_us * 0.0343 / 2
-// pulseIn() returns 0 on its 25 ms timeout.
+// pulseIn() returns 0 on its 25 ms timeout (indicating clear open path / no target).
 // ---------------------------------------------------------------------------
 uint16_t readOnceCm() {
   digitalWrite(PIN_TRIG, LOW);
@@ -147,11 +149,15 @@ uint16_t readOnceCm() {
   delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
 
-  unsigned long duration = pulseIn(PIN_ECHO, HIGH, 25000UL);
+  unsigned long duration = pulseIn(PIN_ECHO, HIGH, 25000UL); // 25ms timeout (~4.3m max)
   if (duration == 0) {
-    return 0;
+    return DIST_INVALID; // Timeout = no obstacle in range / open space
   }
-  return (uint16_t)(duration * 0.0343 / 2.0);
+  uint16_t cm = (uint16_t)(duration * 0.0343 / 2.0);
+  if (cm < 2 || cm > 400) {
+    return DIST_INVALID;
+  }
+  return cm;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,9 +184,8 @@ uint16_t median3(uint16_t a, uint16_t b, uint16_t c) {
 
 // ---------------------------------------------------------------------------
 // Read distance three times and keep the median.
-//   > 400 cm -> DIST_INVALID (no target)
-//   0        -> 0 (blocked / no echo, critical)
-//   1..400   -> valid centimetres
+//   > 400 cm or timeout -> DIST_INVALID (safe / no obstacle)
+//   2..400              -> valid centimetres
 // ---------------------------------------------------------------------------
 uint16_t readDistanceCm() {
   uint16_t a = readOnceCm();
@@ -188,7 +193,7 @@ uint16_t readDistanceCm() {
   uint16_t c = readOnceCm();
   uint16_t m = median3(a, b, c);
 
-  if (m > 400) {
+  if (m == 0 || m > 400 || m == DIST_INVALID) {
     return DIST_INVALID;
   }
   return m;
@@ -197,27 +202,19 @@ uint16_t readDistanceCm() {
 // ---------------------------------------------------------------------------
 // Distance -> zone
 // ---------------------------------------------------------------------------
-// The boundary value belongs to the safer zone: exactly 120 cm is WATCH.
-// DIST_INVALID is reported as SAFE because there is no object to warn about;
-// board 2 also checks distanceCm and turns its RGB off for DIST_INVALID.
+// Rule: Anything >= 200 cm (or DIST_INVALID) is SAFE!
 // ---------------------------------------------------------------------------
 uint8_t computeZone(uint16_t cm) {
-  if (cm == DIST_INVALID) {
+  if (cm == DIST_INVALID || cm >= 200) {
     return ZONE_SAFE;
   }
-  if (cm == 0) {
-    return ZONE_CRITICAL;
-  }
-  if (cm > 120) {
-    return ZONE_SAFE;
-  }
-  if (cm > 60) {
+  if (cm >= 120) {
     return ZONE_WATCH;
   }
-  if (cm > 30) {
+  if (cm >= 60) {
     return ZONE_WARN;
   }
-  if (cm > 10) {
+  if (cm >= 20) {
     return ZONE_CLOSE;
   }
   return ZONE_CRITICAL;
@@ -255,36 +252,37 @@ void triggerBoard1TxBlip() {
 // ---------------------------------------------------------------------------
 // High-Precision Analog Color Gradient (Continuous 24-bit PWM Interpolation)
 // Smoothly transitions from Pure Green -> Lime -> Yellow -> Orange -> Deep Red
+// Threshold: >= 200 cm is SAFE (Pure Solid Green)
 // ---------------------------------------------------------------------------
 void computeProximityColor(uint16_t cm, uint8_t &r, uint8_t &g, uint8_t &b) {
   b = 0; // Pure warm/hazard spectrum
 
-  // 1. Critical Stop / Touch (< 8 cm): Pure Solid Red
-  if (cm <= 8) {
-    r = 255;
-    g = 0;
-    return;
-  }
-
-  // 2. Clear / Safe Buffer (>= 150 cm): Pure Green
-  if (cm >= 150) {
+  // 1. Clear / Safe Buffer (>= 200 cm or DIST_INVALID): Pure Green
+  if (cm == DIST_INVALID || cm >= 200) {
     r = 0;
     g = 255;
     return;
   }
 
-  // 3. Approach Zone (80 cm to 150 cm): Green stays 255, Red ramps up 0 -> 255
-  // (Pure Green at 150cm -> Lime at 120cm -> Chartreuse at 100cm -> Pure Yellow at 80cm)
-  if (cm >= 80) {
-    r = (uint8_t)map(cm, 150, 80, 0, 255);
+  // 2. Critical Stop / Touch (<= 20 cm): Pure Solid Red
+  if (cm <= 20) {
+    r = 255;
+    g = 0;
+    return;
+  }
+
+  // 3. Approach Zone (100 cm to 200 cm): Green stays 255, Red ramps up 0 -> 255
+  // (Pure Green at 200cm -> Lime at 160cm -> Chartreuse at 130cm -> Pure Yellow at 100cm)
+  if (cm >= 100) {
+    r = (uint8_t)map(cm, 200, 100, 0, 255);
     g = 255;
     return;
   }
 
-  // 4. Proximity Danger Zone (8 cm to 80 cm): Red stays 255, Green drops 255 -> 0
-  // (Pure Yellow at 80cm -> Amber at 60cm -> Orange at 40cm -> Red-Orange at 20cm -> Deep Red at 8cm)
+  // 4. Proximity Danger Zone (20 cm to 100 cm): Red stays 255, Green drops 255 -> 0
+  // (Pure Yellow at 100cm -> Amber at 70cm -> Orange at 45cm -> Deep Red at 20cm)
   r = 255;
-  g = (uint8_t)map(cm, 80, 8, 255, 0);
+  g = (uint8_t)map(cm, 100, 20, 255, 0);
 }
 
 void applyZoneColor(uint16_t cm) {
@@ -298,26 +296,13 @@ void applyZoneColor(uint16_t cm) {
     }
   }
 
-  // Priority 1: PIR Motion Intruder Alert (when path is clear or at safe distance)
-  if (motion && (cm > 120 || cm == DIST_INVALID)) {
-    setColor(255, 0, 200); // Vibrant Magenta (MOTION ALERT on both boards)
-    return;
-  }
-
-  // Priority 2: High-Precision Proximity Color Gradient (when obstacle in range)
-  if (cm != DIST_INVALID && cm <= 150) {
-    uint8_t r = 0, g = 0, b = 0;
-    computeProximityColor(cm, r, g, b);
-    setColor(r, g, b); // Liquid smooth analog color transition
-    return;
-  }
-
-  // Priority 3: Clear Operational Buffer (> 150 cm or No Target)
-  if (gpsFix) {
-    setColor(0, 255, 0); // Pure Green (NOMINAL + GPS FIX on both boards)
-  } else {
-    setColor(220, 160, 0); // Warm Amber (NOMINAL + SEARCHING GPS on both boards)
-  }
+  // Board 1 RGB is 100% Dedicated to Proximity Radar:
+  // >= 200 cm or DIST_INVALID: PURE SOLID GREEN (0, 255, 0)
+  // < 200 cm: High-precision analog color gradient (Green -> Yellow -> Orange -> Red)
+  // < 8 cm: Pure Solid Red (255, 0, 0)
+  uint8_t r = 0, g = 0, b = 0;
+  computeProximityColor(cm, r, g, b);
+  setColor(r, g, b);
 }
 
 // Wi-Fi Channel Synchronization (matches router NASA)
@@ -484,6 +469,8 @@ void loop() {
     lngE7 = (int32_t)(gps.location.lng() * 10000000.0);
   } else {
     gpsFix = 0;
+    latE7 = DEFAULT_LAT_E7;
+    lngE7 = DEFAULT_LNG_E7;
   }
 
   uint32_t sats = gps.satellites.value();

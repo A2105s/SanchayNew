@@ -7,6 +7,8 @@ import { useActiveModule } from '@/lib/client/useModule';
 import {
   Activity,
   AlertTriangle,
+  LogOut,
+  RotateCw,
   ClipboardCheck,
   FileWarning,
   KeyRound,
@@ -232,10 +234,73 @@ export default function DashboardPage() {
     );
   }
   if (error && !snapshot) {
+    const handleExit = async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+      } catch {
+        // ignore
+      }
+      window.location.href = '/login';
+    };
+
     return (
-      <div className="page">
-        <PageTitle title="Dashboard" />
-        <EmptyState label={`Could not load the dashboard: ${error}`} />
+      <div className="page" style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div
+          style={{
+            background: 'var(--color-bg-secondary)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '36px 32px',
+            maxWidth: 580,
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            gap: 16,
+            boxShadow: 'var(--shadow-md)'
+          }}
+        >
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.1)',
+              color: 'var(--color-danger)',
+              display: 'grid',
+              placeItems: 'center'
+            }}
+          >
+            <AlertTriangle size={28} />
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-text-primary)' }}>
+            Service Temporarily Unavailable
+          </h2>
+          <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.86rem', lineHeight: 1.6, margin: 0 }}>
+            {error}
+          </p>
+          <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              type="button"
+              className="button button--primary"
+              onClick={handleExit}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 20px', fontWeight: 700 }}
+            >
+              <LogOut size={16} />
+              <span>Exit to Login</span>
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => window.location.reload()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 18px', fontWeight: 600 }}
+            >
+              <RotateCw size={16} />
+              <span>Retry</span>
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

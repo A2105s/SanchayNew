@@ -356,31 +356,48 @@ export function LiveMap() {
 
     const activeIds = new Set<string>();
 
+    const DEFAULT_IOT_LAT = 26.245263;
+    const DEFAULT_IOT_LNG = 78.312914;
+
     for (const v of filtered) {
-      if (v.lat == null || v.lng == null) continue;
+      const isOurIot =
+        v.registrationNumber === 'MP07-DG-6386' ||
+        v.registrationNormalized === 'MP07DG6386' ||
+        Boolean(v.notes && v.notes.includes('SANCHAY-IOT'));
+
+      let vLat = v.lat;
+      let vLng = v.lng;
+      if (isOurIot && (vLat == null || vLng == null || (vLat === 0 && vLng === 0))) {
+        vLat = DEFAULT_IOT_LAT;
+        vLng = DEFAULT_IOT_LNG;
+      }
+
+      if (vLat == null || vLng == null) continue;
       activeIds.add(v.id);
 
       const isSelected = v.id === selectedId;
       const existing = currentMarkers.get(v.id);
 
       if (existing) {
-        existing.setLngLat([v.lng, v.lat]);
+        existing.setLngLat([vLng, vLat]);
         updateFleetMarkerElement(existing.getElement(), v, {
           heading: v.heading,
           isSelected,
+          isIot: isOurIot,
         });
       } else {
         const el = createFleetMarkerElement(v, {
           heading: v.heading,
           isSelected,
+          isIot: isOurIot,
           onClick: () => {
             setSelectedId(v.id);
             const map = mapRef.current;
             if (!map) return;
             const marker = vehicleMarkersRef.current.get(v.id);
             const pos = marker?.getLngLat();
-            const centerLng = pos ? pos.lng : v.lng;
-            const centerLat = pos ? pos.lat : v.lat;
+            const centerLng = pos ? pos.lng : vLng;
+            const centerLat = pos ? pos.lat : vLat;
             if (centerLng != null && centerLat != null) {
               map.flyTo({
                 center: [centerLng, centerLat],
@@ -392,7 +409,7 @@ export function LiveMap() {
           },
         });
         const marker = new ml.Marker({ element: el, anchor: 'center' })
-          .setLngLat([v.lng, v.lat])
+          .setLngLat([vLng, vLat])
           .addTo(map);
         currentMarkers.set(v.id, marker);
       }

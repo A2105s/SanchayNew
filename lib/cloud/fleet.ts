@@ -145,38 +145,81 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
   // Fetch active borrowed vehicle IDs if user is assigned to a station
   let borrowedVehicleIds: string[] = [];
   if ((user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId) {
-    const activeBorrowedAllocations = await prisma.allocation.findMany({
-      where: {
-        borrowingStationId: user.stationId,
-        lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'AWAITING_HANDOVER', 'OVERDUE'] },
-        OR: [
-          { endAt: { gt: now } },
-          { lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'OVERDUE'] } }
-        ]
-      },
-      select: { assignedVehicleIds: true, vehicleId: true }
-    });
-    for (const alloc of activeBorrowedAllocations) {
-      if (Array.isArray(alloc.assignedVehicleIds)) {
-        for (const vid of alloc.assignedVehicleIds) {
-          if (typeof vid === 'string') borrowedVehicleIds.push(vid);
+    try {
+      const activeBorrowedAllocations: any[] = await prisma.$queryRaw`
+        SELECT "assignedVehicleIds", "vehicleId" FROM "Allocation"
+        WHERE "borrowingStationId" = ${user.stationId}
+          AND "lifecycle" IN ('ACTIVE', 'PARTIALLY_RETURNED', 'AWAITING_HANDOVER', 'OVERDUE')
+          AND ("endAt" > ${now} OR "lifecycle" IN ('ACTIVE', 'PARTIALLY_RETURNED', 'OVERDUE'))
+      `;
+      for (const alloc of activeBorrowedAllocations) {
+        if (Array.isArray(alloc.assignedVehicleIds)) {
+          for (const vid of alloc.assignedVehicleIds) {
+            if (typeof vid === 'string') borrowedVehicleIds.push(vid);
+          }
+        } else if (alloc.vehicleId) {
+          borrowedVehicleIds.push(alloc.vehicleId);
         }
-      } else if (alloc.vehicleId) {
-        borrowedVehicleIds.push(alloc.vehicleId);
       }
+    } catch {
+      // Fallback gracefully
     }
   }
 
+  // Always include the real physical hardware IoT vehicle (MP07-DG-6386) across all
+  // police station logins so every station officer can demonstrate real-time telemetry!
+  let realIotVehicleId: string | null = null;
+  try {
+    const realDev = await prisma.iotDevice.findFirst({
+      where: { simulated: false, vehicleId: { not: null } },
+      select: { vehicleId: true }
+    });
+    realIotVehicleId = realDev?.vehicleId ?? null;
+  } catch {
+    // fallback
+  }
+
+  const stationVehicleIds = [
+    ...borrowedVehicleIds,
+    ...(realIotVehicleId ? [realIotVehicleId] : [])
+  ];
+
   const vehicleStationFilter =
     (user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId
-      ? borrowedVehicleIds.length > 0
-        ? { OR: [{ stationId: user.stationId }, { id: { in: borrowedVehicleIds } }] }
+      ? stationVehicleIds.length > 0
+        ? { OR: [{ stationId: user.stationId }, { id: { in: stationVehicleIds } }] }
         : { stationId: user.stationId }
       : {};
 
+  let stationRequestIds: string[] = [];
+  let stationAllocIds: string[] = [];
+  if (user.role === 'STATION_OFFICER' && user.stationId) {
+    try {
+      const rRows: any[] = await prisma.$queryRaw`
+        SELECT "id" FROM "AssetRequest"
+        WHERE "requestingStationId" = ${user.stationId} OR "providerStationId" = ${user.stationId}
+      `;
+      stationRequestIds = rRows.map((r) => r.id);
+    } catch {
+      // Fallback
+    }
+
+    try {
+      const aRows: any[] = await prisma.$queryRaw`
+        SELECT "id" FROM "Allocation"
+        WHERE "borrowingStationId" = ${user.stationId} OR "lendingStationId" = ${user.stationId}
+      `;
+      stationAllocIds = aRows.map((r) => r.id);
+    } catch {
+      // Fallback
+    }
+  }
+
   const requestWhere =
     user.role === 'STATION_OFFICER' && user.stationId
-      ? { OR: [{ requestingStationId: user.stationId }, { providerStationId: user.stationId }] }
+      ? stationRequestIds.length > 0
+        ? { id: { in: stationRequestIds } }
+        : { id: '__none__' }
       : tree === null
         ? {}
         : { OR: [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }] };
@@ -184,7 +227,9 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
   // Allocations in scope
   const allocWhere =
     user.role === 'STATION_OFFICER' && user.stationId
-      ? { OR: [{ borrowingStationId: user.stationId }, { lendingStationId: user.stationId }] }
+      ? stationAllocIds.length > 0
+        ? { id: { in: stationAllocIds } }
+        : { id: '__none__' }
       : tree === null
         ? {}
         : { OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] };

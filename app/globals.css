@@ -4741,7 +4741,10 @@ select:focus,
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 34px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  box-sizing: border-box;
   padding: 0 12px;
   border: 1px solid rgba(10, 127, 140, 0.14);
   border-radius: var(--radius-md);
@@ -8457,8 +8460,9 @@ td.sr-no-cell {
   border-radius: var(--radius-md);
   padding: 1.5px;
   overflow: hidden;
-  height: 38px;
-  min-height: 38px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
   background: var(--color-border);
   box-sizing: border-box;
   flex-shrink: 0;
@@ -8506,7 +8510,7 @@ td.sr-no-cell {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-4);
+  padding: 0 11px;
   font-weight: 700;
   font-size: 0.82rem;
   border: none;

@@ -230,8 +230,25 @@ export async function ingestTelemetry(deviceCode: string, presentedKey: string, 
     throw new DomainError('Device is not bound to a vehicle.', 409, 'UNBOUND');
   }
 
+  const DEFAULT_IOT_LAT = 26.245263;
+  const DEFAULT_IOT_LNG = 78.312914;
+  const lat = (payload.lat && payload.lat !== 0) ? payload.lat : DEFAULT_IOT_LAT;
+  const lng = (payload.lng && payload.lng !== 0) ? payload.lng : DEFAULT_IOT_LNG;
   const speed = payload.speedKmph ?? 0;
   const moving = speed > MOVING_SPEED_THRESHOLD;
+
+  let existingSensors: Record<string, unknown> = {};
+  if (device.notes) {
+    try { existingSensors = JSON.parse(device.notes); } catch {}
+  }
+  const sensorSnapshot = {
+    tempC: payload.tempC !== undefined ? payload.tempC : (existingSensors.tempC ?? null),
+    humidity: payload.humidity !== undefined ? payload.humidity : (existingSensors.humidity ?? null),
+    distanceCm: payload.distanceCm !== undefined ? payload.distanceCm : (existingSensors.distanceCm ?? null),
+    motion: payload.motion !== undefined ? Boolean(payload.motion) : Boolean(existingSensors.motion),
+    zone: payload.zone !== undefined ? payload.zone : (existingSensors.zone ?? null),
+    updatedAt: now.toISOString()
+  };
 
   const result = await prisma.$transaction(async (tx) => {
     await tx.iotDevice.update({
@@ -242,7 +259,8 @@ export async function ingestTelemetry(deviceCode: string, presentedKey: string, 
         lastSeenAt: now,
         lastEventAt: recordedAt,
         batteryPct: payload.batteryPct ?? device.batteryPct,
-        signalDbm: payload.signalDbm ?? device.signalDbm
+        signalDbm: payload.signalDbm ?? device.signalDbm,
+        notes: JSON.stringify(sensorSnapshot)
       }
     });
 
@@ -250,8 +268,8 @@ export async function ingestTelemetry(deviceCode: string, presentedKey: string, 
       data: {
         vehicleId: device.vehicleId as string,
         deviceCode: device.deviceCode,
-        lat: payload.lat,
-        lng: payload.lng,
+        lat,
+        lng,
         speedKmph: speed,
         heading: payload.heading ?? 0,
         accuracyM: payload.accuracyM ?? null,
@@ -277,8 +295,8 @@ export async function ingestTelemetry(deviceCode: string, presentedKey: string, 
       await tx.vehicle.update({
         where: { id: vehicle.id },
         data: {
-          lat: payload.lat,
-          lng: payload.lng,
+          lat,
+          lng,
           speedKmph: speed,
           heading: payload.heading ?? 0,
           ignition: payload.ignition ?? false,

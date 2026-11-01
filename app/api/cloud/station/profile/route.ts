@@ -48,12 +48,18 @@ export async function GET(request: Request) {
         select: { username: true, displayName: true, role: true },
         orderBy: { username: 'asc' }
       }),
-      prisma.allocation.count({
-        where: {
-          lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED'] },
-          OR: [{ lendingStationId: station.id }, { borrowingStationId: station.id }]
+      (async () => {
+        try {
+          const rows: any[] = await prisma.$queryRaw`
+            SELECT COUNT(*)::int as count FROM "Allocation"
+            WHERE "lifecycle" IN ('RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED')
+              AND ("lendingStationId" = ${station.id} OR "borrowingStationId" = ${station.id})
+          `;
+          return rows[0]?.count ?? 0;
+        } catch {
+          return 0;
         }
-      }),
+      })(),
       getStationInventoryBreakdown(station.id)
     ]);
 

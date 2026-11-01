@@ -1206,10 +1206,16 @@ th.is-sorted {
   .top-nav__actions .ai-copilot-btn-inner kbd {
     display: none;
   }
+  .top-nav__actions .ai-copilot-btn-wrap {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    max-height: 36px;
+  }
   .top-nav__actions .ai-copilot-btn-inner {
     padding: 0;
-    width: 32px;
-    height: 32px;
+    width: 100%;
+    height: 100%;
     justify-content: center;
   }
 }
@@ -1932,40 +1938,179 @@ td {
   font-family: monospace;
 }
 
-/* Header module toggle pill (Fleet | Spaces) */
+/* Header module switcher: Fleet | Spaces (Uniform 36px rectangle button group) */
+.module-toggle-group,
 .module-toggle-pill {
   display: inline-flex;
   align-items: center;
-  background: var(--color-surface-subtle, rgba(255, 255, 255, 0.08));
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.14));
-  border-radius: 9999px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: 2px;
   gap: 2px;
   margin-left: 8px;
+  box-sizing: border-box;
 }
 
+:root[data-theme='dark'] .module-toggle-group,
+:root[data-theme='dark'] .module-toggle-pill {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+.module-toggle-btn,
 .module-pill-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px 10px;
-  border-radius: 9999px;
+  gap: 6px;
+  height: 30px;
+  min-height: 30px;
+  max-height: 30px;
+  padding: 0 10px;
+  border-radius: calc(var(--radius-md) - 2px);
   border: none;
   background: transparent;
-  color: var(--color-text-secondary, #94a3b8);
-  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast, 0.15s ease);
-  line-height: 1.2;
+  transition: all var(--transition-fast);
+  line-height: 1;
+  white-space: nowrap;
+  box-sizing: border-box;
 }
 
+.module-toggle-btn svg,
+.module-pill-btn svg {
+  flex-shrink: 0;
+  opacity: 0.82;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.module-toggle-btn:hover,
 .module-pill-btn:hover {
-  color: var(--color-text-primary, #ffffff);
+  color: var(--color-text-primary);
+  background: var(--color-bg-secondary);
 }
 
+.module-toggle-btn:hover svg,
+.module-pill-btn:hover svg {
+  opacity: 1;
+}
+
+.module-toggle-btn.is-active,
 .module-pill-btn.is-active {
-  background: var(--color-brand, #0a7f8c);
+  background: var(--color-brand);
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.module-toggle-btn.is-active svg,
+.module-pill-btn.is-active svg {
+  opacity: 1;
+  color: #ffffff;
+}
+
+:root[data-theme='dark'] .module-toggle-btn:hover,
+:root[data-theme='dark'] .module-pill-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme='dark'] .module-toggle-btn.is-active,
+:root[data-theme='dark'] .module-pill-btn.is-active {
+  background: var(--color-brand);
+  color: #ffffff;
+}
+
+/* Strict 36px equal rectangle height enforcement on all navbar buttons */
+.top-nav .icon-button,
+.top-nav .ai-copilot-btn-wrap,
+.top-nav .ai-beam-btn-wrap,
+.top-nav .lang-selector-btn,
+.top-nav .theme-toggle,
+.top-nav .db-health,
+.top-nav .module-toggle-group,
+.top-nav .module-toggle-pill {
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  border-radius: var(--radius-md) !important;
+  box-sizing: border-box !important;
+}
+
+
+/* Special IoT Edge Device Marker & Animated Radar Pulse Halo */
+.fleet-marker--iot {
+  z-index: 22 !important;
+}
+
+.fleet-marker__iot-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  margin-left: -26px;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.48);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+  pointer-events: none;
+  z-index: 0;
+  animation: iotBeaconPulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.fleet-marker__iot-pulse::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(239, 68, 68, 0.6);
+  animation: iotBeaconRipple 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+@keyframes iotBeaconPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.95;
+  }
+}
+
+@keyframes iotBeaconRipple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+.fleet-marker--iot .fleet-marker__pill {
+  border-color: rgba(14, 165, 233, 0.5);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.fleet-marker__iot-badge {
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }

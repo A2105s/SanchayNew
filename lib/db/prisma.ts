@@ -1,6 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+// Invalidate stale in-memory Prisma client module cache in development
+if (process.env.NODE_ENV === 'development' && typeof require !== 'undefined' && require.cache) {
+  for (const k of Object.keys(require.cache)) {
+    if (k.includes('.prisma') || k.includes('@prisma')) {
+      delete require.cache[k];
+    }
+  }
+  delete (globalThis as any).prisma;
+}
+
 
 /**
  * Local development only: use the session-mode connection (DIRECT_URL, port 5432).
@@ -24,6 +34,7 @@ function resolveDatasourceUrl(): string | undefined {
   return dbUrl;
 }
 
+delete globalForPrisma.prisma;
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({

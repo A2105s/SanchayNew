@@ -1,8 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { seedDemoData, seedSpacesData, DEMO_PASSWORD, DEMO_OPERATORS } from '@/lib/seed/gwalior';
+import { seedSpacesData } from '@/lib/seed/gwalior';
+import { seedPoint14Fleet, POINT14_DEMO_PASSWORD, TARGET_STATIONS } from '@/lib/seed/point14-fleet';
 
 /**
- * CLI seed runner (tsx prisma/seed.ts). Loads the deterministic Gwalior demo fleet.
+ * CLI seed runner (tsx prisma/seed.ts). Loads the deterministic Point 14 Gwalior police fleet.
  * Refuses to run against a production NODE_ENV unless --force is passed.
  */
 async function main() {
@@ -14,26 +15,28 @@ async function main() {
 
   const prisma = new PrismaClient();
   try {
-    const existing = await prisma.vehicle.count();
-    if (existing > 0 && !force) {
-      console.log(`Database already has ${existing} vehicles. Running idempotent spaces seed...`);
-      const spacesCount = await seedSpacesData(prisma);
-      console.log(`Successfully upserted ${spacesCount} verified Gwalior civic spaces.`);
-      return;
-    }
+    console.log('Seeding Point 14 high-fidelity vehicle fleet for 8 Gwalior police stations...');
+    const point14Result = await seedPoint14Fleet(prisma);
 
-    console.log('Seeding Gwalior demo fleet...');
-    const result = await seedDemoData(prisma);
+    console.log('\nPoint 14 Seed Complete:');
+    console.table(point14Result.vehiclesPerStation);
 
-    console.log('\nSeed complete:');
-    console.table(result);
+    console.log(`Total Stations: ${point14Result.stationsCount}`);
+    console.log(`Total Vehicles: ${point14Result.vehiclesCount}`);
+    console.log(`Total Inter-Station Requests: ${point14Result.requestsCount}`);
+    console.log(`Total Active/Historical Allocations: ${point14Result.allocationsCount}`);
+
+    console.log('\nRunning idempotent civic spaces seed...');
+    const spacesCount = await seedSpacesData(prisma);
+    console.log(`Successfully upserted ${spacesCount} verified Gwalior civic spaces.`);
 
     console.log('\nDemo operator accounts (shared password):');
-    for (const op of DEMO_OPERATORS) {
-      console.log(`  - ${op.username.padEnd(16)} ${op.role.padEnd(16)} ${op.orgCode ?? '-'}`);
+    console.log(`  - ${'admin'.padEnd(18)} ${'ADMIN'.padEnd(16)} Platform Administrator`);
+    for (const st of TARGET_STATIONS) {
+      const slug = st.slug.replace(/-police-station$/, '');
+      console.log(`  - ${`ps.${slug}`.padEnd(18)} ${'STATION_OFFICER'.padEnd(16)} ${st.name}`);
     }
-    // The demo password is printed ONLY here from the CLI, never from the API or UI.
-    console.log(`\n  Demo password: ${DEMO_PASSWORD}\n`);
+    console.log(`\n  Demo password: ${POINT14_DEMO_PASSWORD}\n`);
   } finally {
     await prisma.$disconnect();
   }

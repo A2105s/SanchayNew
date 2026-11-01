@@ -74,8 +74,11 @@ export async function recomputeStationInventory(tx: TxClient, stationId: string)
   const activeAllocations = await tx.allocation.findMany({
     where: {
       lendingStationId: stationId,
-      lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'INCIDENT_HOLD'] },
-      endAt: { gt: now }
+      lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'INCIDENT_HOLD', 'OVERDUE'] },
+      OR: [
+        { endAt: { gt: now } },
+        { lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'INCIDENT_HOLD', 'OVERDUE'] } }
+      ]
     },
     select: { assignedVehicleIds: true, returnDetails: true, quantity: true, returnedQuantity: true, vehicleId: true }
   });

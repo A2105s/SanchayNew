@@ -61,10 +61,14 @@ export async function getStationInventoryBreakdown(
           'ACTIVE',
           'PARTIALLY_RETURNED',
           'RETURN_PENDING_CONFIRMATION',
-          'INCIDENT_HOLD'
+          'INCIDENT_HOLD',
+          'OVERDUE'
         ]
       },
-      endAt: { gt: now }
+      OR: [
+        { endAt: { gt: now } },
+        { lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'INCIDENT_HOLD', 'OVERDUE'] } }
+      ]
     },
     select: {
       assignedVehicleIds: true,

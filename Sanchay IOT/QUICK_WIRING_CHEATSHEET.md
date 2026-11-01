@@ -26,8 +26,6 @@
 | | **GND** | **GND** | Ground | Common GND |
 | | **TX** | **D6** (GPIO 12) | 3.3V | GPS TX -> ESP Software RX |
 | | **RX** | **D7** (GPIO 13) | 3.3V | GPS RX -> ESP Software TX |
-| **Acoustic Buzzer** *(Optional on Board 1)* | **(+) Positive** | **D6** or **D0** | 3.3V | Direct zero-latency hardware drive (D6 if GPS not wired, or D0 if PIR not wired) |
-| | **(-) Negative** | **GND** | Ground | Common GND |
 | **RGB LED** (Sentinel) | **RED** | **D1** (GPIO 5) | 3.3V | Via 100R to MOSFET Gate / Anode |
 | | **GREEN** | **D5** (GPIO 14) | 3.3V | Via 100R to MOSFET Gate / Anode |
 | | **BLUE** | **D8** (GPIO 15) | 3.3V | Via 100R to MOSFET Gate / Anode (Must be LOW at boot) |
@@ -99,4 +97,3 @@
         [ VIN] |                  | [ 3V ] -> 3.3V Rail
                +------------------+
 ```
-

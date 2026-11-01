@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { seedSpacesData } from '@/lib/seed/gwalior';
 import { seedPoint14Fleet, POINT14_DEMO_PASSWORD, TARGET_STATIONS } from '@/lib/seed/point14-fleet';
+import { seedPoint15Spaces, POINT15_PASSWORD } from '@/lib/seed/point15-spaces';
 
 /**
- * CLI seed runner (tsx prisma/seed.ts). Loads the deterministic Point 14 Gwalior police fleet.
+ * CLI seed runner (tsx prisma/seed.ts). Loads the deterministic Point 14 Gwalior police fleet
+ * and Point 15 Civic Spaces property booking network.
  * Refuses to run against a production NODE_ENV unless --force is passed.
  */
 async function main() {
@@ -30,13 +32,20 @@ async function main() {
     const spacesCount = await seedSpacesData(prisma);
     console.log(`Successfully upserted ${spacesCount} verified Gwalior civic spaces.`);
 
-    console.log('\nDemo operator accounts (shared password):');
-    console.log(`  - ${'admin'.padEnd(18)} ${'ADMIN'.padEnd(16)} Platform Administrator`);
+    console.log('\nRunning Point 15 G2G Spaces Module seed...');
+    const point15Result = await seedPoint15Spaces(prisma);
+    console.log(`Successfully seeded ${point15Result.spacesCount} government spaces and ${point15Result.bookingsCount} bookings across 2 organizations.`);
+
+    console.log('\nDemo operator accounts:');
+    console.log(`  - ${'admin'.padEnd(18)} ${'ADMIN'.padEnd(16)} Platform Administrator (Password: ${POINT14_DEMO_PASSWORD})`);
     for (const st of TARGET_STATIONS) {
       const slug = st.slug.replace(/-police-station$/, '');
-      console.log(`  - ${`ps.${slug}`.padEnd(18)} ${'STATION_OFFICER'.padEnd(16)} ${st.name}`);
+      console.log(`  - ${`ps.${slug}`.padEnd(18)} ${'STATION_OFFICER'.padEnd(16)} ${st.name} (Password: ${POINT14_DEMO_PASSWORD})`);
     }
-    console.log(`\n  Demo password: ${POINT14_DEMO_PASSWORD}\n`);
+    console.log('\nPoint 15 Spaces Operators:');
+    console.log(`  - ${'school.gmhss'.padEnd(18)} ${'ORG_ADMIN'.padEnd(16)} Govt Model HSS, Gwalior (Password: ${POINT15_PASSWORD})`);
+    console.log(`  - ${'admin.gatc'.padEnd(18)} ${'ORG_ADMIN'.padEnd(16)} Govt Admin Training Centre, Gwalior (Password: ${POINT15_PASSWORD})`);
+    console.log('');
   } finally {
     await prisma.$disconnect();
   }

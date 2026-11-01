@@ -7,7 +7,8 @@ import { DEFAULT_FLEET_SETTINGS, FLEET_SETTINGS_KEY } from '@/lib/cloud/errors';
 import { reevaluateEligibility } from '@/lib/cloud/eligibility';
 import { recomputeStationInventory } from '@/lib/cloud/ops/transfers';
 import { normalizeRegistration } from '@/lib/cloud/context';
-import type { Role, Sector, VehicleClass } from '@/types';
+import { getSpacePhotos } from '@/lib/fleet/space-photos';
+import type { Role, Sector, VehicleClass, SpaceCategory } from '@/types';
 import STATIONS_DATA from '@/lib/data/gwalior-police-stations.json';
 import DEPARTMENTS_DATA from '@/lib/data/gwalior-departments.json';
 import FLEET_BLUEPRINTS from '@/lib/data/gwalior-fleet-blueprints.json';
@@ -639,7 +640,8 @@ export async function seedSpacesData(prisma: PrismaClient): Promise<number> {
         operatingHours: sp.operatingHours,
         minBookingHours: sp.minBookingHours,
         maxBookingHours: sp.maxBookingHours,
-        bookingLeadDays: sp.bookingLeadDays
+        bookingLeadDays: sp.bookingLeadDays,
+        photos: getSpacePhotos({ assetCode: sp.assetCode, category: sp.category as SpaceCategory })
       },
       create: {
         assetCode: sp.assetCode,
@@ -664,6 +666,7 @@ export async function seedSpacesData(prisma: PrismaClient): Promise<number> {
         minBookingHours: sp.minBookingHours,
         maxBookingHours: sp.maxBookingHours,
         bookingLeadDays: sp.bookingLeadDays,
+        photos: getSpacePhotos({ assetCode: sp.assetCode, category: sp.category as SpaceCategory }),
         createdBy: 'seed'
       }
     });

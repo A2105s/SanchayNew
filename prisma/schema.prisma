@@ -850,6 +850,8 @@ model Space {
   amenities   Json?
   /// string[] of accessibility features, e.g. ["Lift","Wheelchair ramp"]
   accessibility Json?
+  /// string[] of photograph URLs
+  photos      Json?
   /// Per-weekday operating hours (IST): { mon: ["09:00","21:00"], ... } — missing day = closed
   operatingHours Json?
   minBookingHours Int  @default(1)

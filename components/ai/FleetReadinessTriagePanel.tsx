@@ -246,416 +246,419 @@ export function FleetReadinessTriagePanel({
   return (
     <div className="ai-pulse-card-wrap" style={{ margin: 'var(--space-4) 0' }}>
       <div className="ai-pulse-card-inner ai-triage-panel" role="region" aria-label="AI Fleet Readiness and Dispatch Desk" style={{ margin: 0 }}>
-      {/* Header Banner */}
-      <div className="ai-triage-header">
-        <div className="ai-triage-title-group">
-          <div className="ai-triage-icon-badge" aria-hidden="true">
-            <Bot size={18} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span className="ai-triage-title">AI Fleet Readiness & Autonomous Dispatch Desk</span>
-              <span className="ai-triage-badge">
-                <Shield size={11} aria-hidden="true" />
-                Executive Supervisory Mode
-              </span>
-              {data?.provider && !data.degraded ? (
-                <span className="ai-triage-badge" title={`Engine: ${PROVIDER_LABEL[data.provider]}`}>
-                  <Sparkles size={11} aria-hidden="true" />
-                  {PROVIDER_LABEL[data.provider]}
-                </span>
-              ) : data?.degraded ? (
-                <span className="ai-triage-badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
-                  <TriangleAlert size={11} aria-hidden="true" />
-                  Deterministic Engine
-                </span>
-              ) : null}
+        {/* Header Banner */}
+        <div className="ai-triage-header">
+          <div className="ai-triage-title-group">
+            <div className="ai-triage-icon-badge" aria-hidden="true">
+              <Bot size={18} />
             </div>
-            <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>
-              {stationName ? `Station command: ${stationName}` : 'District-wide fleet command (37 Police Stations)'}
-              {data ? ` · ${data.totalVehicles} assets monitored` : ''}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span className="ai-triage-title">AI Fleet Readiness & Autonomous Dispatch Desk</span>
+                <span className="ai-triage-badge">
+                  <Shield size={11} aria-hidden="true" />
+                  Executive Supervisory Mode
+                </span>
+                {data?.provider && !data.degraded ? (
+                  <span className="ai-triage-badge" title={`Engine: ${PROVIDER_LABEL[data.provider]}`}>
+                    <Sparkles size={11} aria-hidden="true" />
+                    {PROVIDER_LABEL[data.provider]}
+                  </span>
+                ) : data?.degraded ? (
+                  <span className="ai-triage-badge" style={{ background: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+                    <TriangleAlert size={11} aria-hidden="true" />
+                    Deterministic Engine
+                  </span>
+                ) : null}
+              </div>
+              <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: '0.2rem' }}>
+                {stationName ? `Station command: ${stationName}` : 'District-wide fleet command (37 Police Stations)'}
+                {data ? ` · ${data.totalVehicles} assets monitored` : ''}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="cluster" style={{ gap: '0.5rem' }}>
-          {activeLaneFilter ? (
+          <div className="cluster" style={{ gap: '0.5rem' }}>
+            {activeLaneFilter ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Filter size={13} />}
+                onClick={() => onFilterLane?.(null, null)}
+              >
+                Clear lane filter ({activeLaneFilter})
+              </Button>
+            ) : null}
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
-              icon={<Filter size={13} />}
-              onClick={() => onFilterLane?.(null, null)}
+              icon={<RefreshCw size={13} className={loading ? 'spin' : ''} />}
+              onClick={() => void loadTriage(true)}
+              disabled={loading}
             >
-              Clear lane filter ({activeLaneFilter})
+              Refresh
             </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<RefreshCw size={13} className={loading ? 'spin' : ''} />}
-            onClick={() => void loadTriage(true)}
-            disabled={loading}
+          </div>
+        </div>
+
+        {/* AI Operations Summary */}
+        {error ? (
+          <p className="text-danger" style={{ fontSize: '0.85rem' }}>{error}</p>
+        ) : data?.summary ? (
+          <div className="ai-triage-summary">
+            <strong>Mission Digest:</strong> {data.summary}
+          </div>
+        ) : null}
+
+        {/* 3 Visual Mission Lanes */}
+        <div className="ai-lanes-grid">
+          {/* Ready Lane */}
+          <div
+            className={`ai-lane-card ai-lane-card--ready ${activeLaneFilter === 'ready' ? 'ai-lane-card--active' : ''}`}
           >
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* AI Operations Summary */}
-      {error ? (
-        <p className="text-danger" style={{ fontSize: '0.85rem' }}>{error}</p>
-      ) : data?.summary ? (
-        <div className="ai-triage-summary">
-          <strong>Mission Digest:</strong> {data.summary}
-        </div>
-      ) : null}
-
-      {/* 3 Visual Mission Lanes */}
-      <div className="ai-lanes-grid">
-        {/* Ready Lane */}
-        <div
-          className={`ai-lane-card ai-lane-card--ready ${activeLaneFilter === 'ready' ? 'ai-lane-card--active' : ''}`}
-        >
-          <div>
-            <div className="ai-lane-header">
-              <span className="ai-lane-name" style={{ color: 'var(--color-success, #10b981)' }}>
-                <CheckCircle2 size={15} /> Mission Ready
-              </span>
-              <span className="ai-lane-count">{data?.lanes.ready.count ?? 0}</span>
+            <div>
+              <div className="ai-lane-header">
+                <span className="ai-lane-name" style={{ color: 'var(--color-success, #10b981)' }}>
+                  <CheckCircle2 size={15} /> Mission Ready
+                </span>
+                <span className="ai-lane-count">{data?.lanes.ready.count ?? 0}</span>
+              </div>
+              <p className="ai-lane-desc">
+                {data?.lanes.ready.description || '100% compliant, fully fueled, and immediately dispatchable.'}
+              </p>
             </div>
-            <p className="ai-lane-desc">
-              {data?.lanes.ready.description || '100% compliant, fully fueled, and immediately dispatchable.'}
-            </p>
+            <Button
+              variant={activeLaneFilter === 'ready' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => toggleLane('ready')}
+            >
+              {activeLaneFilter === 'ready' ? 'Viewing Ready' : 'Filter Ready'}
+            </Button>
           </div>
-          <Button
-            variant={activeLaneFilter === 'ready' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => toggleLane('ready')}
-          >
-            {activeLaneFilter === 'ready' ? 'Viewing Ready' : 'Filter Ready'}
-          </Button>
-        </div>
 
-        {/* Attention Lane */}
-        <div
-          className={`ai-lane-card ai-lane-card--attention ${activeLaneFilter === 'attention' ? 'ai-lane-card--active' : ''}`}
-        >
-          <div>
-            <div className="ai-lane-header">
-              <span className="ai-lane-name" style={{ color: 'var(--color-warning, #f59e0b)' }}>
-                <AlertTriangle size={15} /> Attention Required
-              </span>
-              <span className="ai-lane-count">{data?.lanes.attention.count ?? 0}</span>
+          {/* Attention Lane */}
+          <div
+            className={`ai-lane-card ai-lane-card--attention ${activeLaneFilter === 'attention' ? 'ai-lane-card--active' : ''}`}
+          >
+            <div>
+              <div className="ai-lane-header">
+                <span className="ai-lane-name" style={{ color: 'var(--color-warning, #f59e0b)' }}>
+                  <AlertTriangle size={15} /> Attention Required
+                </span>
+                <span className="ai-lane-count">{data?.lanes.attention.count ?? 0}</span>
+              </div>
+              <p className="ai-lane-desc">
+                {data?.lanes.attention.description || 'Expiring certificates, low fuel, or upcoming routine maintenance.'}
+              </p>
             </div>
-            <p className="ai-lane-desc">
-              {data?.lanes.attention.description || 'Expiring certificates, low fuel, or upcoming routine maintenance.'}
-            </p>
+            <Button
+              variant={activeLaneFilter === 'attention' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => toggleLane('attention')}
+            >
+              {activeLaneFilter === 'attention' ? 'Viewing Attention' : 'Filter Attention'}
+            </Button>
           </div>
-          <Button
-            variant={activeLaneFilter === 'attention' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => toggleLane('attention')}
-          >
-            {activeLaneFilter === 'attention' ? 'Viewing Attention' : 'Filter Attention'}
-          </Button>
-        </div>
 
-        {/* Grounded Lane */}
-        <div
-          className={`ai-lane-card ai-lane-card--grounded ${activeLaneFilter === 'grounded' ? 'ai-lane-card--active' : ''}`}
-        >
-          <div>
-            <div className="ai-lane-header">
-              <span className="ai-lane-name" style={{ color: 'var(--color-danger, #ef4444)' }}>
-                <XCircle size={15} /> Grounded / Standdown
-              </span>
-              <span className="ai-lane-count">{data?.lanes.grounded.count ?? 0}</span>
+          {/* Grounded Lane */}
+          <div
+            className={`ai-lane-card ai-lane-card--grounded ${activeLaneFilter === 'grounded' ? 'ai-lane-card--active' : ''}`}
+          >
+            <div>
+              <div className="ai-lane-header">
+                <span className="ai-lane-name" style={{ color: 'var(--color-danger, #ef4444)' }}>
+                  <XCircle size={15} /> Grounded / Standdown
+                </span>
+                <span className="ai-lane-count">{data?.lanes.grounded.count ?? 0}</span>
+              </div>
+              <p className="ai-lane-desc">
+                {data?.lanes.grounded.description || 'Expired compliance, open critical tickets, or restrictions.'}
+              </p>
             </div>
-            <p className="ai-lane-desc">
-              {data?.lanes.grounded.description || 'Expired compliance, open critical tickets, or restrictions.'}
-            </p>
+            <Button
+              variant={activeLaneFilter === 'grounded' ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => toggleLane('grounded')}
+            >
+              {activeLaneFilter === 'grounded' ? 'Viewing Grounded' : 'Filter Grounded'}
+            </Button>
           </div>
-          <Button
-            variant={activeLaneFilter === 'grounded' ? 'primary' : 'secondary'}
-            size="sm"
-            onClick={() => toggleLane('grounded')}
-          >
-            {activeLaneFilter === 'grounded' ? 'Viewing Grounded' : 'Filter Grounded'}
-          </Button>
-        </div>
-      </div>
-
-      {/* 1-Click Managerial Action Cards Queue */}
-      <div className="ai-actions-section">
-        <div className="ai-actions-heading">
-          <span>1-Click Supervisory Action Queue</span>
-          <span className="text-muted" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
-            {uncommittedActions.length} prescreened actions ready for managerial commitment
-          </span>
         </div>
 
-        {uncommittedActions.length === 0 ? (
-          <div style={{ padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
-            No urgent compliance or maintenance actions pending. Fleet operating parameters are within compliant thresholds.
+        {/* 1-Click Managerial Action Cards Queue */}
+        <div className="ai-actions-section">
+          <div className="ai-actions-heading">
+            <span>1-Click Supervisory Action Queue</span>
+            <span className="text-muted" style={{ fontSize: '0.75rem', fontWeight: 500 }}>
+              {uncommittedActions.length} prescreened actions ready for managerial commitment
+            </span>
           </div>
-        ) : (
-          <div className="ai-action-cards-grid">
-            {uncommittedActions.map((action) => {
-              const isExecuting = executingActionId === action.id;
-              const isComp = action.type === 'COMPLIANCE_RENEWAL';
-              const isFuel = action.type === 'FUEL_ROUTING';
-              const isMaint = action.type === 'MAINTENANCE_SCHEDULE';
 
-              return (
-                <div key={action.id} className="ai-action-card">
-                  <div>
-                    <div className="ai-action-card__top">
-                      <div className="cluster" style={{ gap: '0.4rem' }}>
-                        {isComp ? (
-                          <FileText size={15} style={{ color: 'var(--color-warning)' }} />
-                        ) : isFuel ? (
-                          <Fuel size={15} style={{ color: 'var(--color-brand)' }} />
-                        ) : (
-                          <Wrench size={15} style={{ color: 'var(--color-danger)' }} />
-                        )}
-                        <span className="mono" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
-                          {action.assetCode}
+          {uncommittedActions.length === 0 ? (
+            <div style={{ padding: '0.75rem 1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', color: 'var(--color-text-secondary)' }}>
+              No urgent compliance or maintenance actions pending. Fleet operating parameters are within compliant thresholds.
+            </div>
+          ) : (
+            <div className="ai-action-cards-grid">
+              {uncommittedActions.map((action) => {
+                const isExecuting = executingActionId === action.id;
+                const isComp = action.type === 'COMPLIANCE_RENEWAL';
+                const isFuel = action.type === 'FUEL_ROUTING';
+                const isMaint = action.type === 'MAINTENANCE_SCHEDULE';
+
+                return (
+                  <div key={action.id} className="ai-action-card">
+                    <div>
+                      <div className="ai-action-card__top">
+                        <div className="cluster" style={{ gap: '0.4rem' }}>
+                          {isComp ? (
+                            <FileText size={15} style={{ color: 'var(--color-warning)' }} />
+                          ) : isFuel ? (
+                            <Fuel size={15} style={{ color: 'var(--color-brand)' }} />
+                          ) : (
+                            <Wrench size={15} style={{ color: 'var(--color-danger)' }} />
+                          )}
+                          <span className="mono" style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                            {action.assetCode}
+                          </span>
+                        </div>
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '0.68rem',
+                            background:
+                              action.priority === 'high'
+                                ? 'var(--color-danger-bg, #fee2e2)'
+                                : 'var(--color-warning-bg, #fef3c7)',
+                            color:
+                              action.priority === 'high'
+                                ? 'var(--color-danger, #b91c1c)'
+                                : 'var(--color-warning, #b45309)'
+                          }}
+                        >
+                          {action.priority.toUpperCase()}
                         </span>
                       </div>
-                      <span
-                        className="badge"
-                        style={{
-                          fontSize: '0.68rem',
-                          background:
-                            action.priority === 'high'
-                              ? 'var(--color-danger-bg, #fee2e2)'
-                              : 'var(--color-warning-bg, #fef3c7)',
-                          color:
-                            action.priority === 'high'
-                              ? 'var(--color-danger, #b91c1c)'
-                              : 'var(--color-warning, #b45309)'
-                        }}
-                      >
-                        {action.priority.toUpperCase()}
-                      </span>
+
+                      <div className="ai-action-card__title" style={{ marginTop: '0.35rem' }}>
+                        {action.title}
+                      </div>
+                      <p className="ai-action-card__desc" style={{ marginTop: '0.25rem' }}>
+                        {action.description}
+                      </p>
                     </div>
 
-                    <div className="ai-action-card__title" style={{ marginTop: '0.35rem' }}>
-                      {action.title}
-                    </div>
-                    <p className="ai-action-card__desc" style={{ marginTop: '0.25rem' }}>
-                      {action.description}
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="ai-action-card__impact">
-                      Impact: {action.impact}
-                    </span>
-
-                    <div className="ai-action-card__bottom">
-                      <span className="text-muted" style={{ fontSize: '0.72rem' }}>
-                        {action.stationName || 'Police Fleet'}
+                    <div>
+                      <span className="ai-action-card__impact">
+                        Impact: {action.impact}
                       </span>
-                      <div className="cluster" style={{ gap: '0.4rem' }}>
-                        {action.actionUrl ? (
-                          <Link
-                            href={action.actionUrl}
-                            className="button button--ghost button--sm"
-                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.45rem' }}
-                            title="Inspect details"
+
+                      <div className="ai-action-card__bottom">
+                        <span className="text-muted" style={{ fontSize: '0.72rem' }}>
+                          {action.stationName || 'Police Fleet'}
+                        </span>
+                        <div className="cluster" style={{ gap: '0.4rem' }}>
+                          {action.actionUrl ? (
+                            <Link
+                              href={action.actionUrl}
+                              className="button button--ghost button--sm"
+                              style={{ fontSize: '0.75rem', padding: '0.2rem 0.45rem' }}
+                              title="Inspect details"
+                            >
+                              <ExternalLink size={12} />
+                            </Link>
+                          ) : null}
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={isExecuting}
+                            onClick={() => void handleExecuteAction(action)}
+                            icon={
+                              isExecuting ? (
+                                <LoaderCircle size={12} className="spin" />
+                              ) : (
+                                <Check size={12} />
+                              )
+                            }
                           >
-                            <ExternalLink size={12} />
-                          </Link>
-                        ) : null}
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          disabled={isExecuting}
-                          onClick={() => void handleExecuteAction(action)}
-                          icon={
-                            isExecuting ? (
-                              <LoaderCircle size={12} className="spin" />
-                            ) : (
-                              <Check size={12} />
-                            )
-                          }
-                        >
-                          {isComp ? '1-Click Renew' : isFuel ? '1-Click Refuel' : '1-Click Book MT'}
-                        </Button>
+                            {isComp ? '1-Click Renew' : isFuel ? '1-Click Refuel' : '1-Click Book MT'}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Quick Mission Auto-Dispatch Assistant */}
-      <div className="ai-dispatch-section">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
-          <div>
-            <strong style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>
-              Mission Auto-Dispatch Desk (Zero-Clerk Deployment)
-            </strong>
-            <p className="text-muted" style={{ fontSize: '0.76rem', margin: 0 }}>
-              AI analyzes passenger requirement, fuel range, and officer roster to recommend the optimal patrol vehicle.
-            </p>
-          </div>
-          {status.features.draftRequest ? null : (
-            <span className="badge" style={{ fontSize: '0.7rem' }}>AI Draft Feature Disabled</span>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Input Bar */}
-        <div className="ai-dispatch-bar">
-          <input
-            type="text"
-            className="input ai-dispatch-input"
-            placeholder="e.g. Need 4-person patrol for Sarafa Bazaar festival duty"
-            value={missionText}
-            onChange={(e) => setMissionText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !dispatchLoading) {
-                e.preventDefault();
-                void handleRunAutoDispatch();
-              }
-            }}
-            disabled={dispatchLoading}
-            aria-label="Mission intent description"
-          />
-          <Button
-            variant="primary"
-            icon={dispatchLoading ? <LoaderCircle size={14} className="spin" /> : <Send size={14} />}
-            disabled={dispatchLoading || !missionText.trim()}
-            onClick={() => void handleRunAutoDispatch()}
-          >
-            Analyze & Dispatch
-          </Button>
-        </div>
-
-        {/* Sample Pills */}
-        <div className="ai-sample-pills">
-          <span className="text-muted" style={{ fontSize: '0.72rem', marginRight: '0.2rem' }}>Quick presets:</span>
-          {SAMPLE_MISSIONS.map((sample) => (
-            <button
-              key={sample}
-              type="button"
-              className="ai-sample-pill"
-              onClick={() => {
-                setMissionText(sample);
-                void handleRunAutoDispatch(sample);
-              }}
-            >
-              {sample}
-            </button>
-          ))}
-        </div>
-
-        {/* Dispatch Results Box */}
-        {dispatchError ? (
-          <p className="text-danger" style={{ fontSize: '0.82rem' }}>{dispatchError}</p>
-        ) : null}
-
-        {deployedSuccess ? (
-          <div style={{ padding: '0.75rem 1rem', background: 'var(--color-success-bg, #ecfdf5)', color: 'var(--color-success, #065f46)', borderRadius: 'var(--radius-md)', fontSize: '0.84rem', fontWeight: 600 }}>
-            {deployedSuccess}
+        {/* Quick Mission Auto-Dispatch Assistant */}
+        <div className="ai-dispatch-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.4rem' }}>
+            <div>
+              <strong style={{ fontSize: '0.86rem', color: 'var(--color-text-primary)' }}>
+                Mission Auto-Dispatch Desk (Zero-Clerk Deployment)
+              </strong>
+              <p className="text-muted" style={{ fontSize: '0.76rem', margin: 0 }}>
+                AI analyzes passenger requirement, fuel range, and officer roster to recommend the optimal patrol vehicle.
+              </p>
+            </div>
+            {status.features.draftRequest ? null : (
+              <span className="badge" style={{ fontSize: '0.7rem' }}>AI Draft Feature Disabled</span>
+            )}
           </div>
-        ) : null}
 
-        {dispatchResult ? (
-          <div className="ai-dispatch-result-box">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div className="cluster" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
-                <span className="badge" style={{ fontSize: '0.72rem' }}>
-                  Target: {dispatchResult.parsedRequirements.classNeeded}
-                </span>
-                <span className="badge" style={{ fontSize: '0.72rem' }}>
-                  Officers: {dispatchResult.parsedRequirements.passengerCount} Pax
-                </span>
-                <span className="badge" style={{ fontSize: '0.72rem' }}>
-                  Priority: {dispatchResult.parsedRequirements.urgency}
-                </span>
-                {dispatchResult.parsedRequirements.destination ? (
+          {/* Input Bar */}
+          <div className="ai-dispatch-bar">
+            <input
+              type="text"
+              className="input ai-dispatch-input"
+              placeholder="e.g. Need 4-person patrol for Sarafa Bazaar festival duty"
+              value={missionText}
+              onChange={(e) => setMissionText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !dispatchLoading) {
+                  e.preventDefault();
+                  void handleRunAutoDispatch();
+                }
+              }}
+              disabled={dispatchLoading}
+              aria-label="Mission intent description"
+            />
+            <Button
+              variant="primary"
+              icon={dispatchLoading ? <LoaderCircle size={14} className="spin" /> : <Send size={14} />}
+              disabled={dispatchLoading || !missionText.trim()}
+              onClick={() => void handleRunAutoDispatch()}
+            >
+              Analyze & Dispatch
+            </Button>
+          </div>
+
+          {/* Sample Pills */}
+          <div className="ai-sample-pills">
+            <span className="text-muted" style={{ fontSize: '0.72rem', marginRight: '0.2rem' }}>Quick presets:</span>
+            {SAMPLE_MISSIONS.map((sample) => (
+              <button
+                key={sample}
+                type="button"
+                className="ai-sample-pill"
+                onClick={() => {
+                  setMissionText(sample);
+                  void handleRunAutoDispatch(sample);
+                }}
+              >
+                {sample}
+              </button>
+            ))}
+          </div>
+
+          {/* Dispatch Results Box */}
+          {dispatchError ? (
+            <p className="text-danger" style={{ fontSize: '0.82rem' }}>{dispatchError}</p>
+          ) : null}
+
+          {deployedSuccess ? (
+            <div style={{ padding: '0.75rem 1rem', background: 'var(--color-success-bg, #ecfdf5)', color: 'var(--color-success, #065f46)', borderRadius: 'var(--radius-md)', fontSize: '0.84rem', fontWeight: 600 }}>
+              {deployedSuccess}
+            </div>
+          ) : null}
+
+          {dispatchResult ? (
+            <div className="ai-dispatch-result-box">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div className="cluster" style={{ gap: '0.4rem', flexWrap: 'wrap' }}>
                   <span className="badge" style={{ fontSize: '0.72rem' }}>
-                    Point: {dispatchResult.parsedRequirements.destination}
+                    Target: {dispatchResult.parsedRequirements.classNeeded}
+                  </span>
+                  <span className="badge" style={{ fontSize: '0.72rem' }}>
+                    Officers: {dispatchResult.parsedRequirements.passengerCount} Pax
+                  </span>
+                  <span className="badge" style={{ fontSize: '0.72rem' }}>
+                    Priority: {dispatchResult.parsedRequirements.urgency}
+                  </span>
+                  {dispatchResult.parsedRequirements.destination ? (
+                    <span className="badge" style={{ fontSize: '0.72rem' }}>
+                      Point: {dispatchResult.parsedRequirements.destination}
+                    </span>
+                  ) : null}
+                </div>
+
+                {dispatchResult.provider && !dispatchResult.degraded ? (
+                  <span className="text-muted" style={{ fontSize: '0.7rem' }}>
+                    Evaluated via {PROVIDER_LABEL[dispatchResult.provider]}
                   </span>
                 ) : null}
               </div>
 
-              {dispatchResult.provider && !dispatchResult.degraded ? (
-                <span className="text-muted" style={{ fontSize: '0.7rem' }}>
-                  Evaluated via {PROVIDER_LABEL[dispatchResult.provider]}
-                </span>
-              ) : null}
-            </div>
-
-            {dispatchResult.warnings.length > 0 ? (
-              <div style={{ fontSize: '0.78rem', color: 'var(--color-warning)' }}>
-                {dispatchResult.warnings.map((w, idx) => (
-                  <div key={idx}>⚠️ {w}</div>
-                ))}
-              </div>
-            ) : null}
-
-            {dispatchResult.recommendations.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
-                  Top Ranked Candidate:
+              {dispatchResult.warnings.length > 0 ? (
+                <div style={{ fontSize: '0.78rem', color: 'var(--color-warning)' }}>
+                  {dispatchResult.warnings.map((w, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <AlertTriangle size={12} aria-hidden="true" />
+                    <span>{w}</span>
+                  </div>
+                  ))}
                 </div>
-                {dispatchResult.recommendations.slice(0, 2).map((cand, idx) => (
-                  <div key={cand.vehicleId} className="ai-candidate-card">
-                    <div>
-                      <div className="cluster" style={{ gap: '0.45rem' }}>
-                        <strong>{cand.registrationNumber}</strong>
-                        <span className="mono text-muted" style={{ fontSize: '0.78rem' }}>({cand.assetCode})</span>
-                        <span className="badge" style={{ fontSize: '0.7rem' }}>{cand.vehicleClass}</span>
-                        {idx === 0 ? (
-                          <span className="badge" style={{ fontSize: '0.7rem', background: 'var(--color-brand-subtle)', color: 'var(--color-brand)' }}>
-                            Top Recommendation
-                          </span>
+              ) : null}
+
+              {dispatchResult.recommendations.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-text-secondary)' }}>
+                    Top Ranked Candidate:
+                  </div>
+                  {dispatchResult.recommendations.slice(0, 2).map((cand, idx) => (
+                    <div key={cand.vehicleId} className="ai-candidate-card">
+                      <div>
+                        <div className="cluster" style={{ gap: '0.45rem' }}>
+                          <strong>{cand.registrationNumber}</strong>
+                          <span className="mono text-muted" style={{ fontSize: '0.78rem' }}>({cand.assetCode})</span>
+                          <span className="badge" style={{ fontSize: '0.7rem' }}>{cand.vehicleClass}</span>
+                          {idx === 0 ? (
+                            <span className="badge" style={{ fontSize: '0.7rem', background: 'var(--color-brand-subtle)', color: 'var(--color-brand)' }}>
+                              Top Recommendation
+                            </span>
+                          ) : null}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
+                          {cand.suitabilityReason}
+                        </div>
+                        {cand.assignedDriver ? (
+                          <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
+                            <User size={12} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> Driver: {cand.assignedDriver.name}
+                          </div>
                         ) : null}
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', marginTop: '0.2rem' }}>
-                        {cand.suitabilityReason}
-                      </div>
-                      {cand.assignedDriver ? (
-                        <div style={{ fontSize: '0.74rem', color: 'var(--color-text-muted)', marginTop: '0.15rem' }}>
-                          <User size={12} style={{ display: 'inline', verticalAlign: 'text-bottom' }} /> Driver: {cand.assignedDriver.name}
-                        </div>
-                      ) : null}
-                    </div>
 
-                    <div className="cluster" style={{ gap: '0.65rem' }}>
-                      <span className="ai-score-badge">
-                        {cand.suitabilityScore}% Match
-                      </span>
-                      {idx === 0 && dispatchResult.suggestedAction ? (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          icon={deploying ? <LoaderCircle size={13} className="spin" /> : <ArrowRight size={13} />}
-                          disabled={deploying}
-                          onClick={() => void handleDeployMission()}
-                        >
-                          1-Click Deploy Mission
-                        </Button>
-                      ) : null}
+                      <div className="cluster" style={{ gap: '0.65rem' }}>
+                        <span className="ai-score-badge">
+                          {cand.suitabilityScore}% Match
+                        </span>
+                        {idx === 0 && dispatchResult.suggestedAction ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={deploying ? <LoaderCircle size={13} className="spin" /> : <ArrowRight size={13} />}
+                            disabled={deploying}
+                            onClick={() => void handleDeployMission()}
+                          >
+                            1-Click Deploy Mission
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted" style={{ fontSize: '0.82rem' }}>
-                No active government fleet patrol vehicles available in this scope.
-              </p>
-            )}
-          </div>
-        ) : null}
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted" style={{ fontSize: '0.82rem' }}>
+                  No active government fleet patrol vehicles available in this scope.
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
-    </div>
     </div>
   );
 }

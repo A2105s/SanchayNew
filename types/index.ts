@@ -974,6 +974,7 @@ export interface SpaceView {
   contactPhone: string | null;
   amenities: string[];
   accessibility: string[];
+  photos?: string[];
   /** Per-weekday IST operating hours; missing day = closed */
   operatingHours: Partial<Record<'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat', [string, string]>>;
   minBookingHours: number;

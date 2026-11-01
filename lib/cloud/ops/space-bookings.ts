@@ -252,7 +252,16 @@ async function canReviewSilent(user: SessionUser, spaceId: string): Promise<bool
 export async function listSpaceBookings(user: SessionUser, filters: SpaceBookingSearchParsed): Promise<{ bookings: SpaceBookingView[]; total: number }> {
   const and: Prisma.SpaceBookingWhereInput[] = [];
   if (filters.scope === 'mine') {
-    and.push({ requestedBy: user.username });
+    if (user.organizationId) {
+      and.push({
+        OR: [
+          { requestedBy: user.username },
+          { requestedForOrgId: user.organizationId }
+        ]
+      });
+    } else {
+      and.push({ requestedBy: user.username });
+    }
   } else if (filters.scope === 'review') {
     if (user.username === 'spaces.admin' || user.role === 'ADMIN') {
       // platform admin and civic spaces admin see all pending/reviewable
@@ -284,9 +293,9 @@ export async function listSpaceBookings(user: SessionUser, filters: SpaceBooking
 export async function spaceCalendar(user: SessionUser, spaceId: string, fromISO: string, toISO: string): Promise<{ bookings: SpaceBookingView[]; blocked: boolean }> {
   const space = await prisma.space.findUnique({ where: { id: spaceId }, select: { organizationId: true } });
   if (!space) throw new DomainError('Space not found.', 404);
-  const isCivicAdmin = user.username === 'spaces.admin' || user.role === 'ADMIN';
-  const tree = isCivicAdmin ? null : await orgTree(user);
-  if (tree !== null && !tree.includes(space.organizationId)) throw new DomainError('This space belongs to another organization.', 403);
+
+
+  // Calendar free/busy intervals are discoverable by any authorized government user
   const from = new Date(fromISO);
   const to = new Date(toISO);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) throw new DomainError('Invalid calendar window.', 400);

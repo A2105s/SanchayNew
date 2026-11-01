@@ -97,10 +97,21 @@ async function blockedByMaintenanceFor(spaceId: string, tx: TxClient | typeof pr
 }
 
 export async function searchSpaces(user: SessionUser, filters: SpaceSearchParsed): Promise<{ spaces: SpaceView[]; total: number }> {
-  const isCivicSpacesAdmin = user.username === 'spaces.admin';
+  const isCivicSpacesAdmin = user.username === 'spaces.admin' || user.role === 'ADMIN';
   const tree = isCivicSpacesAdmin ? null : await orgTree(user);
   const and: Prisma.SpaceWhereInput[] = [];
-  if (tree !== null) and.push({ organizationId: { in: tree } });
+  
+  if (filters.organizationId) {
+    and.push({ organizationId: filters.organizationId });
+  } else if (filters.scope === 'managed' && tree !== null) {
+    and.push({ organizationId: { in: tree } });
+  } else {
+    // Cross-organization government discovery: allow discovering spaces across all registered departments.
+    // Hide RETIRED spaces from general discovery unless viewing managed spaces.
+    if (!filters.state) {
+      and.push({ operationalState: { not: 'RETIRED' } });
+    }
+  }
   if (filters.q) {
     const q = filters.q;
     and.push({
@@ -169,9 +180,9 @@ export interface SpaceDetail {
 
 export async function getSpaceDetail(user: SessionUser, id: string): Promise<SpaceDetail> {
   const space = await loadSpace(id);
-  const isCivicSpacesAdmin = user.username === 'spaces.admin';
+  const isCivicSpacesAdmin = user.username === 'spaces.admin' || user.role === 'ADMIN';
   const tree = isCivicSpacesAdmin ? null : await orgTree(user);
-  if (tree !== null && !tree.includes(space.organizationId)) throw new DomainError('This space belongs to another organization.', 403);
+  const isOwner = tree === null || tree.includes(space.organizationId);
 
   const [org, bookings, maintenance, lastEnd, busyNow, blocked] = await Promise.all([
     prisma.organization.findUnique({ where: { id: space.organizationId }, select: { name: true } }),

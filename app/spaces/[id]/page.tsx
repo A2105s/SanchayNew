@@ -31,6 +31,7 @@ import { MiniMap } from '@/components/vehicles/MiniMap';
 import { SpaceStateBadge, SpaceCategoryLabel } from '@/components/spaces/SpaceCard';
 import { SpacesNav } from '@/components/spaces/SpacesNav';
 import { SpaceBookingCalendar } from '@/components/spaces/SpaceBookingCalendar';
+import { SpacePhotoGallery } from '@/components/spaces/SpacePhotoGallery';
 import { RelocateDialog } from '@/components/spaces/RelocateDialog';
 import type { SpaceBookingView, SpaceMaintenanceView, SpaceView } from '@/types';
 
@@ -108,6 +109,8 @@ function SpaceDetailInner({ params }: { params: Promise<{ id: string }> }) {
   return (
     <div className="page stack">
       <Link href="/spaces" className="back-link"><ArrowLeft size={15} aria-hidden="true" /> Back to spaces</Link>
+
+      <SpacePhotoGallery space={space} />
       
       <PageTitle
         title={space.name}

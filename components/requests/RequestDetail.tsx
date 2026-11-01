@@ -125,15 +125,26 @@ export function RequestDetail({ id }: { id: string }) {
 
   const isRequester = me?.username === request.requesterUsername || (Boolean(me?.stationId) && me?.stationId === request.requestingStationId);
   const isProvider = Boolean(me?.stationId) && me?.stationId === request.providerStationId;
-  const canReview = can('request.review') || isProvider;
+  const isHigherAuthority = me?.role === 'ADMIN' || me?.role === 'DEPT_OFFICER' || me?.role === 'ORG_ADMIN';
+
+  // For inter-station requests with a specific provider station:
+  // ONLY the designated provider station (or higher admin) can decide.
+  const isStationScoped = Boolean(request.providerStationId);
+  const authorizedDecider = isStationScoped
+    ? (isProvider || isHigherAuthority)
+    : (can('request.review') && !isRequester);
+
+  const canReview = authorizedDecider;
   const state = request.state;
 
   // Approver cannot act on their own request (separation of duties).
   const reviewBlockedReason = isRequester && !isProvider
-    ? 'You raised this request — a different officer must review it (separation of duties).'
-    : !canReview
-      ? 'You do not have permission to review requests.'
-      : null;
+    ? 'You raised this request — a different officer at the lending station must review it (separation of duties).'
+    : isStationScoped && !isProvider && !isHigherAuthority
+      ? `This request was sent to ${request.providerStationName ?? 'the provider station'}. Only that station or District Police HQ may review it.`
+      : !canReview
+        ? 'You do not have permission to review requests.'
+        : null;
 
   const timeline: TimelineEntry[] = [
     {
@@ -277,7 +288,7 @@ export function RequestDetail({ id }: { id: string }) {
           ) : null}
 
           {/* Reviewer actions */}
-          {(state === 'PENDING_APPROVAL' || state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') && !reviewBlockedReason ? (
+          {(state === 'PENDING_APPROVAL' || state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') && canReview && !reviewBlockedReason ? (
             <>
               {state === 'SUBMITTED' || state === 'PENDING_APPROVAL' ? (
                 <Button variant="secondary" onClick={() => openAction({ kind: 'startReview', title: 'Start review', confirmLabel: 'Start review' })}>

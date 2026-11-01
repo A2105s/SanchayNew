@@ -656,6 +656,7 @@ export function mapSpace(
     contactPhone: row.contactPhone,
     amenities: stringArray(row.amenities),
     accessibility: stringArray(row.accessibility),
+    photos: stringArray(row.photos),
     operatingHours: (row.operatingHours ?? {}) as SpaceView['operatingHours'],
     minBookingHours: row.minBookingHours,
     maxBookingHours: row.maxBookingHours,

@@ -492,7 +492,9 @@ export const spaceSearchSchema = z.object({
   minCapacity: z.coerce.number().int().min(0).optional(),
   from: isoDateNullable.optional(),
   to: isoDateNullable.optional(),
-  availableOnly: z.coerce.boolean().optional()
+  availableOnly: z.coerce.boolean().optional(),
+  scope: z.enum(['all', 'managed']).optional(),
+  organizationId: z.string().trim().optional()
 });
 
 export const spaceActionSchema = z.discriminatedUnion('type', [

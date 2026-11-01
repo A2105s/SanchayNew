@@ -75,6 +75,44 @@
 
 ---
 
+---
+
+## Board 3: Dual-Screen Cockpit & Judge Billboard Node
+
+> **Sketch:** `firmware/board3_dual_display/board3_dual_display.ino`
+> **Role:** Simultaneously drives the **7-Pin SPI OLED** (Telemetry sensor pages) AND the **4-Pin I2C OLED** (Executive marketing/pitch deck slides) on one NodeMCU.
+
+### 1. Screen 1: 7-Pin SPI OLED (Live Multi-Page Telemetry)
+
+| 7-Pin OLED Pin | Connects to NodeMCU | Voltage | Function |
+|:---|:---|:---|:---|
+| **GND** | **GND** | Ground | Common GND |
+| **VCC** | **3V3** | 3.3V | **3.3V ONLY (Never connect to VIN)** |
+| **D0** (SCK / CLK) | **D0** (GPIO 16) | 3.3V | SPI Clock signal |
+| **D1** (MOSI / DATA) | **D1** (GPIO 5) | 3.3V | SPI Data signal |
+| **RES** (Reset) | **D2** (GPIO 4) | 3.3V | Reset signal |
+| **DC** (Data/Command) | **D3** (GPIO 0) | 3.3V | Command select |
+| **CS** (Chip Select) | **D4** (GPIO 2) | 3.3V | Chip enable |
+
+### 2. Screen 2: 4-Pin I2C OLED (Sanchay PR & Judge Pitch Billboard)
+
+| 4-Pin OLED Pin | Connects to NodeMCU | Voltage | Function |
+|:---|:---|:---|:---|
+| **GND** | **GND** | Ground | Common GND |
+| **VCC** | **3V3** | 3.3V | **3.3V ONLY** |
+| **SDA** (Data) | **D7** (GPIO 13) | 3.3V | Software I2C Data |
+| **SCL** (Clock) | **D8** (GPIO 15) | 3.3V | Software I2C Clock |
+
+### 3. Local Climate Sensor: DHT11 (Live Interactive Demo)
+
+| DHT11 Pin | Connects to NodeMCU | Voltage | Function |
+|:---|:---|:---|:---|
+| **GND** (-) | **GND** | Ground | Common GND |
+| **VCC** (+) | **3V3** | 3.3V | 3.3V Rail |
+| **DATA** (Out) | **D5** (GPIO 14) | 3.3V | Live temperature & humidity (judges can blow on it to test) |
+
+---
+
 ## Physical Breadboard Pin Cheat (NodeMCU Pin Map)
 
 ```text

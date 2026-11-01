@@ -1969,3 +1969,75 @@ td {
   color: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.16);
 }
+
+
+/* Special IoT Edge Device Marker & Animated Radar Pulse Halo */
+.fleet-marker--iot {
+  z-index: 22 !important;
+}
+
+.fleet-marker__iot-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  margin-left: -26px;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.48);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+  pointer-events: none;
+  z-index: 0;
+  animation: iotBeaconPulse 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.fleet-marker__iot-pulse::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(239, 68, 68, 0.6);
+  animation: iotBeaconRipple 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+@keyframes iotBeaconPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.95;
+  }
+}
+
+@keyframes iotBeaconRipple {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.75);
+    opacity: 0;
+  }
+}
+
+.fleet-marker--iot .fleet-marker__pill {
+  border-color: rgba(14, 165, 233, 0.5);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.fleet-marker__iot-badge {
+  background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

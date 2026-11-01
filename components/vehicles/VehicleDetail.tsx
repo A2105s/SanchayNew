@@ -942,7 +942,13 @@ function TelemetrySection({ vehicle, devices, masked }: { vehicle: VehicleDetail
                 </span>
               </div>
             ) : null}
-            <MiniMap lat={v.lat} lng={v.lng} heading={v.heading} />
+            <MiniMap
+              lat={v.lat}
+              lng={v.lng}
+              heading={v.heading}
+              isIot={v.registrationNumber === 'MP07-DG-6386' || devices.some((d) => d.deviceCode === 'SANCHAY-IOT-001')}
+              registrationNumber={v.registrationNumber}
+            />
           </>
         )}
       </Panel>
@@ -951,9 +957,17 @@ function TelemetrySection({ vehicle, devices, masked }: { vehicle: VehicleDetail
           {devices.length === 0 ? <p className="text-muted">No devices bound.</p> : (
             <ul className="plain-list">
               {devices.map((d) => (
-                <li key={d.id}>
-                  <strong className="mono">{d.deviceCode}</strong> · {d.kind} · {d.status}{' '}
-                  {d.simulated ? <Badge tone="warning">Simulated</Badge> : <Badge tone="info">Real</Badge>}
+                <li key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div className="cluster" style={{ gap: 8, alignItems: 'center' }}>
+                    <Link href={`/iot/${d.id}`} className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)', textDecoration: 'none' }}>
+                      {d.deviceCode}
+                    </Link>
+                    <span>· {d.kind} · {d.status}</span>
+                    {d.simulated ? <Badge tone="warning">Simulated</Badge> : <Badge tone="success">Live HW</Badge>}
+                  </div>
+                  <Link href={`/iot/${d.id}`} style={{ fontSize: '0.8rem', color: 'var(--color-brand)', fontWeight: 600, textDecoration: 'none' }}>
+                    Live Dashboard →
+                  </Link>
                 </li>
               ))}
             </ul>

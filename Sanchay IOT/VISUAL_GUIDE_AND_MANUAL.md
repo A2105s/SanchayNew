@@ -40,68 +40,70 @@ The **Sanchay IoT System** is a dual-node distributed proximity radar and enviro
 
 ## 2. OLED Screen Cockpit Guide (Board 2)
 
-The 0.96" OLED screen is engineered with a **clean, spacious, high-contrast cockpit layout**. All status labels are written in **plain English** with zero cryptic acronyms.
+The 0.96" OLED screen is engineered with a **clean, spacious, high-contrast cockpit layout**. 
+By **transferring the Cloud status (`CLD`) to the top header bar**, the entire screen gains ample vertical breathing room, completely eliminating text crowding and line-wrap collisions.
 
 ### Visual Screen Layout
 
 ```text
 +-------------------------------------------------------+
-| NODE 1: OK                           WIFI: OK         | <-- Top Radio Status Bar
+| NODE:OK             WF:OK             CLD:22          | <-- Top Unified Cockpit Bar
 +-------------------------------------------------------+
 |                                                       |
-|   45 cm             [ WARNING ]                       | <-- Hero Distance (Big Size 2) & Zone
+|   45 cm                               [ WARN ]        | <-- Hero Distance (Big Size 2) & Zone
 |                                                       |
-| [=======================                            ] | <-- Analog Radar Distance Gauge
+| [=======================                            ] | <-- Analog Radar Distance Bar
 |                                                       |
-| TEMP: 26.4 C                         HUM: 54 %        | <-- Climate Readings (DHT22)
-| MOTION: NO                           GPS: 8 SAT       | <-- Security (PIR) & Navigation
+| TEMP: 26.4C                           HUM: 54%        | <-- Fixed-Anchor Climate Row (DHT22)
 |                                                       |
-| CLOUD: 28 PKTS SYNCED                                 | <-- Sanchay App Upload Status
+| PIR: CLEAR                            GPS: 8 SAT      | <-- Security (PIR) & Navigation
 +-------------------------------------------------------+
 ```
 
 ### Detailed Field Breakdown
 
-| Screen Row | Display Example | What It Means |
+| Screen Field | Display Example | What It Means |
 |---|---|---|
-| **Top Left** | `NODE 1: OK` | Wireless ESP-NOW connection to Board 1 is healthy. |
-| | `NODE 1: LOST` | Board 1 is unpowered, out of range, or rebooting. |
-| **Top Right** | `WIFI: OK` | Connected to Wi-Fi router `NASA` (2.4 GHz). |
-| | `WIFI: --` | Searching for Wi-Fi router or credentials not reached. |
-| **Hero Display** | **`45 cm`** | Distance to nearest obstacle in front of the ultrasonic sensor (**displayed in large text size 2** for instant readability). |
-| | `CLEAR` | No obstacle detected in range (> 400 cm). |
-| **Zone Badge** | `[SAFE]` | Obstacle is > 120 cm away (Safe operational buffer). |
-| | `[WATCH]` | Obstacle is between 60 cm and 120 cm. |
-| | `[WARN]` | Obstacle is between 30 cm and 60 cm. |
-| | `[CLOSE]` | Obstacle is between 10 cm and 30 cm (Slow down!). |
-| | `[STOP!]` | Obstacle is < 10 cm away or touching bumper (Critical collision risk!). |
-| **Radar Bar** | `[========  ]` | Graphical analog progress bar. Expands as an obstacle gets closer. |
-| **Climate Row** | `TEMP: 26.4 C` | Real-time ambient temperature from DHT22. |
-| | `HUM: 54 %` | Relative humidity percentage from DHT22. |
-| **Security Row** | `MOTION: NO` | PIR motion sensor area is clear. |
-| | `>> MOTION DETECTED <<` | Inverted white banner flashes when human/object movement is detected by the PIR sensor. |
-| **GPS Row** | `GPS: 8 SAT` | NEO-M8 has an active 3D satellite fix with 8 satellites. |
-| | `GPS: SEARCH` | Satellite fix is currently acquiring. |
-| **Bottom Row** | `CLOUD: SENDING DATA...` | A live telemetry packet is currently being dispatched via HTTP to Sanchay App. |
-| | `CLOUD: 28 PKTS SYNCED` | Total count of confirmed telemetry packets ingested by Sanchay App. |
-| | `CLOUD: OFFLINE (NO WF)`| Running in offline mode without router connection. |
+| **Top Left** | `NODE:OK` | Wireless ESP-NOW link with Board 1 is healthy and receiving. |
+| | `NODE:--` | Board 1 is unpowered, rebooting, or out of range. |
+| **Top Middle** | `WF:OK` | Connected to Wi-Fi router `NASA` (2.4 GHz). |
+| | `WF:--` | Searching for router `NASA` or credentials not reached. |
+| **Top Right** | `CLD:22` | **Total confirmed telemetry packets ingested by Sanchay App** (`POST /api/iot/ingest`). |
+| | `CLD:TX` | Currently transmitting live telemetry payload to Sanchay App. |
+| | `CLD:RDY`| Connected to Wi-Fi and ready for next telemetry ingestion. |
+| | `CLD:--` | Cloud sync offline (waiting for router link). |
+| **Hero Display** | **`45 cm`** | Distance to nearest obstacle in front of the ultrasonic sensor (**displayed in large text size 2** for instant driver readability). |
+| | `CLEAR` | No obstacle detected in range or open space. |
+| **Zone Badge** | `[SAFE]` | **Obstacle is $\ge 200\text{ cm}$ away or clear** (Safe operational buffer). |
+| | `[WATCH]` | Obstacle is between 120 cm and 200 cm (Approaching object). |
+| | `[WARN]` | Obstacle is between 60 cm and 120 cm (Attention required). |
+| | `[CLOSE]` | Obstacle is between 20 cm and 60 cm (Slow down!). |
+| | `[STOP!]` | Obstacle is $< 20\text{ cm}$ away or touching bumper (Critical collision risk!). |
+| **Radar Bar** | `[========  ]` | Graphical analog progress bar. **Completely empty when $\ge 200\text{ cm}$**. Smoothly fills as object approaches $< 200\text{ cm}$. |
+| **Climate Row** | `TEMP: 26.4C` | Real-time ambient temperature from DHT22 (x = 2). |
+| | `HUM: 54%` | Relative humidity percentage from DHT22 (x = 76). |
+| **Security Row** | `PIR: CLEAR` | PIR motion sensor area is clear. |
+| | `>> MOTION DETECTED <<` | Inverted white banner flashes across row when human/object movement is detected by the PIR sensor. |
+| **GPS Field** | `GPS: 8 SAT` | NEO-M8 has an active 3D satellite fix with 8 satellites. |
+| | `GPS: WAIT` | Satellite fix is currently acquiring. |
 
 ---
 
 ## 3. Board 1 RGB: Proximity Radar Gradient (Ultrasonic Sensor Node)
 
-Board 1 is dedicated to the front ultrasonic bumper radar. Rather than jumping in coarse steps, Board 1's RGB LED uses **24-bit continuous PWM interpolation** across the warm/hazard color spectrum (from 150 cm down to 8 cm). Every single centimeter change produces a smooth, fluid analog color transition:
+Board 1 is dedicated to the front ultrasonic bumper radar. Rather than jumping in coarse steps, Board 1's RGB LED uses **24-bit continuous PWM interpolation** across the warm/hazard color spectrum (from 200 cm down to 8 cm). Every single centimeter change produces a smooth, fluid analog color transition:
 
 ```
-Distance:   150 cm ------> 110 cm ------> 80 cm ------> 50 cm ------> 25 cm ------> < 8 cm
-Visual:     [GREEN]       [LIME]        [YELLOW]      [AMBER]       [ORANGE]       [SOLID RED]
-RGB:       (0,255,0)    (75,255,0)    (255,255,0)   (255,180,0)   (255,60,0)     (255,0,0)
-Zone:       [SAFE]        [FAR]        [APPROACH]     [WARN]       [CAUTION]       [STOP!]
+Distance:   >= 200 cm ------> 150 cm ------> 100 cm ------> 60 cm ------> 20 cm ------> < 8 cm
+Visual:      [GREEN]         [LIME]        [YELLOW]       [AMBER]       [ORANGE]       [SOLID RED]
+RGB:        (0,255,0)      (100,255,0)   (255,255,0)    (255,170,0)   (255,50,0)     (255,0,0)
+Zone:        [SAFE]          [WATCH]       [WARN]        [CLOSE]       [CLOSE]        [STOP!]
 ```
 
-* **150 cm to 80 cm (Approach Zone)**: Green channel stays at `255` while Red channel smoothly ramps from `0` to `255` (Pure Green -> Lime -> Chartreuse -> Pure Bright Yellow).
-* **80 cm to 8 cm (Danger Zone)**: Red channel stays at `255` while Green channel smoothly drops from `255` down to `0` (Pure Yellow -> Amber -> Warm Orange -> Red-Orange -> Deep Solid Red).
-* **< 8 cm (Contact / Collision Stop)**: Pure intense Solid Red (`255, 0, 0`).
+* **$\ge 200\text{ cm}$ or Clear (Safe Buffer)**: Pure Solid Green (`0, 255, 0`).
+* **200 cm to 100 cm (Approach Zone)**: Green channel stays at `255` while Red channel smoothly ramps from `0` to `255` (Pure Green -> Lime -> Chartreuse -> Pure Bright Yellow).
+* **100 cm to 8 cm (Danger Zone)**: Red channel stays at `255` while Green channel smoothly drops from `255` down to `0` (Pure Yellow -> Amber -> Warm Orange -> Red-Orange -> Deep Solid Red).
+* **$< 8\text{ cm}$ (Contact / Collision Stop)**: Pure intense Solid Red (`255, 0, 0`).
 * **RF Broadcast Spark**: Micro 20 ms Cyan-White spark (`180, 255, 255`) every 1s confirming telemetry transmission to Board 2.
 
 ---
@@ -137,18 +139,16 @@ To provide rich real-time communication feedback without obscuring the steady st
 
 ---
 
-## 6. High-Precision Dynamic Acoustic Buzzer (Board 2)
+## 6. Clean Automotive Acoustic Buzzer (Board 2)
 
-The active buzzer on Board 2 has been upgraded to a **continuous automotive parking radar curve**. Instead of 3 coarse steps, the beep cadence scales smoothly from 150 cm down to 8 cm:
+The active buzzer on Board 2 sounds **ONLY when an obstacle is within 50 cm** (the immediate proximity danger zone). When beyond 50 cm, the buzzer remains **completely silent** to avoid cabin annoyance. It transitions cleanly into a solid alarm tone at 20 cm without any frantic machine-gun buzzing:
 
-| Distance Measured | Beep Period | Pulse Width (ON time) | Acoustic Cadence & Pitch |
-|---|---|---|---|
-| **> 150 cm** | Infinite | 0 ms | **Completely Silent** |
-| **150 cm – 100 cm** | 900 ms – 520 ms | 65 ms | **Slow Periodic Tick** (1 to 2 Hz) |
-| **100 cm – 60 cm** | 520 ms – 280 ms | 55 ms | **Steady Radar Beep** (~3 Hz) |
-| **60 cm – 20 cm** | 280 ms – 90 ms | 40 ms | **Rapid Warning Pulse** (4 to 10 Hz) |
-| **20 cm – 8 cm** | 90 ms – 35 ms | 20 ms | **Ultra-Rapid Staccato** (Geiger-counter buzz!) |
-| **< 8 cm (Contact)** | Continuous | Solid ON | **Solid Continuous Tone** (Collision stop!) |
+| Distance Measured | Beep Period | Pulse Width (ON time) | Cadence & Sound Signature | Screen Zone |
+|---|---|---|---|---|
+| **$\ge 50\text{ cm}$ (or Clear)** | Infinite | 0 ms | **Completely Silent** (Visuals only: OLED & RGB LED) | `[SAFE]` / `[WATCH]` |
+| **35 cm – 50 cm** | 400 ms – 220 ms | 45 ms | **Clear Alert Beep** (2.5 Hz to 4.5 Hz) | `[WARN]` / `[CLOSE]` |
+| **20 cm – 35 cm** | 220 ms – 100 ms | 30 ms | **Urgent Warning Pulse** (4.5 Hz to 10 Hz) | `[CLOSE]` |
+| **$\le 20\text{ cm}$ (Bumper Stop)** | Continuous | Solid ON | **Solid Continuous Alarm Tone** (Emergency Stop!) | `[STOP!]` |
 
 ---
 

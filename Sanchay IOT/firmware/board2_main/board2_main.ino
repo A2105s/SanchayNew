@@ -113,8 +113,8 @@ const uint16_t SANCHAY_SERVER_PORT = 3000;
 const char *DEVICE_CODE = "SANCHAY-IOT-001";
 const char *DEVICE_INGEST_KEY = "sk_sanchay_iot_edge_2026";
 
-// Cloud sync interval (every 3000 ms)
-const unsigned long CLOUD_SYNC_INTERVAL_MS = 3000;
+// High-Speed Cloud Telemetry Sync (Every 1000 ms periodic + Immediate Event Dispatch)
+const unsigned long CLOUD_SYNC_INTERVAL_MS = 1000;
 unsigned long lastCloudPostMs = 0;
 uint32_t cloudUploadOk = 0;
 uint32_t cloudUploadFail = 0;
@@ -244,40 +244,31 @@ void computeProximityColor(uint16_t cm, uint8_t &r, uint8_t &g, uint8_t &b) {
 }
 
 // ---------------------------------------------------------------------------
-// High-Precision Buzzer Scaling
-// Dynamic curve from 1000 ms down to 35 ms with centimeter precision!
+// Clean Automotive Acoustic Buzzer Engine
+// Rule: Buzzer sounds ONLY when obstacle is LESS than 50 cm!
+// Completely SILENT when >= 50 cm or DIST_INVALID (zero driver annoyance).
+// Continuous solid STOP tone when <= 20 cm (emergency contact zone).
 // ---------------------------------------------------------------------------
 uint16_t getBuzzerPeriod(uint16_t cm) {
-  if (cm >= 150 || cm == DIST_INVALID) return 0; // Silent
-  if (cm <= 8) return 1; // Special code for continuous solid tone
+  if (cm >= 50 || cm == DIST_INVALID) return 0; // Completely SILENT >= 50 cm
+  if (cm <= 20) return 1; // Solid unbroken STOP tone (<= 20 cm)
 
-  // Progressive acoustic curve matching automotive parking radars:
-  // 150 cm -> 900 ms period (Slow tick)
-  // 100 cm -> 520 ms period
-  // 60 cm  -> 280 ms period
-  // 35 cm  -> 160 ms period
-  // 20 cm  -> 90 ms period
-  // 12 cm  -> 50 ms period
-  // 8 cm   -> 35 ms period (Ultra-rapid staccato)
-  if (cm > 100) {
-    return (uint16_t)map(cm, 150, 100, 900, 520);
-  } else if (cm > 60) {
-    return (uint16_t)map(cm, 100, 60, 520, 280);
-  } else if (cm > 20) {
-    return (uint16_t)map(cm, 60, 20, 280, 90);
+  // Clear, non-frantic warning progression between 20 cm and 50 cm:
+  // 50 cm -> 400 ms period (Clear alert tick: 2.5 Hz)
+  // 35 cm -> 220 ms period (Active warning: 4.5 Hz)
+  // 20 cm -> 100 ms period (Immediate urgency: 10 Hz)
+  if (cm > 35) {
+    return (uint16_t)map(cm, 50, 35, 400, 220);
   } else {
-    return (uint16_t)map(cm, 20, 8, 90, 35);
+    return (uint16_t)map(cm, 35, 20, 220, 100);
   }
 }
 
 const char *getPrecisionZoneName(uint16_t cm) {
-  if (cm == DIST_INVALID || cm > 150) return "CLEAR";
-  if (cm > 120) return "SAFE";
-  if (cm > 90)  return "FAR";
-  if (cm > 60)  return "APPROACH";
-  if (cm > 40)  return "WARN";
-  if (cm > 20)  return "CAUTION";
-  if (cm > 8)   return "CLOSE";
+  if (cm == DIST_INVALID || cm >= 200) return "SAFE";
+  if (cm >= 120) return "WATCH";
+  if (cm >= 60)  return "WARN";
+  if (cm >= 20)  return "CLOSE";
   return "STOP!";
 }
 
@@ -348,30 +339,53 @@ void updateRgb(bool linkUp, const SensorPacket &p) {
 }
 
 // ---------------------------------------------------------------------------
-// Buzzer State Machine (High-Precision Continuous Pitch & Cadence)
+// Jitter-Free Precision Acoustic State Machine
+// Centimeter-level precision with dynamic microsecond timing
 // ---------------------------------------------------------------------------
 void updateBuzzer(bool linkUp, const SensorPacket &p) {
-  if (!linkUp || p.distanceCm == DIST_INVALID || p.distanceCm >= 150) {
-    digitalWrite(PIN_BUZZER, LOW);
+  static unsigned long lastBeepStartMs = 0;
+  static bool buzzerActive = false;
+
+  // 1. Silent when link down, no target, or distance >= 50 cm
+  if (!linkUp || p.distanceCm == DIST_INVALID || p.distanceCm >= 50) {
+    if (buzzerActive) {
+      digitalWrite(PIN_BUZZER, LOW);
+      buzzerActive = false;
+    }
     return;
   }
 
-  // Continuous solid tone for emergency collision stop (< 8 cm)
-  if (p.distanceCm <= 8) {
+  // 2. Emergency Collision Stop (<= 20 cm): Continuous solid unbroken tone
+  if (p.distanceCm <= 20) {
     digitalWrite(PIN_BUZZER, HIGH);
+    buzzerActive = true;
     return;
   }
 
   uint16_t period = getBuzzerPeriod(p.distanceCm);
   if (period <= 1) {
     digitalWrite(PIN_BUZZER, HIGH);
+    buzzerActive = true;
     return;
   }
 
-  // Crisp, snappy clicks (proportional pulse width)
-  uint16_t onMs = constrain(period / 3, 20, 75);
-  unsigned long phase = millis() % period;
-  digitalWrite(PIN_BUZZER, phase < onMs ? HIGH : LOW);
+  // 3. Crisp, audible chirp duration (never frantic):
+  // 45 ms at 50 cm down to 25 ms at 20 cm
+  uint16_t onDuration = constrain(period / 4, 25, 45);
+  unsigned long now = millis();
+
+  if (buzzerActive) {
+    if (now - lastBeepStartMs >= onDuration) {
+      digitalWrite(PIN_BUZZER, LOW);
+      buzzerActive = false;
+    }
+  } else {
+    if (now - lastBeepStartMs >= period) {
+      lastBeepStartMs = now;
+      digitalWrite(PIN_BUZZER, HIGH);
+      buzzerActive = true;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -416,31 +430,45 @@ void playSanchayBootAnimation() {
 
 // ---------------------------------------------------------------------------
 // OLED Display Renderer (Uncluttered, High-Legibility Cockpit Layout)
+// CLD transferred to Top Bar for maximum vertical breathing room!
 // ---------------------------------------------------------------------------
 void drawScreen(bool linkUp, const SensorPacket &p) {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
 
   // -------------------------------------------------------------------------
-  // Header Row: Node and Wi-Fi Status (y = 0..8)
+  // Header Row: Unified Radio & Cloud Cockpit (y = 0..8)
+  // [NODE:OK]           [WF:OK]           [CLD:22]
   // -------------------------------------------------------------------------
   display.setTextSize(1);
   display.setCursor(0, 0);
   if (linkUp) {
-    display.print("NODE 1: OK");
+    display.print("NODE:OK");
   } else {
-    display.print("NODE 1: LOST");
+    display.print("NODE:--");
   }
 
-  display.setCursor(72, 0);
+  display.setCursor(50, 0);
   if (WiFi.status() == WL_CONNECTED) {
-    display.print("WIFI: OK");
+    display.print("WF:OK");
   } else {
-    display.print("WIFI: --");
+    display.print("WF:--");
+  }
+
+  display.setCursor(84, 0);
+  if (cloudSyncingNow) {
+    display.print("CLD:TX");
+  } else if (cloudUploadOk > 0) {
+    display.print("CLD:");
+    display.print(cloudUploadOk);
+  } else if (WiFi.status() == WL_CONNECTED) {
+    display.print("CLD:RDY");
+  } else {
+    display.print("CLD:--");
   }
 
   // Thin clean dividing rule
-  display.drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
   // If Link Lost, show bold diagnostic instructions
   if (!linkUp) {
@@ -462,48 +490,57 @@ void drawScreen(bool linkUp, const SensorPacket &p) {
   }
 
   // -------------------------------------------------------------------------
-  // Hero Area: Large, Readable Distance & Zone Status (y = 12..26)
+  // Hero Area: Large, Readable Distance & Zone Status (y = 14..30)
+  // Rule: >= 200 cm or DIST_INVALID is SAFE!
   // -------------------------------------------------------------------------
   if (p.distanceCm == DIST_INVALID) {
     display.setTextSize(2);
-    display.setCursor(4, 13);
+    display.setCursor(2, 14);
     display.print("CLEAR");
     display.setTextSize(1);
-    display.setCursor(72, 17);
-    display.print("[NO TARGET]");
-  } else {
+    display.setCursor(76, 18);
+    display.print("[SAFE]");
+  } else if (p.distanceCm >= 200) {
     display.setTextSize(2);
-    display.setCursor(4, 13);
+    display.setCursor(2, 14);
     display.print(p.distanceCm);
     display.setTextSize(1);
-    display.print(" cm");
+    display.print("cm");
 
-    display.setCursor(72, 17);
+    display.setCursor(76, 18);
+    display.print("[SAFE]");
+  } else {
+    display.setTextSize(2);
+    display.setCursor(2, 14);
+    display.print(p.distanceCm);
+    display.setTextSize(1);
+    display.print("cm");
+
+    display.setCursor(76, 18);
     display.print("[");
     display.print(getPrecisionZoneName(p.distanceCm));
     display.print("]");
   }
 
   // -------------------------------------------------------------------------
-  // Graphical Radar Distance Gauge Bar (y = 29..32)
+  // Graphical Radar Distance Gauge Bar (y = 32..35)
+  // Completely empty when >= 200 cm (Safe buffer)
   // -------------------------------------------------------------------------
-  display.drawRect(4, 29, 120, 4, SSD1306_WHITE);
+  display.drawRect(2, 32, 124, 4, SSD1306_WHITE);
   int barWidth = 0;
-  if (p.distanceCm == 0) {
-    barWidth = 118; // 100% full (CRITICAL STOP)
-  } else if (p.distanceCm != DIST_INVALID && p.distanceCm <= 150) {
-    int fill = map(p.distanceCm, 150, 8, 2, 118);
-    barWidth = constrain(fill, 2, 118);
+  if (p.distanceCm != DIST_INVALID && p.distanceCm < 200) {
+    int fill = map(p.distanceCm, 200, 20, 2, 120);
+    barWidth = constrain(fill, 2, 120);
   }
   if (barWidth > 0) {
-    display.fillRect(5, 30, barWidth, 2, SSD1306_WHITE);
+    display.fillRect(4, 33, barWidth, 2, SSD1306_WHITE);
   }
 
   // -------------------------------------------------------------------------
-  // Climate Row: Temperature & Humidity (y = 37)
+  // Climate Row: Temperature & Humidity with Fixed Anchors (y = 40..47)
   // -------------------------------------------------------------------------
   display.setTextSize(1);
-  display.setCursor(4, 37);
+  display.setCursor(2, 40);
   display.print("TEMP: ");
   if (p.dhtValid) {
     display.print(p.tempC, 1);
@@ -512,7 +549,8 @@ void drawScreen(bool linkUp, const SensorPacket &p) {
     display.print("--.-C");
   }
 
-  display.print("   HUM: ");
+  display.setCursor(76, 40);
+  display.print("HUM: ");
   if (p.dhtValid) {
     display.print((int)p.humidity);
     display.print("%");
@@ -521,40 +559,27 @@ void drawScreen(bool linkUp, const SensorPacket &p) {
   }
 
   // -------------------------------------------------------------------------
-  // Security & GPS Row (y = 47)
+  // Security & GPS Row (y = 51..60)
   // -------------------------------------------------------------------------
   if (p.motion) {
     // Inverted high-contrast highlight for active motion alarm
-    display.fillRect(4, 46, 120, 9, SSD1306_WHITE);
+    display.fillRect(2, 50, 124, 11, SSD1306_WHITE);
     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
-    display.setCursor(8, 47);
+    display.setCursor(4, 52);
     display.print(">> MOTION DETECTED <<");
     display.setTextColor(SSD1306_WHITE);
   } else {
-    display.setCursor(4, 47);
-    display.print("MOTION: NO   GPS: ");
+    display.setCursor(2, 52);
+    display.print("PIR: CLEAR");
+
+    display.setCursor(68, 52);
+    display.print("GPS: ");
     if (p.gpsFix) {
       display.print(p.satellites);
       display.print(" SAT");
     } else {
-      display.print("SEARCH");
+      display.print("WAIT");
     }
-  }
-
-  // -------------------------------------------------------------------------
-  // Footer: Sanchay Cloud Telemetry Status in Plain English (y = 56)
-  // -------------------------------------------------------------------------
-  display.setCursor(4, 56);
-  if (cloudSyncingNow) {
-    display.print("CLOUD: SENDING DATA...");
-  } else if (cloudUploadOk > 0) {
-    display.print("CLOUD: ");
-    display.print(cloudUploadOk);
-    display.print(" PKTS SYNCED");
-  } else if (WiFi.status() == WL_CONNECTED) {
-    display.print("CLOUD: STANDBY (READY)");
-  } else {
-    display.print("CLOUD: OFFLINE (NO WF)");
   }
 
   display.display();
@@ -582,9 +607,9 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
     http.addHeader("X-Device-Code", DEVICE_CODE);
     http.addHeader("Authorization", "Bearer " + String(DEVICE_INGEST_KEY));
 
-    // Lat/Lng from GPS, or fallback to Gwalior coordinates if GPS acquiring
-    double lat = p.gpsFix ? (p.latE7 / 10000000.0) : 26.2183;
-    double lng = p.gpsFix ? (p.lngE7 / 10000000.0) : 78.1828;
+    // Lat/Lng from GPS, or fallback to default coordinates if GPS acquiring (no lock)
+    double lat = (p.gpsFix && p.latE7 != 0) ? (p.latE7 / 10000000.0) : 26.245263;
+    double lng = (p.gpsFix && p.lngE7 != 0) ? (p.lngE7 / 10000000.0) : 78.312914;
     double speed = (p.gpsFix && p.distanceCm != DIST_INVALID) ? 24.5 : 0.0;
 
     String json = "{";
@@ -595,7 +620,16 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
     json += "\"ignition\":true,";
     json += "\"fuelPercent\":85,";
     json += "\"signalDbm\":" + String(WiFi.RSSI()) + ",";
-    json += "\"sos\":" + String(p.zone == ZONE_CRITICAL ? "true" : "false");
+    json += "\"sos\":" + String((p.zone == ZONE_CRITICAL || (p.distanceCm != DIST_INVALID && p.distanceCm <= 20)) ? "true" : "false") + ",";
+    if (p.dhtValid) {
+      json += "\"tempC\":" + String(p.tempC, 1) + ",";
+      json += "\"humidity\":" + String(p.humidity, 1) + ",";
+    }
+    if (p.distanceCm != DIST_INVALID) {
+      json += "\"distanceCm\":" + String(p.distanceCm) + ",";
+    }
+    json += "\"motion\":" + String(p.motion ? "true" : "false") + ",";
+    json += "\"zone\":\"" + String(getPrecisionZoneName(p.distanceCm)) + "\"";
     json += "}";
 
     int httpCode = http.POST(json);
@@ -633,6 +667,7 @@ void setup() {
     Serial.println("OLED initialization failed!");
     while (true) delay(1000);
   }
+  display.setTextWrap(false);
 
   // Play Sanchay Branding Animation
   playSanchayBootAnimation();

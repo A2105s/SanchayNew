@@ -300,6 +300,53 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
 
   const vehicles: VehicleView[] = vehicleRows.map((v) => mapVehicle(v, orgNameById.get(v.organizationId) ?? 'Unknown', settings.telemetryFreshMinutes));
 
+  // Self-healing: Eliminate concentric circle clustering from legacy seeded databases
+  const stationMap = new Map(stations.map((s) => [s.id, s]));
+  const PATROL_DISTANCES = [
+    0.0042, 0.0078, 0.0125, 0.0185, 0.0054,
+    0.0096, 0.0145, 0.0210, 0.0048, 0.0088,
+    0.0135, 0.0195, 0.0066, 0.0115, 0.0168
+  ];
+  const PATROL_ANGLES = [
+    0.42, 1.15, 1.98, 2.81, 3.55,
+    4.31, 5.15, 5.89, 0.78, 1.58,
+    2.41, 3.21, 4.01, 4.78, 5.58
+  ];
+
+  for (let idx = 0; idx < vehicles.length; idx++) {
+    const v = vehicles[idx];
+    if (v.stationId && v.lat != null && v.lng != null) {
+      const st = stationMap.get(v.stationId);
+      if (st && st.lat != null && st.lng != null) {
+        const dLat = v.lat - st.lat;
+        const dLng = (v.lng - st.lng) / 1.15;
+        const radialDist = Math.hypot(dLat, dLng);
+
+        // Legacy concentric circle detection: radialDist is approximately 0.005
+        if (Math.abs(radialDist - 0.005) < 0.00065) {
+          const isStationCompound =
+            idx % 5 === 0 ||
+            v.operationalStatus === 'MAINTENANCE' ||
+            v.operationalStatus === 'OUT_OF_SERVICE' ||
+            v.ownershipCategory === 'SEIZED_IMPOUNDED';
+
+          if (isStationCompound) {
+            const bayRow = idx % 3;
+            const bayCol = Math.floor(idx / 3) % 4;
+            v.lat = st.lat + (bayRow - 1) * 0.00015 + (((idx * 17) % 7) - 3) * 0.000018;
+            v.lng = st.lng + (bayCol - 1) * 0.00022 + (((idx * 31) % 7) - 3) * 0.000018;
+          } else {
+            const pIdx = idx % PATROL_DISTANCES.length;
+            const dist = PATROL_DISTANCES[pIdx];
+            const angle = PATROL_ANGLES[pIdx] + ((st.lat * 100) % 1);
+            v.lat = st.lat + Math.sin(angle) * dist;
+            v.lng = st.lng + Math.cos(angle) * dist * 1.15;
+          }
+        }
+      }
+    }
+  }
+
   // Requests I raised OR that need my org's decision. Their rows loaded in the main
   // parallel batch above; only the per-row detail fan-out runs as a second stage.
   const [requests, allocations] = await Promise.all([

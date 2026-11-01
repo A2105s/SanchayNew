@@ -118,8 +118,8 @@ const uint16_t SANCHAY_LOCAL_PORT = 3000;
 const char *DEVICE_CODE = "SANCHAY-IOT-001";
 const char *DEVICE_INGEST_KEY = "sk_sanchay_iot_edge_2026";
 
-// High-Speed Cloud Telemetry Sync (Every 1000 ms periodic + Immediate Event Dispatch)
-const unsigned long CLOUD_SYNC_INTERVAL_MS = 1000;
+// High-Speed Cloud Telemetry Sync (Every 2000 ms periodic + Immediate Event Dispatch)
+const unsigned long CLOUD_SYNC_INTERVAL_MS = 2000;
 unsigned long lastCloudPostMs = 0;
 uint32_t cloudUploadOk = 0;
 uint32_t cloudUploadFail = 0;
@@ -259,20 +259,17 @@ uint16_t getBuzzerPeriod(uint16_t cm) {
   if (cm <= 20) return 1; // Solid unbroken STOP tone (<= 20 cm)
 
   // Clear, non-frantic warning progression between 20 cm and 50 cm:
-  // 50 cm -> 400 ms period (Clear alert tick: 2.5 Hz)
-  // 35 cm -> 220 ms period (Active warning: 4.5 Hz)
-  // 20 cm -> 100 ms period (Immediate urgency: 10 Hz)
   if (cm > 35) {
-    return (uint16_t)map(cm, 50, 35, 400, 220);
+    return (uint16_t)map(cm, 50, 35, 420, 220); // 2.4 Hz to 4.5 Hz
   } else {
-    return (uint16_t)map(cm, 35, 20, 220, 100);
+    return (uint16_t)map(cm, 35, 20, 220, 95);  // 4.5 Hz to 10.5 Hz
   }
 }
 
 const char *getPrecisionZoneName(uint16_t cm) {
   if (cm == DIST_INVALID || cm >= 200) return "SAFE";
   if (cm >= 120) return "WATCH";
-  if (cm >= 60)  return "WARN";
+  if (cm >= 50)  return "WARN";
   if (cm >= 20)  return "CLOSE";
   return "STOP!";
 }
@@ -374,9 +371,8 @@ void updateBuzzer(bool linkUp, const SensorPacket &p) {
     return;
   }
 
-  // 3. Crisp, audible chirp duration (never frantic):
-  // 45 ms at 50 cm down to 25 ms at 20 cm
-  uint16_t onDuration = constrain(period / 4, 25, 45);
+  // 3. Crisp, audible chirp duration: 30-48 ms
+  uint16_t onDuration = constrain(period / 4, 30, 48);
   unsigned long now = millis();
 
   if (buzzerActive) {
@@ -598,8 +594,10 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
 
   cloudSyncingNow = true;
 
-  // Visual feedback: 50 ms dark blip on RGB LED confirming data unit dispatch
-  triggerBlip(BLIP_CLOUD_UPLOAD);
+  // Visual feedback: only blip when not in critical proximity danger
+  if (p.distanceCm == DIST_INVALID || p.distanceCm > 50) {
+    triggerBlip(BLIP_CLOUD_UPLOAD);
+  }
 
   HTTPClient http;
   bool beginOk = false;
@@ -609,7 +607,7 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
 
   if (USE_SANCHAY_CLOUD) {
     secureClient.setInsecure(); // Skip certificate validation for low-memory ESP8266
-    secureClient.setTimeout(2500);
+    secureClient.setTimeout(1200);
     beginOk = http.begin(secureClient, SANCHAY_CLOUD_URL);
   } else {
     String url = "http://" + String(SANCHAY_LOCAL_IP) + ":" + String(SANCHAY_LOCAL_PORT) + "/api/iot/ingest";
@@ -617,7 +615,7 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
   }
 
   if (beginOk) {
-    http.setTimeout(2500);
+    http.setTimeout(1200);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Code", DEVICE_CODE);
     http.addHeader("Authorization", "Bearer " + String(DEVICE_INGEST_KEY));
@@ -655,13 +653,13 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
     }
     http.end();
 
-    // Dual-dispatch to laptop localhost if enabled (non-blocking fast 300ms timeout)
+    // Dual-dispatch to laptop localhost if enabled (non-blocking fast 150ms timeout)
     if (ALSO_POST_TO_LOCAL && USE_SANCHAY_CLOUD) {
       WiFiClient localClient;
       HTTPClient localHttp;
       String localUrl = "http://" + String(SANCHAY_LOCAL_IP) + ":" + String(SANCHAY_LOCAL_PORT) + "/api/iot/ingest";
       if (localHttp.begin(localClient, localUrl)) {
-        localHttp.setTimeout(300);
+        localHttp.setTimeout(150);
         localHttp.addHeader("Content-Type", "application/json");
         localHttp.addHeader("X-Device-Code", DEVICE_CODE);
         localHttp.addHeader("Authorization", "Bearer " + String(DEVICE_INGEST_KEY));
@@ -752,7 +750,7 @@ void loop() {
 
   bool isEventTriggered = (zoneChanged || motionChanged || (isAlertTrigger && distanceShifted));
   bool periodicDue = (now - lastCloudPostMs >= CLOUD_SYNC_INTERVAL_MS);
-  bool eventDue = isEventTriggered && (now - lastCloudPostMs >= 350);
+  bool eventDue = isEventTriggered && (now - lastCloudPostMs >= 2000);
 
   if (linkUp && (periodicDue || eventDue)) {
     lastCloudPostMs = now;

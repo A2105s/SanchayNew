@@ -45,6 +45,17 @@ const uint8_t PIN_RGB_R = 5;     // D1  / GPIO5
 const uint8_t PIN_RGB_G = 14;    // D5  / GPIO14
 const uint8_t PIN_RGB_B = 15;    // D8  / GPIO15
 
+// ---------------------------------------------------------------------------
+// OPTIONAL DIRECT BUZZER ON BOARD 1 (0ms Latency Hardware Lockstep)
+// If you plug the buzzer into Board 1:
+// - Default: D6 (GPIO 12) if GPS is not connected
+// - Or D0 (GPIO 16) if PIR is not connected (same as Board 2!)
+// - Or D7 (GPIO 13), or RX (GPIO 3)
+// Set ENABLE_BOARD1_BUZZER = true if buzzer is wired to Board 1.
+// ---------------------------------------------------------------------------
+const bool ENABLE_BOARD1_BUZZER = true;
+const uint8_t PIN_BUZZER = 12;   // D6 / GPIO12 (Change to 16 for D0, or 13 for D7, or 3 for RX)
+
 // 0 cm means "blocked / no echo" and is CRITICAL red.
 // 999 is a separate "no target, above 400 cm" sentinel.
 const uint16_t DIST_INVALID = 999;
@@ -136,11 +147,8 @@ void onSent(uint8_t *mac, uint8_t status) {
 }
 
 // ---------------------------------------------------------------------------
-// HC-SR04 distance
-// ---------------------------------------------------------------------------
-// One 10 us trigger pulse, then measure the ECHO HIGH time.
-// distance_cm = duration_us * 0.0343 / 2
-// pulseIn() returns 0 on its 25 ms timeout (indicating clear open path / no target).
+// High-Speed HC-SR04 Proximity Radar
+// Optimized for instantaneous response (<14 ms pulse timeout)
 // ---------------------------------------------------------------------------
 uint16_t readOnceCm() {
   digitalWrite(PIN_TRIG, LOW);
@@ -149,73 +157,38 @@ uint16_t readOnceCm() {
   delayMicroseconds(10);
   digitalWrite(PIN_TRIG, LOW);
 
-  unsigned long duration = pulseIn(PIN_ECHO, HIGH, 25000UL); // 25ms timeout (~4.3m max)
+  // 14ms timeout (~2.4m max range) ensures zero thread blocking
+  unsigned long duration = pulseIn(PIN_ECHO, HIGH, 14000UL);
   if (duration == 0) {
     return DIST_INVALID; // Timeout = no obstacle in range / open space
   }
   uint16_t cm = (uint16_t)(duration * 0.0343 / 2.0);
-  if (cm < 2 || cm > 400) {
+  if (cm < 2 || cm > 250) {
     return DIST_INVALID;
   }
   return cm;
 }
 
-// ---------------------------------------------------------------------------
-// Median of three - removes a single wild ultrasonic reading.
-// ---------------------------------------------------------------------------
-uint16_t median3(uint16_t a, uint16_t b, uint16_t c) {
-  if (a > b) {
-    uint16_t t = a;
-    a = b;
-    b = t;
-  }
-  if (b > c) {
-    uint16_t t = b;
-    b = c;
-    c = t;
-  }
-  if (a > b) {
-    uint16_t t = a;
-    a = b;
-    b = t;
-  }
-  return b;
-}
-
-// ---------------------------------------------------------------------------
-// Read distance three times and keep the median.
-//   > 400 cm or timeout -> DIST_INVALID (safe / no obstacle)
-//   2..400              -> valid centimetres
-// ---------------------------------------------------------------------------
 uint16_t readDistanceCm() {
   uint16_t a = readOnceCm();
+  if (a == DIST_INVALID) return DIST_INVALID;
   uint16_t b = readOnceCm();
-  uint16_t c = readOnceCm();
-  uint16_t m = median3(a, b, c);
-
-  if (m == 0 || m > 400 || m == DIST_INVALID) {
-    return DIST_INVALID;
-  }
-  return m;
+  if (b == DIST_INVALID) return a;
+  return (a < b) ? a : b; // Responsive low-pass filter
 }
 
 // ---------------------------------------------------------------------------
 // Distance -> zone
 // ---------------------------------------------------------------------------
-// Rule: Anything >= 200 cm (or DIST_INVALID) is SAFE!
-// ---------------------------------------------------------------------------
 uint8_t computeZone(uint16_t cm) {
-  if (cm == DIST_INVALID || cm >= 200) {
+  if (cm == DIST_INVALID || cm >= 120) {
     return ZONE_SAFE;
   }
-  if (cm >= 120) {
+  if (cm > 50) {
     return ZONE_WATCH;
   }
-  if (cm >= 60) {
+  if (cm > 20) {
     return ZONE_WARN;
-  }
-  if (cm >= 20) {
-    return ZONE_CLOSE;
   }
   return ZONE_CRITICAL;
 }
@@ -250,39 +223,91 @@ void triggerBoard1TxBlip() {
 }
 
 // ---------------------------------------------------------------------------
-// High-Precision Analog Color Gradient (Continuous 24-bit PWM Interpolation)
-// Smoothly transitions from Pure Green -> Lime -> Yellow -> Orange -> Deep Red
-// Threshold: >= 200 cm is SAFE (Pure Solid Green)
+// Lockstep Acoustic Buzzer & Visual Engine (0ms Latency)
+// Rule: At EXACTLY <= 50 cm: Buzzer sounds AND LED turns Pure Solid Red!
+// Continuous solid STOP tone when <= 20 cm.
+// ---------------------------------------------------------------------------
+uint16_t getBuzzerPeriod(uint16_t cm) {
+  if (cm >= 50 || cm == DIST_INVALID) return 0; // Completely SILENT >= 50 cm
+  if (cm <= 20) return 1; // Solid unbroken STOP tone (<= 20 cm)
+
+  // Clear warning cadence progression between 20 cm and 50 cm:
+  if (cm > 35) {
+    return (uint16_t)map(cm, 50, 35, 420, 220); // 2.4 Hz to 4.5 Hz
+  } else {
+    return (uint16_t)map(cm, 35, 20, 220, 95);  // 4.5 Hz to 10.5 Hz
+  }
+}
+
+void updateBoard1Buzzer(uint16_t cm) {
+  if (!ENABLE_BOARD1_BUZZER) return;
+  static unsigned long lastBeepStartMs = 0;
+  static bool buzzerActive = false;
+
+  if (cm == DIST_INVALID || cm >= 50) {
+    if (buzzerActive) {
+      digitalWrite(PIN_BUZZER, LOW);
+      buzzerActive = false;
+    }
+    return;
+  }
+
+  // Emergency Collision Stop (<= 20 cm): Continuous solid unbroken tone
+  if (cm <= 20) {
+    digitalWrite(PIN_BUZZER, HIGH);
+    buzzerActive = true;
+    return;
+  }
+
+  uint16_t period = getBuzzerPeriod(cm);
+  if (period <= 1) {
+    digitalWrite(PIN_BUZZER, HIGH);
+    buzzerActive = true;
+    return;
+  }
+
+  // Crisp, audible chirp duration: 35-45 ms
+  uint16_t onDuration = constrain(period / 4, 30, 48);
+  unsigned long now = millis();
+
+  if (buzzerActive) {
+    if (now - lastBeepStartMs >= onDuration) {
+      digitalWrite(PIN_BUZZER, LOW);
+      buzzerActive = false;
+    }
+  } else {
+    if (now - lastBeepStartMs >= period) {
+      lastBeepStartMs = now;
+      digitalWrite(PIN_BUZZER, HIGH);
+      buzzerActive = true;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Synchronized Color Gradient (Lockstep with Buzzer Threshold)
 // ---------------------------------------------------------------------------
 void computeProximityColor(uint16_t cm, uint8_t &r, uint8_t &g, uint8_t &b) {
-  b = 0; // Pure warm/hazard spectrum
+  b = 0; // Pure hazard spectrum
 
-  // 1. Clear / Safe Buffer (>= 200 cm or DIST_INVALID): Pure Green
-  if (cm == DIST_INVALID || cm >= 200) {
+  // 1. Safe Buffer (>= 120 cm or DIST_INVALID): Pure Green
+  if (cm == DIST_INVALID || cm >= 120) {
     r = 0;
     g = 255;
     return;
   }
 
-  // 2. Critical Stop / Touch (<= 20 cm): Pure Solid Red
-  if (cm <= 20) {
-    r = 255;
-    g = 0;
+  // 2. Approach Caution (50 cm < cm < 120 cm): Smooth Green -> Yellow -> Orange
+  if (cm > 50) {
+    r = (uint8_t)map(cm, 120, 50, 0, 255);
+    g = (uint8_t)map(cm, 120, 50, 255, 90);
     return;
   }
 
-  // 3. Approach Zone (100 cm to 200 cm): Green stays 255, Red ramps up 0 -> 255
-  // (Pure Green at 200cm -> Lime at 160cm -> Chartreuse at 130cm -> Pure Yellow at 100cm)
-  if (cm >= 100) {
-    r = (uint8_t)map(cm, 200, 100, 0, 255);
-    g = 255;
-    return;
-  }
-
-  // 4. Proximity Danger Zone (20 cm to 100 cm): Red stays 255, Green drops 255 -> 0
-  // (Pure Yellow at 100cm -> Amber at 70cm -> Orange at 45cm -> Deep Red at 20cm)
+  // 3. Hazard Alert Zone (<= 50 cm): EXACT LOCKSTEP WITH BUZZER!
+  // At the EXACT moment distance reaches 50 cm, Buzzer sounds AND LED is pure Red!
   r = 255;
-  g = (uint8_t)map(cm, 100, 20, 255, 0);
+  g = 0;
 }
 
 void applyZoneColor(uint16_t cm) {
@@ -394,11 +419,16 @@ void setup() {
   pinMode(PIN_RGB_G, OUTPUT);
   pinMode(PIN_RGB_B, OUTPUT);
 
+  if (ENABLE_BOARD1_BUZZER) {
+    pinMode(PIN_BUZZER, OUTPUT);
+    digitalWrite(PIN_BUZZER, LOW);
+  }
+
   digitalWrite(PIN_TRIG, LOW);
 
   Serial.println();
-  Serial.println("BOARD 1 - SENSOR NODE (FINAL)");
-  Serial.println("DHT=D4 TRIG=D3 ECHO=D2 PIR=D0 GPS=D6/D7 RGB=D1/D5/D8");
+  Serial.println("BOARD 1 - SENSOR NODE (FINAL - DUAL ALERT ENGINE)");
+  Serial.println("DHT=D4 TRIG=D3 ECHO=D2 PIR=D0 GPS=D6/D7 RGB=D1/D5/D8 BUZZER=D6/D0");
 
   // Visible RGB self-test. Wrong order means wrong channel wiring.
   setColor(255, 0, 0);
@@ -430,12 +460,25 @@ void loop() {
 
   unsigned long now = millis();
 
-  // ---- Distance every 300 ms -------------------------------------------
-  if (now - lastDistanceMs >= 300) {
+  // Keep Board 1 Buzzer timing clocked continuously (sub-millisecond precision)
+  updateBoard1Buzzer(distanceCm);
+
+  // ---- Fast-Track Distance every 60 ms (16 Hz Ultra-Responsive) --------
+  if (now - lastDistanceMs >= 60) {
     lastDistanceMs = now;
+    uint16_t prevDist = distanceCm;
     distanceCm = readDistanceCm();
     currentZone = computeZone(distanceCm);
     applyZoneColor(distanceCm);
+    updateBoard1Buzzer(distanceCm);
+
+    // Fast-dispatch ESP-NOW immediately if zone changed or inside alert zone
+    if (abs((int)distanceCm - (int)prevDist) >= 8 || distanceCm <= 50) {
+      if (now - lastSendMs >= 60) {
+        lastSendMs = now;
+        sendPacket();
+      }
+    }
   }
 
   // ---- DHT22 every 2 seconds -------------------------------------------

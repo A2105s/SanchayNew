@@ -58,15 +58,15 @@
 // ---------------------------------------------------------------------------
 // Screen 1: 7-Pin SPI OLED Pin Assignments (D0 -> D0, D1 -> D1, RES -> D2, DC -> D3, CS -> D4)
 // ---------------------------------------------------------------------------
-const uint8_t PIN_SPI_SCK  = 16; // D0 / GPIO16 (OLED D0/SCK)
-const uint8_t PIN_SPI_MOSI = 5;  // D1 / GPIO5  (OLED D1/MOSI)
-const uint8_t PIN_SPI_RES  = 4;  // D2 / GPIO4  (OLED RES)
-const uint8_t PIN_SPI_DC   = 0;  // D3 / GPIO0  (OLED DC)
-const uint8_t PIN_SPI_CS   = 2;  // D4 / GPIO2  (OLED CS)
+const uint8_t PIN_OLED_SCK  = 16; // D0 / GPIO16 (OLED D0/SCK)
+const uint8_t PIN_OLED_MOSI = 5;  // D1 / GPIO5  (OLED D1/MOSI)
+const uint8_t PIN_OLED_RES  = 4;  // D2 / GPIO4  (OLED RES)
+const uint8_t PIN_OLED_DC   = 0;  // D3 / GPIO0  (OLED DC)
+const uint8_t PIN_OLED_CS   = 2;  // D4 / GPIO2  (OLED CS)
 
 Adafruit_SSD1306 oledSensors(SCREEN_WIDTH, SCREEN_HEIGHT,
-                             PIN_SPI_MOSI, PIN_SPI_SCK,
-                             PIN_SPI_DC, PIN_SPI_RES, PIN_SPI_CS);
+                             PIN_OLED_MOSI, PIN_OLED_SCK,
+                             PIN_OLED_DC, PIN_OLED_RES, PIN_OLED_CS);
 
 // ---------------------------------------------------------------------------
 // Screen 2: 4-Pin I2C OLED Pin Assignments (SDA -> D7, SCL -> D8)
@@ -111,9 +111,9 @@ typedef struct __attribute__((packed)) {
   int32_t lngE7;
 } SensorPacket;
 
-volatile SensorPacket latestPacket;
+SensorPacket latestPacket;
 volatile bool packetReady = false;
-unsigned long lastPacketMs = 0;
+volatile unsigned long lastPacketMs = 0;
 const unsigned long LINK_TIMEOUT_MS = 2500;
 
 // ---------------------------------------------------------------------------

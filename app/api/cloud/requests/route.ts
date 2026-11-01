@@ -18,16 +18,49 @@ export async function GET(request: NextRequest) {
     const stateFilter = sp.get('state');
     const mine = sp.get('mine') === 'true';
     const needsMyDecision = sp.get('needsMyDecision') === 'true';
+    const requestingStationId = sp.get('requestingStationId');
+    const providerStationId = sp.get('providerStationId');
+    const requestedClass = sp.get('requestedClass');
     const tree = await orgTree(auth.user);
 
     const and: Record<string, unknown>[] = [];
-    if (tree !== null) {
-      const or: Record<string, unknown>[] = [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }];
-      and.push({ OR: or });
+
+    if (auth.user.role === 'STATION_OFFICER' && auth.user.stationId) {
+      if (needsMyDecision) {
+        and.push({
+          providerStationId: auth.user.stationId,
+          state: { in: ['SUBMITTED', 'UNDER_REVIEW', 'PENDING_APPROVAL'] }
+        });
+      } else if (mine) {
+        and.push({
+          OR: [
+            { requestingStationId: auth.user.stationId },
+            { requesterUsername: auth.user.username }
+          ]
+        });
+      } else {
+        and.push({
+          OR: [
+            { requestingStationId: auth.user.stationId },
+            { providerStationId: auth.user.stationId }
+          ]
+        });
+      }
+    } else {
+      if (tree !== null) {
+        const or: Record<string, unknown>[] = [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }];
+        and.push({ OR: or });
+      }
+      if (mine) and.push({ requesterUsername: auth.user.username });
+      if (needsMyDecision) {
+        and.push({ state: { in: ['SUBMITTED', 'UNDER_REVIEW', 'PENDING_APPROVAL'] } });
+      }
     }
+
     if (stateFilter) and.push({ state: stateFilter });
-    if (mine) and.push({ requesterUsername: auth.user.username });
-    if (needsMyDecision && tree !== null) and.push({ approverOrgId: { in: tree }, state: { in: ['SUBMITTED', 'UNDER_REVIEW'] } });
+    if (requestingStationId) and.push({ requestingStationId });
+    if (providerStationId) and.push({ providerStationId });
+    if (requestedClass) and.push({ requestedClass });
 
     const rows = await prisma.assetRequest.findMany({ where: and.length ? { AND: and } : {}, orderBy: { createdAt: 'desc' }, take: 200 });
     const views = await Promise.all(rows.map((r) => buildRequestView(r.id, auth.user)));

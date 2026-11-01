@@ -214,7 +214,10 @@ export const vehicleSearchSchema = z.object({
 
 export const requestInputSchema = z.object({
   vehicleId: z.string().trim().min(1).nullish(),
+  requestingStationId: z.string().trim().min(1).nullish(),
+  providerStationId: z.string().trim().min(1).nullish(),
   requestedClass: zVehicleClass,
+  quantity: z.number().int().min(1).max(100).optional(),
   purpose: z.string().trim().min(1).max(500),
   destination: z.string().trim().max(300).optional(),
   passengers: z.number().int().min(1).max(200),
@@ -230,7 +233,7 @@ export const requestActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('update'), patch: requestInputSchema.omit({ submit: true }).partial() }),
   z.object({ type: z.literal('submit') }),
   z.object({ type: z.literal('startReview') }),
-  z.object({ type: z.literal('approve'), comment: z.string().trim().max(1000).optional() }),
+  z.object({ type: z.literal('approve'), comment: z.string().trim().max(1000).optional(), vehicleIds: z.array(z.string().trim().min(1)).optional() }),
   z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(1000) }),
   z.object({ type: z.literal('requestChanges'), comment: z.string().trim().min(1).max(1000) }),
   z.object({ type: z.literal('escalate'), comment: z.string().trim().max(1000).optional() }),
@@ -256,10 +259,20 @@ export const allocationActionSchema = z.discriminatedUnion('type', [
     type: z.literal('recordReturn'),
     receivedBy: z.string().trim().min(1).max(120),
     conditionNotes: z.string().trim().min(1).max(2000),
+    returnQuantity: z.number().int().min(1).optional(),
     odometerKm: z.number().int().min(0).optional(),
     fuelPercent: z.number().min(0).max(100).optional(),
     discrepancies: z.string().trim().max(2000).optional(),
-    evidenceRef: z.string().trim().max(300).optional()
+    evidenceRef: z.string().trim().max(300).optional(),
+    damagedVehicleIds: z.array(z.string().trim()).optional(),
+    damageNotes: z.string().trim().max(2000).optional()
+  }),
+  z.object({
+    type: z.literal('confirmReturn'),
+    receivedBy: z.string().trim().min(1).max(120).optional(),
+    notes: z.string().trim().max(2000).optional(),
+    damagedVehicleIds: z.array(z.string().trim()).optional(),
+    damageNotes: z.string().trim().max(2000).optional()
   }),
   z.object({ type: z.literal('inspect'), decision: z.enum(['ACCEPTED', 'DISPUTED']), notes: z.string().trim().max(2000).optional() }),
   z.object({ type: z.literal('requestExtension'), newEndAt: isoDate, reason: z.string().trim().min(1).max(1000) }),

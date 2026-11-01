@@ -86,6 +86,18 @@ export function LiveMap() {
   const isSatelliteRef = useRef(false);
   isSatelliteRef.current = isSatellite;
   const layersPopRef = useRef<HTMLDivElement>(null);
+  const [stationBreakdown, setStationBreakdown] = useState<any>(null);
+
+  useEffect(() => {
+    if (!selectedStationId) {
+      setStationBreakdown(null);
+      return;
+    }
+    fetch(`/api/cloud/station/${selectedStationId}/inventory`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setStationBreakdown(data))
+      .catch(() => setStationBreakdown(null));
+  }, [selectedStationId]);
 
   const liveVehicles = fleet.liveVehicles;
   const stations = fleet.snapshot?.stations ?? [];
@@ -845,15 +857,19 @@ export function LiveMap() {
 
             {/* Breakdown by vehicle class */}
             <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Fleet by Class & Machinery
+              Fleet Availability & Breakdown
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {VEHICLE_CLASSIFICATIONS.map((c) => {
                 const classVehicles = stationVehicles.filter((v) => v.vehicleClass === c.key);
+                const classBreakdown = stationBreakdown?.byClass?.[c.key];
                 const invVal = selectedStation.inventory?.[c.key] ?? 0;
-                const count = Math.max(classVehicles.length, invVal);
-                if (count === 0 && !['CAR', 'PATROL_CAR', 'MOTORCYCLE', 'VAN'].includes(c.key)) return null;
-                const availCount = classVehicles.filter((v) => v.operationalStatus === 'ACTIVE' && v.eligibilityState === 'ELIGIBLE' && v.ownershipCategory === 'GOVERNMENT_FLEET').length || invVal;
+                const totalCount = classBreakdown?.totalRegistered ?? Math.max(classVehicles.length, invVal);
+                const availCount = classBreakdown?.available ?? (classVehicles.filter((v) => v.operationalStatus === 'ACTIVE' && v.eligibilityState === 'ELIGIBLE' && v.ownershipCategory === 'GOVERNMENT_FLEET').length || invVal);
+                const allocCount = classBreakdown?.allocated ?? 0;
+
+                if (totalCount === 0 && availCount === 0 && !['CAR', 'PATROL_CAR', 'MOTORCYCLE', 'VAN', 'TRUCK'].includes(c.key)) return null;
+
                 return (
                   <div
                     key={c.key}
@@ -878,10 +894,19 @@ export function LiveMap() {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <span className="mono" style={{ fontWeight: 800, fontSize: '0.9rem' }}>{count}</span>
-                      <span style={{ fontSize: '0.68rem', color: '#16a34a', display: 'block' }}>
-                        {availCount} avail
+                      <span className="mono" style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                        {totalCount} registered
                       </span>
+                      <div className="cluster" style={{ gap: '0.4rem', justifyContent: 'flex-end', fontSize: '0.68rem' }}>
+                        <span style={{ color: availCount > 0 ? '#16a34a' : '#64748b', fontWeight: 600 }}>
+                          {availCount} available
+                        </span>
+                        {allocCount > 0 ? (
+                          <span style={{ color: '#d97706' }}>
+                            ({allocCount} on loan)
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 );
@@ -889,9 +914,14 @@ export function LiveMap() {
             </div>
           </div>
 
-          <div className="cluster" style={{ gap: '0.4rem', marginTop: '0.75rem' }}>
-            <ButtonLink href={`/vehicles?stationId=${selectedStation.id}`} variant="primary" size="sm">
-              View station fleet →
+          <div className="cluster" style={{ gap: '0.4rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+            {selectedStation.id !== fleet.me?.stationId ? (
+              <ButtonLink href={`/requests?new=true&providerStationId=${selectedStation.id}`} variant="primary" size="sm">
+                Request vehicles →
+              </ButtonLink>
+            ) : null}
+            <ButtonLink href={`/vehicles?stationId=${selectedStation.id}`} variant={selectedStation.id === fleet.me?.stationId ? 'primary' : 'secondary'} size="sm">
+              View station fleet
             </ButtonLink>
             <ButtonLink href={`/transfers?source=${selectedStation.id}`} variant="secondary" size="sm">
               Transfer vehicles

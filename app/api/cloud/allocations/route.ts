@@ -17,18 +17,35 @@ export async function GET(request: NextRequest) {
     const sp = request.nextUrl.searchParams;
     const lifecycle = sp.get('lifecycle');
     const overdue = sp.get('overdue') === 'true';
+    const borrowingStationId = sp.get('borrowingStationId');
+    const lendingStationId = sp.get('lendingStationId');
     const tree = await orgTree(auth.user);
 
     const and: Prisma.AllocationWhereInput[] = [];
-    if (tree !== null) {
+
+    if (auth.user.role === 'STATION_OFFICER' && auth.user.stationId) {
+      and.push({
+        OR: [
+          { borrowingStationId: auth.user.stationId },
+          { lendingStationId: auth.user.stationId }
+        ]
+      });
+    } else if (tree !== null) {
       and.push({ OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] });
     }
+
     if (lifecycle) and.push({ lifecycle });
+    if (borrowingStationId) and.push({ borrowingStationId });
+    if (lendingStationId) and.push({ lendingStationId });
+
     if (overdue) {
       const row = await prisma.appSetting.findUnique({ where: { key: FLEET_SETTINGS_KEY } });
       const settings = row ? mergeFleetSettings(row.value) : DEFAULT_FLEET_SETTINGS;
       const cutoff = new Date(Date.now() - settings.returnGraceMinutes * 60000);
-      and.push({ lifecycle: 'ACTIVE', endAt: { lt: cutoff } });
+      and.push({
+        lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED'] },
+        endAt: { lt: cutoff }
+      });
     }
 
     const rows = await prisma.allocation.findMany({ where: and.length ? { AND: and } : {}, orderBy: { createdAt: 'desc' }, take: 200, select: { id: true } });

@@ -30,6 +30,7 @@ tsc_errors.txt
 
 # scratch and transcript logs
 Last_Chat_Freebuff
+scratch/
 
 # agent tooling / local harness artifacts
 .agents/

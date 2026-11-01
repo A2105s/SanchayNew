@@ -13,6 +13,7 @@ function permissionFor(action: AllocationActionParsed): Permission {
     case 'recordHandover':
       return 'handover.record';
     case 'recordReturn':
+    case 'confirmReturn':
       return 'return.record';
     case 'inspect':
       return 'return.inspect';

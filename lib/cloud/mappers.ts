@@ -100,26 +100,26 @@ export function inventoryToRecord(inv: StationInventory | null | undefined): Rec
     MOTORCYCLE: inv?.motorcycle ?? 0,
     VAN: inv?.van ?? 0,
     HEAVY: inv?.heavy ?? 0,
-    CAR: inv?.patrolCar ?? 0,
-    CHHOTA_HATHI: 0,
-    TRUCK: inv?.heavy ?? 0,
-    BUS: 0,
-    JCB: inv?.heavy ?? 0,
-    SPECIALIZED: 0
+    CAR: inv?.car ?? (inv?.patrolCar ?? 0),
+    CHHOTA_HATHI: inv?.chhotaHathi ?? 0,
+    TRUCK: inv?.truck ?? (inv?.heavy ?? 0),
+    BUS: inv?.bus ?? 0,
+    JCB: inv?.jcb ?? 0,
+    SPECIALIZED: inv?.specialized ?? 0
   };
 }
 
-export const VEHICLE_CLASS_TO_INVENTORY_FIELD: Record<VehicleClass, 'patrolCar' | 'motorcycle' | 'van' | 'heavy'> = {
+export const VEHICLE_CLASS_TO_INVENTORY_FIELD: Record<VehicleClass, 'patrolCar' | 'motorcycle' | 'van' | 'heavy' | 'car' | 'truck' | 'bus' | 'jcb' | 'chhotaHathi' | 'specialized'> = {
   PATROL_CAR: 'patrolCar',
-  CAR: 'patrolCar',
+  CAR: 'car',
   MOTORCYCLE: 'motorcycle',
   VAN: 'van',
-  CHHOTA_HATHI: 'heavy',
-  TRUCK: 'heavy',
-  BUS: 'heavy',
-  JCB: 'heavy',
+  CHHOTA_HATHI: 'chhotaHathi',
+  TRUCK: 'truck',
+  BUS: 'bus',
+  JCB: 'jcb',
   HEAVY: 'heavy',
-  SPECIALIZED: 'heavy'
+  SPECIALIZED: 'specialized'
 };
 
 export function mapOrganization(row: Organization): OrganizationView {
@@ -374,6 +374,8 @@ export function mapApprovalStep(row: ApprovalStep, orgName: string): ApprovalSte
 
 export interface RequestMapOptions {
   requestingOrgName: string;
+  requestingStationName?: string | null;
+  providerStationName?: string | null;
   vehicleOrgName: string | null;
   vehicleLabel: string | null;
   steps: ApprovalStepView[];
@@ -386,12 +388,17 @@ export function mapRequest(row: AssetRequest, opts: RequestMapOptions): AssetReq
     requestCode: row.requestCode,
     requestingOrgId: row.requestingOrgId,
     requestingOrgName: opts.requestingOrgName,
+    requestingStationId: row.requestingStationId ?? null,
+    requestingStationName: opts.requestingStationName ?? null,
+    providerStationId: row.providerStationId ?? null,
+    providerStationName: opts.providerStationName ?? null,
     requesterUsername: row.requesterUsername,
     requesterName: row.requesterName,
     vehicleId: row.vehicleId,
     vehicleLabel: opts.vehicleLabel,
     vehicleOrgName: opts.vehicleOrgName,
     requestedClass: row.requestedClass as VehicleClass,
+    quantity: row.quantity ?? 1,
     purpose: row.purpose,
     destination: row.destination,
     passengers: row.passengers,
@@ -404,6 +411,7 @@ export function mapRequest(row: AssetRequest, opts: RequestMapOptions): AssetReq
     approverOrgId: row.approverOrgId,
     submittedAt: iso(row.submittedAt),
     decidedAt: iso(row.decidedAt),
+    decidedBy: row.decidedBy ?? null,
     decisionReason: row.decisionReason,
     steps: opts.steps,
     allocationId: opts.allocationId,
@@ -464,6 +472,8 @@ export function mapExtension(row: ExtensionRequest): ExtensionView {
 
 export interface AllocationMapOptions {
   vehicleLabel: string;
+  borrowingStationName?: string | null;
+  lendingStationName?: string | null;
   handover: HandoverRecordView | null;
   returnRecord: ReturnRecordView | null;
   extensions: ExtensionView[];
@@ -473,14 +483,21 @@ export interface AllocationMapOptions {
 
 export function mapAllocation(row: Allocation, opts: AllocationMapOptions): AllocationView {
   const now = opts.now ?? new Date();
-  const overdue = row.lifecycle === 'ACTIVE' && now.getTime() > row.endAt.getTime() + opts.graceMinutes * 60000;
+  const overdue = (row.lifecycle === 'ACTIVE' || row.lifecycle === 'PARTIALLY_RETURNED') && now.getTime() > row.endAt.getTime() + opts.graceMinutes * 60000;
   const overdueHours = overdue ? Math.floor((now.getTime() - row.endAt.getTime()) / 3600000) : 0;
   return {
     id: row.id,
     allocationCode: row.allocationCode,
     requestId: row.requestId,
-    vehicleId: row.vehicleId,
+    vehicleId: row.vehicleId ?? null,
     vehicleLabel: opts.vehicleLabel,
+    quantity: row.quantity ?? 1,
+    returnedQuantity: row.returnedQuantity ?? 0,
+    assignedVehicleIds: (row.assignedVehicleIds as string[] | null) ?? (row.vehicleId ? [row.vehicleId] : []),
+    borrowingStationId: row.borrowingStationId ?? null,
+    borrowingStationName: opts.borrowingStationName ?? null,
+    lendingStationId: row.lendingStationId ?? null,
+    lendingStationName: opts.lendingStationName ?? null,
     startAt: isoReq(row.startAt),
     endAt: isoReq(row.endAt),
     lifecycle: row.lifecycle as AllocationView['lifecycle'],
@@ -490,6 +507,7 @@ export function mapAllocation(row: Allocation, opts: AllocationMapOptions): Allo
     cancelReason: row.cancelReason,
     handover: opts.handover,
     returnRecord: opts.returnRecord,
+    returnDetails: row.returnDetails ?? null,
     extensions: opts.extensions,
     createdAt: isoReq(row.createdAt)
   };

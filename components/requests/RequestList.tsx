@@ -47,11 +47,12 @@ export function RequestList() {
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [q, setQ] = useState('');
   const [stateFilter, setStateFilter] = useState(params.get('state') ?? '');
-  const [showWizard, setShowWizard] = useState(params.get('new') === '1');
+  const [showWizard, setShowWizard] = useState(params.get('new') === '1' || params.get('new') === 'true');
   const [cancelTarget, setCancelTarget] = useState<AssetRequestView | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const prefillVehicleId = params.get('vehicleId');
+  const prefillProviderStationId = params.get('providerStationId');
   // Approvers land on the queue that needs them when there is no explicit tab in the URL.
   const autoSwitched = useRef(false);
 
@@ -186,8 +187,9 @@ export function RequestList() {
               <tr>
                 <th>Code</th>
                 <th>Purpose</th>
-                <th>Vehicle</th>
-                <th>Requesting org</th>
+                <th>Vehicle Class / Qty</th>
+                <th>Requesting Station</th>
+                <th>Providing Station</th>
                 <th>Window</th>
                 <th>State</th>
                 <th aria-label="Actions" />
@@ -207,8 +209,11 @@ export function RequestList() {
                     <Link href={`/requests/${r.id}`}>{r.requestCode}</Link>
                   </td>
                   <td>{r.purpose}</td>
-                  <td>{r.vehicleLabel ?? CLASS_LABEL[r.requestedClass] + ' (class)'}</td>
-                  <td>{r.requestingOrgName}</td>
+                  <td>
+                    <strong>{r.quantity ?? 1}x</strong> {r.vehicleLabel ?? CLASS_LABEL[r.requestedClass]}
+                  </td>
+                  <td>{r.requestingStationName ?? r.requestingOrgName}</td>
+                  <td>{r.providerStationName ?? '—'}</td>
                   <td className="text-muted" style={{ fontSize: '0.82rem' }}>
                     {fmtDateTime(r.startAt)} → {fmtDateTime(r.endAt)}
                   </td>
@@ -259,8 +264,8 @@ export function RequestList() {
                 <Badge tone={requestStateTone(r.state)}>{REQUEST_STATE_LABEL[r.state]}</Badge>
               </div>
               <div style={{ fontSize: '0.82rem', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <div><strong>Vehicle:</strong> {r.vehicleLabel ?? CLASS_LABEL[r.requestedClass] + ' (class)'}</div>
-                <div><strong>Org:</strong> {r.requestingOrgName}</div>
+                <div><strong>Requested:</strong> {r.quantity ?? 1}x {r.vehicleLabel ?? CLASS_LABEL[r.requestedClass]}</div>
+                <div><strong>From:</strong> {r.requestingStationName ?? r.requestingOrgName} &rarr; <strong>To:</strong> {r.providerStationName ?? 'Any Station'}</div>
               </div>
               <div className="veh-card-foot">
                 <span>{fmtDateTime(r.startAt)} → {fmtDateTime(r.endAt)}</span>
@@ -290,7 +295,10 @@ export function RequestList() {
 
       {showWizard ? (
         <RequestWizard
-          prefill={prefillVehicleId ? { vehicleId: prefillVehicleId } : undefined}
+          prefill={{
+            vehicleId: prefillVehicleId || undefined,
+            providerStationId: prefillProviderStationId || undefined
+          }}
           onClose={() => setShowWizard(false)}
           onDone={() => {
             setShowWizard(false);

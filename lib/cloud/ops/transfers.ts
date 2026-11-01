@@ -139,8 +139,8 @@ async function assertCanReviewSource(tx: TxClient, user: SessionUser, transfer: 
 // ---------------------------------------------------------------------------
 
 export async function createTransfer(user: SessionUser, input: { sourceStationId: string; destinationStationId: string; startAt: string; endAt: string; counts: Partial<Record<VehicleClass, number>>; purpose: string; comments?: string }, correlationId: string): Promise<TransferView> {
-  if (user.role === 'STATION_OFFICER' && user.stationId && input.sourceStationId !== user.stationId) {
-    throw new DomainError('You are only authorized to initiate transfers originating from your assigned station.', 403);
+  if (user.role === 'STATION_OFFICER' && user.stationId && input.sourceStationId !== user.stationId && input.destinationStationId !== user.stationId) {
+    throw new DomainError('You are only authorized to initiate transfers involving your assigned station.', 403);
   }
   if (input.sourceStationId === input.destinationStationId) {
     throw new DomainError('Source and destination stations must be different.', 400);

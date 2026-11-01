@@ -214,6 +214,7 @@ export function FleetReadinessTriagePanel({
         startAt: payload.startAt,
         endAt: payload.endAt || new Date(Date.now() + 8 * 3600_000).toISOString(),
         accountableOfficer: me?.displayName || 'Station Duty Officer',
+        accountablePhone: '+91 70491 10800',
         submit: true
       });
 

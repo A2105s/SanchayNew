@@ -291,6 +291,7 @@ test('AI Fleet Automation & Executive Manager Triage', async (t) => {
         startAt,
         endAt,
         accountableOfficer: 'Admin Incharge',
+        accountablePhone: '+91 70491 10800',
         submit: true
       })
     });

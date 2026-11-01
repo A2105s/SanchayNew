@@ -39,6 +39,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <espnow.h>
 
 // ---------------------------------------------------------------------------
@@ -107,8 +108,13 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT,
 const char *WIFI_SSID = "NASA";
 const char *WIFI_PASS = "9936@Pari";
 
-// Sanchay Application Local Server
-const char *SANCHAY_SERVER_IP = "192.168.1.33";
+// Set to true to push telemetry directly to production Sanchay Fleet Cloud on Vercel (HTTPS).
+// Laptop IP is NOT required when USE_SANCHAY_CLOUD is true!
+const bool USE_SANCHAY_CLOUD = true;
+const char *SANCHAY_CLOUD_URL = "https://sanchaynew.vercel.app/api/iot/ingest";
+
+// Fallback Local Server (Only used if USE_SANCHAY_CLOUD = false)
+const char *SANCHAY_SERVER_IP = "192.168.1.32";
 const uint16_t SANCHAY_SERVER_PORT = 3000;
 const char *DEVICE_CODE = "SANCHAY-IOT-001";
 const char *DEVICE_INGEST_KEY = "sk_sanchay_iot_edge_2026";
@@ -596,13 +602,23 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
   // Visual feedback: 50 ms dark blip on RGB LED confirming data unit dispatch
   triggerBlip(BLIP_CLOUD_UPLOAD);
 
-  WiFiClient client;
   HTTPClient http;
+  bool beginOk = false;
 
-  String url = "http://" + String(SANCHAY_SERVER_IP) + ":" + String(SANCHAY_SERVER_PORT) + "/api/iot/ingest";
+  WiFiClient plainClient;
+  WiFiClientSecure secureClient;
 
-  if (http.begin(client, url)) {
-    http.setTimeout(1200);
+  if (USE_SANCHAY_CLOUD) {
+    secureClient.setInsecure(); // Skip certificate validation for low-memory ESP8266
+    secureClient.setTimeout(2500);
+    beginOk = http.begin(secureClient, SANCHAY_CLOUD_URL);
+  } else {
+    String url = "http://" + String(SANCHAY_SERVER_IP) + ":" + String(SANCHAY_SERVER_PORT) + "/api/iot/ingest";
+    beginOk = http.begin(plainClient, url);
+  }
+
+  if (beginOk) {
+    http.setTimeout(2500);
     http.addHeader("Content-Type", "application/json");
     http.addHeader("X-Device-Code", DEVICE_CODE);
     http.addHeader("Authorization", "Bearer " + String(DEVICE_INGEST_KEY));

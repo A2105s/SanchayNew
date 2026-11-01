@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { hashPassword } from '@/lib/auth/password';
 import { recomputeStationInventory } from '@/lib/cloud/ops/transfers';
@@ -1287,6 +1288,44 @@ export async function seedPoint14Fleet(prisma: PrismaClient): Promise<Point14See
       }
     });
     allocationsCount++;
+  }
+
+  // 6.5 Provision physical hardware IoT Edge Node (SANCHAY-IOT-001)
+  const hardwareVehicle = await prisma.vehicle.findFirst({
+    where: {
+      OR: [
+        { registrationNumber: 'MP07-DG-6386' },
+        { registrationNormalized: 'MP07DG6386' },
+        { sector: 'POLICE_PATROL' }
+      ]
+    }
+  });
+  if (hardwareVehicle) {
+    const iotKeyHash = createHash('sha256').update('sk_sanchay_iot_edge_2026').digest('hex');
+    await prisma.iotDevice.upsert({
+      where: { deviceCode: 'SANCHAY-IOT-001' },
+      update: {
+        vehicleId: hardwareVehicle.id,
+        organizationId: hardwareVehicle.organizationId,
+        ingestKeyHash: iotKeyHash,
+        ingestKeyPrefix: 'sk_sanchay',
+        status: 'ONLINE',
+        protocol: 'HTTP',
+        firmware: 'v1.0-espnow-wifi'
+      },
+      create: {
+        deviceCode: 'SANCHAY-IOT-001',
+        kind: 'GPS_TRACKER',
+        protocol: 'HTTP',
+        status: 'ONLINE',
+        simulated: false,
+        vehicleId: hardwareVehicle.id,
+        organizationId: hardwareVehicle.organizationId,
+        ingestKeyHash: iotKeyHash,
+        ingestKeyPrefix: 'sk_sanchay',
+        firmware: 'v1.0-espnow-wifi'
+      }
+    });
   }
 
   // 7. Synchronize StationInventory for all 8 stations

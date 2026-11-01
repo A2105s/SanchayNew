@@ -205,7 +205,42 @@ export interface IngestResult {
  *  - SOS opens an incident + notification
  */
 export async function ingestTelemetry(deviceCode: string, presentedKey: string, payload: IngestPayloadParsed): Promise<IngestResult> {
-  const device = await prisma.iotDevice.findUnique({ where: { deviceCode } });
+  let device = await prisma.iotDevice.findUnique({ where: { deviceCode } });
+
+  // Self-healing edge device provisioner:
+  // If the physical hardware device SANCHAY-IOT-001 connects with the valid edge key
+  // but does not exist in the database (e.g. after fresh migrations/reseeding on cloud/Supabase),
+  // automatically provision and bind it to the flagship police cruiser.
+  if (!device && deviceCode === 'SANCHAY-IOT-001' && presentedKey === 'sk_sanchay_iot_edge_2026') {
+    const flagshipVehicle = await prisma.vehicle.findFirst({
+      where: {
+        OR: [
+          { registrationNumber: 'MP07-DG-6386' },
+          { registrationNormalized: 'MP07DG6386' },
+          { sector: 'POLICE_PATROL' },
+          { operationalStatus: 'ACTIVE' }
+        ]
+      }
+    });
+
+    if (flagshipVehicle) {
+      device = await prisma.iotDevice.create({
+        data: {
+          deviceCode: 'SANCHAY-IOT-001',
+          kind: 'GPS_TRACKER',
+          protocol: 'HTTP',
+          status: 'ONLINE',
+          simulated: false,
+          vehicleId: flagshipVehicle.id,
+          organizationId: flagshipVehicle.organizationId,
+          ingestKeyHash: hashKey('sk_sanchay_iot_edge_2026'),
+          ingestKeyPrefix: 'sk_sanchay',
+          firmware: 'v1.0-espnow-wifi'
+        }
+      });
+    }
+  }
+
   // Always compare against SOMETHING to avoid a timing oracle on device existence.
   const expectedHash = device?.ingestKeyHash ?? hashKey('sentinel-no-such-key');
   const presentedHash = hashKey(presentedKey);

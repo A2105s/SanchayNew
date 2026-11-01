@@ -376,7 +376,7 @@ async function executeConfirmReturn(
             data: {
               operationalStatus: 'MAINTENANCE',
               eligibilityState: 'INELIGIBLE',
-              eligibilityReasons: [damageNotes ?? 'Vehicle returned with damages; routed to maintenance.']
+              notes: damageNotes ?? 'Vehicle returned with damages; routed to maintenance.'
             }
           });
           await writeAudit(tx, {
@@ -414,10 +414,9 @@ async function executeConfirmReturn(
     }
     const allReturnedIds = Array.from(new Set([...existingReturnedIds, ...newlyReturnedIds]));
 
-    // 3. Create or update ReturnRecord
-    await tx.returnRecord.upsert({
-      where: { allocationId: id },
-      create: {
+    // 3. Create ReturnRecord
+    await tx.returnRecord.create({
+      data: {
         allocationId: id,
         returnedBy: (prevReturnDetails.initiatedBy as string) ?? user.username,
         receivedBy: args.receivedBy ?? (prevReturnDetails.receivedBy as string) ?? user.username,
@@ -427,16 +426,6 @@ async function executeConfirmReturn(
         discrepancies: typeof prevReturnDetails.discrepancies === 'string' ? prevReturnDetails.discrepancies : null,
         evidenceRef: typeof prevReturnDetails.evidenceRef === 'string' ? prevReturnDetails.evidenceRef : null,
         inspectionRequired: false,
-        inspectionStatus: 'ACCEPTED'
-      },
-      update: {
-        returnedBy: (prevReturnDetails.initiatedBy as string) ?? user.username,
-        receivedBy: args.receivedBy ?? (prevReturnDetails.receivedBy as string) ?? user.username,
-        conditionNotes: args.notes ?? (prevReturnDetails.conditionNotes as string) ?? 'Returned and verified',
-        odometerKm: typeof prevReturnDetails.odometerKm === 'number' ? prevReturnDetails.odometerKm : null,
-        fuelPercent: typeof prevReturnDetails.fuelPercent === 'number' ? prevReturnDetails.fuelPercent : null,
-        discrepancies: typeof prevReturnDetails.discrepancies === 'string' ? prevReturnDetails.discrepancies : null,
-        evidenceRef: typeof prevReturnDetails.evidenceRef === 'string' ? prevReturnDetails.evidenceRef : null,
         inspectionStatus: 'ACCEPTED'
       }
     });

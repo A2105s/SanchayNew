@@ -148,8 +148,11 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
     const activeBorrowedAllocations = await prisma.allocation.findMany({
       where: {
         borrowingStationId: user.stationId,
-        lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'AWAITING_HANDOVER'] },
-        endAt: { gt: now }
+        lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'AWAITING_HANDOVER', 'OVERDUE'] },
+        OR: [
+          { endAt: { gt: now } },
+          { lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'OVERDUE'] } }
+        ]
       },
       select: { assignedVehicleIds: true, vehicleId: true }
     });

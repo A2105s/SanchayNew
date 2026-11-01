@@ -135,8 +135,11 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     'trip.write',
     'incident.write',
     'request.create',
+    'request.review',
     'handover.record',
     'return.record',
+    'return.inspect',
+    'extension.decide',
     'transfer.create',
     'transfer.review',
     'document.read',
@@ -156,5 +159,5 @@ export function permissionsFor(role: Role): readonly Permission[] {
 
 /** Roles that can decide a request (approver roles). ADMIN and ORG_ADMIN can also approve. */
 export function isApproverRole(role: Role): boolean {
-  return role === 'DEPT_OFFICER' || role === 'ADMIN' || role === 'ORG_ADMIN';
+  return role === 'DEPT_OFFICER' || role === 'ADMIN' || role === 'ORG_ADMIN' || role === 'STATION_OFFICER';
 }

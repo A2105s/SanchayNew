@@ -21,7 +21,9 @@ const CLASSES: VehicleClass[] = VEHICLE_CLASSIFICATIONS.map((c) => c.key);
 export interface RequestWizardPrefill {
   vehicleId?: string | null;
   vehicleLabel?: string | null;
+  providerStationId?: string | null;
   requestedClass?: VehicleClass;
+  quantity?: number;
   from?: string;
   to?: string;
 }
@@ -50,6 +52,8 @@ export function RequestWizard({
 
   const [vehicleId, setVehicleId] = useState<string | null>(prefill?.vehicleId ?? null);
   const [vehicleLabel, setVehicleLabel] = useState<string | null>(prefill?.vehicleLabel ?? null);
+  const [providerStationId, setProviderStationId] = useState<string>(prefill?.providerStationId ?? '');
+  const [quantity, setQuantity] = useState<string>(String(prefill?.quantity ?? 1));
   const [requestedClass, setRequestedClass] = useState<VehicleClass>(prefill?.requestedClass ?? 'PATROL_CAR');
   const [purpose, setPurpose] = useState('');
   const [destination, setDestination] = useState('');
@@ -97,6 +101,11 @@ export function RequestWizard({
     if (!endAt) e.endAt = 'End date/time is required.';
     if (startAt && endAt && new Date(endAt) <= new Date(startAt)) e.endAt = 'End must be after start.';
     if (startAt && new Date(startAt).getTime() < Date.now() - 60_000) e.startAt = 'Start cannot be in the past.';
+    const q = Number(quantity);
+    if (!Number.isInteger(q) || q < 1) e.quantity = 'Quantity must be a positive integer (at least 1).';
+    if (providerStationId && me?.stationId && providerStationId === me.stationId) {
+      e.providerStationId = 'A station cannot request vehicles from itself.';
+    }
     const p = Number(passengers);
     if (!Number.isFinite(p) || p < 0) e.passengers = 'Enter a valid passenger count.';
     if (!accountableOfficer.trim()) e.accountableOfficer = 'Accountable officer name is required.';
@@ -131,7 +140,9 @@ export function RequestWizard({
   function buildInput(submit: boolean): RequestInput {
     return {
       vehicleId: vehicleId ?? null,
+      providerStationId: providerStationId || undefined,
       requestedClass,
+      quantity: Number(quantity) || 1,
       purpose: purpose.trim(),
       destination: destination.trim() || undefined,
       passengers: Number(passengers) || 0,
@@ -220,6 +231,60 @@ export function RequestWizard({
             />
           </Field>
         ) : null}
+
+        <div className="grid-2">
+          <Field label="Providing police station" error={errors.providerStationId}>
+            <Select
+              value={providerStationId}
+              onChange={(v) => setProviderStationId(v)}
+              options={[
+                { value: '', label: 'Select provider police station…' },
+                ...(snapshot?.stations ?? [])
+                  .filter((s) => s.id !== me?.stationId)
+                  .map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.zone} Zone)`
+                  }))
+              ]}
+              ariaLabel="Providing police station"
+            />
+          </Field>
+          <Field label="Quantity" required error={errors.quantity}>
+            <input
+              className="input"
+              type="number"
+              min="1"
+              max="50"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="e.g. 3"
+            />
+          </Field>
+        </div>
+
+        {providerStationId ? (() => {
+          const prov = snapshot?.stations.find((s) => s.id === providerStationId);
+          const avail = prov?.inventory?.[requestedClass] ?? 0;
+          return (
+            <div
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: avail > 0 ? '#f0fdf4' : '#fef2f2',
+                border: avail > 0 ? '1px solid #bbf7d0' : '1px solid #fecaca',
+                color: avail > 0 ? '#166534' : '#991b1b',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>{prov?.name ?? 'Provider station'}:</span>
+              <span>{avail} {requestedClass.toLowerCase().replace(/_/g, ' ')}(s) currently available for sharing</span>
+            </div>
+          );
+        })() : null}
 
         <DraftRequestPanel onApply={applyDraft} onPickVehicle={pickDraftVehicle} />
 

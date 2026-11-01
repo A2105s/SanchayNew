@@ -2,6 +2,8 @@ import { requirePermission } from '@/lib/cloud/context';
 import { prisma } from '@/lib/db/prisma';
 import { handleRouteError, ok } from '@/lib/cloud/http';
 import { DomainError } from '@/lib/cloud/errors';
+import { inventoryToRecord } from '@/lib/cloud/mappers';
+import { getStationInventoryBreakdown } from '@/lib/cloud/ops/inventory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,17 +42,24 @@ export async function GET(request: Request) {
     });
     if (!station) throw new DomainError('Station not found.', 404);
 
-    const [operators, activeAllocations] = await Promise.all([
+    const [operators, activeAllocations, breakdown] = await Promise.all([
       prisma.operator.findMany({
         where: { stationId: station.id, active: true },
         select: { username: true, displayName: true, role: true },
         orderBy: { username: 'asc' }
       }),
-      prisma.allocation.count({ where: { lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE'] }, vehicle: { stationId: station.id } } })
+      prisma.allocation.count({
+        where: {
+          lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED'] },
+          OR: [{ lendingStationId: station.id }, { borrowingStationId: station.id }]
+        }
+      }),
+      getStationInventoryBreakdown(station.id)
     ]);
 
     return ok({
       station: {
+        id: station.id,
         code: station.code,
         name: station.name,
         zone: station.zone,
@@ -60,9 +69,8 @@ export async function GET(request: Request) {
         inchargeName: station.inchargeName,
         phone: station.phone
       },
-      inventory: station.inventory
-        ? { patrolCar: station.inventory.patrolCar, motorcycle: station.inventory.motorcycle, van: station.inventory.van, heavy: station.inventory.heavy }
-        : { patrolCar: 0, motorcycle: 0, van: 0, heavy: 0 },
+      inventory: inventoryToRecord(station.inventory),
+      breakdown,
       vehicleCount: station._count.vehicles,
       activeAllocations,
       officers: operators

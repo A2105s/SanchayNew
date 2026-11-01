@@ -410,12 +410,18 @@ export type RequestState =
   | 'APPROVED'
   | 'REJECTED'
   | 'CANCELLED'
-  | 'EXPIRED';
+  | 'EXPIRED'
+  | 'PENDING_APPROVAL';
 
 export type AllocationLifecycle =
   | 'RESERVED'
   | 'AWAITING_HANDOVER'
   | 'ACTIVE'
+  | 'PARTIALLY_RETURNED'
+  | 'RETURN_PENDING_CONFIRMATION'
+  | 'RETURNED'
+  | 'OVERDUE'
+  | 'CLOSED'
   | 'RETURNED_PENDING_INSPECTION'
   | 'COMPLETED'
   | 'CANCELLED'
@@ -439,12 +445,17 @@ export interface AssetRequestView {
   requestCode: string;
   requestingOrgId: string;
   requestingOrgName: string;
+  requestingStationId: string | null;
+  requestingStationName: string | null;
+  providerStationId: string | null;
+  providerStationName: string | null;
   requesterUsername: string;
   requesterName: string;
   vehicleId: string | null;
   vehicleLabel: string | null; // masked label for foreign vehicles
   vehicleOrgName: string | null;
   requestedClass: VehicleClass;
+  quantity: number;
   purpose: string;
   destination: string | null;
   passengers: number;
@@ -457,6 +468,7 @@ export interface AssetRequestView {
   approverOrgId: string | null;
   submittedAt: string | null;
   decidedAt: string | null;
+  decidedBy: string | null;
   decisionReason: string | null;
   steps: ApprovalStepView[];
   allocationId: string | null;
@@ -512,8 +524,15 @@ export interface AllocationView {
   id: string;
   allocationCode: string;
   requestId: string;
-  vehicleId: string;
+  vehicleId: string | null;
   vehicleLabel: string; // masked for foreign users
+  quantity: number;
+  returnedQuantity: number;
+  assignedVehicleIds: string[];
+  borrowingStationId: string | null;
+  borrowingStationName: string | null;
+  lendingStationId: string | null;
+  lendingStationName: string | null;
   startAt: string;
   endAt: string;
   lifecycle: AllocationLifecycle;
@@ -524,6 +543,7 @@ export interface AllocationView {
   cancelReason: string | null;
   handover: HandoverRecordView | null;
   returnRecord: ReturnRecordView | null;
+  returnDetails?: any;
   extensions: ExtensionView[];
   createdAt: string;
 }
@@ -774,7 +794,10 @@ export type VehicleBulkAction =
 /** POST /api/cloud/requests  (creates DRAFT or SUBMITTED when submit=true). Header Idempotency-Key supported. */
 export interface RequestInput {
   vehicleId?: string | null;
+  requestingStationId?: string | null;
+  providerStationId?: string | null;
   requestedClass: VehicleClass;
+  quantity?: number;
   purpose: string;
   destination?: string;
   passengers: number;
@@ -786,12 +809,12 @@ export interface RequestInput {
   submit?: boolean;
 }
 
-/** POST /api/cloud/requests/[id]/actions. Approver is resolved on the server from the org hierarchy. */
+/** POST /api/cloud/requests/[id]/actions. Approver is resolved on the server from the org hierarchy or provider station. */
 export type RequestAction =
   | { type: 'update'; patch: Partial<Omit<RequestInput, 'submit'>> } // DRAFT / CHANGES_REQUESTED only
   | { type: 'submit' }
   | { type: 'startReview' }
-  | { type: 'approve'; comment?: string } // re-checks eligibility + availability inside the transaction, then creates the Allocation
+  | { type: 'approve'; comment?: string; vehicleIds?: string[] } // re-checks eligibility + availability inside transaction, allocates
   | { type: 'reject'; reason: string }
   | { type: 'requestChanges'; comment: string }
   | { type: 'escalate'; comment?: string }
@@ -801,7 +824,8 @@ export type RequestAction =
 export type AllocationAction =
   | { type: 'prepareHandover' } // RESERVED -> AWAITING_HANDOVER
   | { type: 'recordHandover'; receivedBy: string; conditionNotes: string; odometerKm?: number; fuelPercent?: number; checklist: { item: string; present: boolean }[]; evidenceRef?: string } // -> ACTIVE
-  | { type: 'recordReturn'; receivedBy: string; conditionNotes: string; odometerKm?: number; fuelPercent?: number; discrepancies?: string; evidenceRef?: string } // ACTIVE -> RETURNED_PENDING_INSPECTION (or COMPLETED when inspection not required)
+  | { type: 'recordReturn'; receivedBy: string; conditionNotes: string; returnQuantity?: number; odometerKm?: number; fuelPercent?: number; discrepancies?: string; evidenceRef?: string; damagedVehicleIds?: string[]; damageNotes?: string }
+  | { type: 'confirmReturn'; receivedBy?: string; notes?: string; damagedVehicleIds?: string[]; damageNotes?: string }
   | { type: 'inspect'; decision: 'ACCEPTED' | 'DISPUTED'; notes?: string }
   | { type: 'requestExtension'; newEndAt: string; reason: string }
   | { type: 'decideExtension'; extensionId: string; decision: 'APPROVED' | 'REJECTED'; note?: string } // re-checks conflicts

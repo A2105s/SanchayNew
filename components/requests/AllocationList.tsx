@@ -28,15 +28,15 @@ const TABS = [
 function matchesTab(a: AllocationView, tab: TabId): boolean {
   switch (tab) {
     case 'active':
-      return a.lifecycle === 'ACTIVE' || a.lifecycle === 'INCIDENT_HOLD';
+      return a.lifecycle === 'ACTIVE' || a.lifecycle === 'PARTIALLY_RETURNED' || a.lifecycle === 'INCIDENT_HOLD';
     case 'upcoming':
       return a.lifecycle === 'RESERVED' || a.lifecycle === 'AWAITING_HANDOVER';
     case 'awaiting':
-      return a.lifecycle === 'RETURNED_PENDING_INSPECTION';
+      return a.lifecycle === 'RETURNED_PENDING_INSPECTION' || a.lifecycle === 'RETURN_PENDING_CONFIRMATION';
     case 'overdue':
-      return a.returnDue || a.overdueHours > 0;
+      return a.returnDue || a.overdueHours > 0 || a.lifecycle === 'OVERDUE';
     case 'history':
-      return a.lifecycle === 'COMPLETED' || a.lifecycle === 'CANCELLED';
+      return a.lifecycle === 'COMPLETED' || a.lifecycle === 'CLOSED' || a.lifecycle === 'RETURNED' || a.lifecycle === 'CANCELLED';
     default:
       return true;
   }
@@ -112,7 +112,9 @@ export function AllocationList() {
               <tr>
                 <th style={{ width: 44, textAlign: 'center' }}>#</th>
                 <th>Code</th>
-                <th>Vehicle</th>
+                <th>Vehicle / Qty</th>
+                <th>Borrowing Station</th>
+                <th>Lending Station</th>
                 <th>Window</th>
                 <th>Lifecycle</th>
                 <th>Return status</th>
@@ -127,7 +129,16 @@ export function AllocationList() {
                   <td className="mono">
                     <Link href={`/allocations/${a.id}`}>{a.allocationCode}</Link>
                   </td>
-                  <td>{a.vehicleLabel}</td>
+                  <td>
+                    <div>
+                      {a.quantity && a.quantity > 1 ? (
+                        <strong>{a.quantity} vehicles {a.returnedQuantity ? `(${a.returnedQuantity} returned)` : ''} · </strong>
+                      ) : null}
+                      {a.vehicleLabel}
+                    </div>
+                  </td>
+                  <td>{a.borrowingStationName ?? '—'}</td>
+                  <td>{a.lendingStationName ?? '—'}</td>
                   <td className="text-muted" style={{ fontSize: '0.82rem' }}>
                     {fmtDateTime(a.startAt)} → {fmtDateTime(a.endAt)}
                   </td>

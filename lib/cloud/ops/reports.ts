@@ -305,7 +305,7 @@ export async function buildReport(user: SessionUser, kind: ReportKind, filters: 
           { key: 'start', label: 'Start' },
           { key: 'end', label: 'End' }
         ],
-        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle.assetCode, lifecycle: a.lifecycle, start: a.startAt.toISOString(), end: a.endAt.toISOString() })),
+        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle?.assetCode ?? 'MULTI-VEHICLE', lifecycle: a.lifecycle, start: a.startAt.toISOString(), end: a.endAt.toISOString() })),
         truncated
       };
     }
@@ -325,7 +325,7 @@ export async function buildReport(user: SessionUser, kind: ReportKind, filters: 
           { key: 'end', label: 'Due' },
           { key: 'overdueHours', label: 'Overdue (h)' }
         ],
-        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle.assetCode, end: a.endAt.toISOString(), overdueHours: Math.floor((now.getTime() - a.endAt.getTime()) / 3600000) })),
+        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle?.assetCode ?? 'MULTI-VEHICLE', end: a.endAt.toISOString(), overdueHours: Math.floor((now.getTime() - a.endAt.getTime()) / 3600000) })),
         truncated
       };
     }
@@ -467,7 +467,7 @@ export async function buildReport(user: SessionUser, kind: ReportKind, filters: 
           { key: 'lifecycle', label: 'Lifecycle' },
           { key: 'created', label: 'Created' }
         ],
-        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle.assetCode, lifecycle: a.lifecycle, created: a.createdAt.toISOString() })),
+        rows: rows.map((a) => ({ code: a.allocationCode, asset: a.vehicle?.assetCode ?? 'MULTI-VEHICLE', lifecycle: a.lifecycle, created: a.createdAt.toISOString() })),
         truncated
       };
     }

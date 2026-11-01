@@ -66,12 +66,64 @@ export async function recomputeStationInventory(tx: TxClient, stationId: string)
       eligibilityState: 'ELIGIBLE',
       operationalStatus: 'ACTIVE'
     },
-    select: { vehicleClass: true }
+    select: { id: true, vehicleClass: true }
   });
-  const tally = { patrolCar: 0, motorcycle: 0, van: 0, heavy: 0 };
-  for (const v of vehicles) {
-    tally[VEHICLE_CLASS_TO_INVENTORY_FIELD[v.vehicleClass as VehicleClass]] += 1;
+
+  // Calculate allocated vehicles currently out on loan
+  const now = new Date();
+  const activeAllocations = await tx.allocation.findMany({
+    where: {
+      lendingStationId: stationId,
+      lifecycle: { in: ['RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'INCIDENT_HOLD'] },
+      endAt: { gt: now }
+    },
+    select: { assignedVehicleIds: true, returnDetails: true, quantity: true, returnedQuantity: true, vehicleId: true }
+  });
+
+  const allocatedVehicleIds = new Set<string>();
+  for (const alloc of activeAllocations) {
+    const unreturnedQty = Math.max(0, (alloc.quantity ?? 1) - (alloc.returnedQuantity ?? 0));
+    if (unreturnedQty === 0) continue;
+
+    const returnDetails = alloc.returnDetails as { returnedVehicleIds?: string[] } | null;
+    const returnedSet = new Set<string>(returnDetails?.returnedVehicleIds ?? []);
+
+    if (Array.isArray(alloc.assignedVehicleIds)) {
+      let added = 0;
+      for (const vid of alloc.assignedVehicleIds) {
+        if (typeof vid === 'string' && !returnedSet.has(vid)) {
+          if (added < unreturnedQty) {
+            allocatedVehicleIds.add(vid);
+            added++;
+          }
+        }
+      }
+    } else if (alloc.vehicleId && !returnedSet.has(alloc.vehicleId)) {
+      allocatedVehicleIds.add(alloc.vehicleId);
+    }
   }
+
+  const tally: Record<string, number> = {
+    patrolCar: 0,
+    motorcycle: 0,
+    van: 0,
+    heavy: 0,
+    car: 0,
+    truck: 0,
+    bus: 0,
+    jcb: 0,
+    chhotaHathi: 0,
+    specialized: 0
+  };
+
+  for (const v of vehicles) {
+    // Only count available (not allocated out)
+    if (!allocatedVehicleIds.has(v.id)) {
+      const field = VEHICLE_CLASS_TO_INVENTORY_FIELD[v.vehicleClass as VehicleClass] ?? 'heavy';
+      tally[field] = (tally[field] ?? 0) + 1;
+    }
+  }
+
   await tx.stationInventory.upsert({
     where: { stationId },
     update: tally,
@@ -271,8 +323,8 @@ async function grantClearance(user: SessionUser, transfer: TransferRequest, corr
 
   const { updated, stations } = await prisma.$transaction(async (tx) => {
     await recomputeStationInventory(tx, transfer.sourceStationId);
-    const rows = await tx.$queryRaw<Array<{ patrolCar: number; motorcycle: number; van: number; heavy: number }>>(
-      Prisma.sql`SELECT "patrolCar", "motorcycle", "van", "heavy" FROM "StationInventory" WHERE "stationId" = ${transfer.sourceStationId} FOR UPDATE`
+    const rows = await tx.$queryRaw<Array<Record<string, number>>>(
+      Prisma.sql`SELECT * FROM "StationInventory" WHERE "stationId" = ${transfer.sourceStationId} FOR UPDATE`
     );
     const source = rows[0];
     if (!source) throw new DomainError('Source station inventory is unavailable.', 409);
@@ -311,8 +363,8 @@ async function grantSanction(user: SessionUser, transfer: TransferRequest, corre
   const { updated, stations } = await prisma.$transaction(async (tx) => {
     await assertCanGrantSanction(tx, user, transfer);
     await recomputeStationInventory(tx, transfer.sourceStationId);
-    const rows = await tx.$queryRaw<Array<{ patrolCar: number; motorcycle: number; van: number; heavy: number }>>(
-      Prisma.sql`SELECT "patrolCar", "motorcycle", "van", "heavy" FROM "StationInventory" WHERE "stationId" = ${transfer.sourceStationId} FOR UPDATE`
+    const rows = await tx.$queryRaw<Array<Record<string, number>>>(
+      Prisma.sql`SELECT * FROM "StationInventory" WHERE "stationId" = ${transfer.sourceStationId} FOR UPDATE`
     );
     const source = rows[0];
     if (!source) throw new DomainError('Source station inventory is unavailable.', 409);

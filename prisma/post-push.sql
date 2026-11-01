@@ -8,7 +8,7 @@ ALTER TABLE "Allocation" DROP CONSTRAINT IF EXISTS allocation_no_overlap;
 ALTER TABLE "Allocation"
   ADD CONSTRAINT allocation_no_overlap
   EXCLUDE USING gist ("vehicleId" WITH =, tsrange("startAt", "endAt", '[)') WITH &&)
-  WHERE ("lifecycle" NOT IN ('CANCELLED', 'COMPLETED'));
+  WHERE ("lifecycle" NOT IN ('CANCELLED', 'COMPLETED', 'CLOSED', 'RETURNED') AND "vehicleId" IS NOT NULL);
 
 -- 2. Sane periods
 ALTER TABLE "Allocation" DROP CONSTRAINT IF EXISTS allocation_period_valid;
@@ -33,10 +33,10 @@ ALTER TABLE "Vehicle" ADD CONSTRAINT vehicle_eligible_only_if_government_fleet
 
 ALTER TABLE "Allocation" DROP CONSTRAINT IF EXISTS allocation_lifecycle_valid;
 ALTER TABLE "Allocation" ADD CONSTRAINT allocation_lifecycle_valid
-  CHECK ("lifecycle" IN ('RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'RETURNED_PENDING_INSPECTION', 'COMPLETED', 'CANCELLED', 'INCIDENT_HOLD'));
+  CHECK ("lifecycle" IN ('RESERVED', 'AWAITING_HANDOVER', 'ACTIVE', 'PARTIALLY_RETURNED', 'RETURN_PENDING_CONFIRMATION', 'RETURNED', 'OVERDUE', 'CLOSED', 'RETURNED_PENDING_INSPECTION', 'COMPLETED', 'CANCELLED', 'INCIDENT_HOLD'));
 ALTER TABLE "AssetRequest" DROP CONSTRAINT IF EXISTS asset_request_state_valid;
 ALTER TABLE "AssetRequest" ADD CONSTRAINT asset_request_state_valid
-  CHECK ("state" IN ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'));
+  CHECK ("state" IN ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'CHANGES_REQUESTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED', 'PENDING_APPROVAL'));
 
 -- 4. Telemetry sanity
 ALTER TABLE "TelemetryPoint" DROP CONSTRAINT IF EXISTS telemetry_coordinates_valid;

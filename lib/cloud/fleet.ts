@@ -121,32 +121,70 @@ async function getSettings(): Promise<FleetSettings> {
  * bypass the ops layer.
  */
 export async function getFleetSnapshot(user: SessionUser): Promise<FleetSnapshot> {
-  const compute = unstable_cache(
-    () => computeFleetSnapshot(user),
-    ['cloud-snapshot', user.username, user.role, user.stationId ?? 'no-station'],
-    { tags: [CLOUD_CACHE_TAGS.fleet, CLOUD_CACHE_TAGS.all], revalidate: 30 }
-  );
-  return compute();
+  try {
+    const compute = unstable_cache(
+      () => computeFleetSnapshot(user),
+      ['cloud-snapshot', user.username, user.role, user.stationId ?? 'no-station'],
+      { tags: [CLOUD_CACHE_TAGS.fleet, CLOUD_CACHE_TAGS.all], revalidate: 30 }
+    );
+    return await compute();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes('incrementalCache missing')) {
+      return computeFleetSnapshot(user);
+    }
+    throw err;
+  }
 }
 
-async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnapshot> {
+export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnapshot> {
   const settings = await getSettings();
   const now = new Date();
   const tree = await orgTree(user);
   const treeOrgFilter = tree === null ? {} : { organizationId: { in: tree } };
+
+  // Fetch active borrowed vehicle IDs if user is assigned to a station
+  let borrowedVehicleIds: string[] = [];
+  if ((user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId) {
+    const activeBorrowedAllocations = await prisma.allocation.findMany({
+      where: {
+        borrowingStationId: user.stationId,
+        lifecycle: { in: ['ACTIVE', 'PARTIALLY_RETURNED', 'AWAITING_HANDOVER'] },
+        endAt: { gt: now }
+      },
+      select: { assignedVehicleIds: true, vehicleId: true }
+    });
+    for (const alloc of activeBorrowedAllocations) {
+      if (Array.isArray(alloc.assignedVehicleIds)) {
+        for (const vid of alloc.assignedVehicleIds) {
+          if (typeof vid === 'string') borrowedVehicleIds.push(vid);
+        }
+      } else if (alloc.vehicleId) {
+        borrowedVehicleIds.push(alloc.vehicleId);
+      }
+    }
+  }
+
   const vehicleStationFilter =
-    (user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId ? { stationId: user.stationId } : {};
+    (user.role === 'STATION_OFFICER' || user.role === 'FIELD_STAFF') && user.stationId
+      ? borrowedVehicleIds.length > 0
+        ? { OR: [{ stationId: user.stationId }, { id: { in: borrowedVehicleIds } }] }
+        : { stationId: user.stationId }
+      : {};
 
   const requestWhere =
-    tree === null
-      ? {}
-      : { OR: [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }] };
+    user.role === 'STATION_OFFICER' && user.stationId
+      ? { OR: [{ requestingStationId: user.stationId }, { providerStationId: user.stationId }] }
+      : tree === null
+        ? {}
+        : { OR: [{ requestingOrgId: { in: tree } }, { approverOrgId: { in: tree } }] };
 
-  // Allocations in scope (vehicle org in tree OR requesting org in tree).
+  // Allocations in scope
   const allocWhere =
-    tree === null
-      ? {}
-      : { OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] };
+    user.role === 'STATION_OFFICER' && user.stationId
+      ? { OR: [{ borrowingStationId: user.stationId }, { lendingStationId: user.stationId }] }
+      : tree === null
+        ? {}
+        : { OR: [{ vehicle: { organizationId: { in: tree } } }, { request: { requestingOrgId: { in: tree } } }] };
 
   const [organizations, stations, vehicleRows, vehicleTotal, devices, incidents, maintenance, trips, transfers, notifUnread, requestRows, allocRows, dataVersion] = await Promise.all([
     prisma.organization.findMany({ orderBy: { name: 'asc' } }),
@@ -206,10 +244,12 @@ async function countUnreadInternal(user: SessionUser): Promise<number> {
 
 async function buildRequestView(requestId: string, user: SessionUser, orgNameById: Map<string, string>, tree: string[] | null): Promise<AssetRequestView> {
   const request = await prisma.assetRequest.findUniqueOrThrow({ where: { id: requestId } });
-  const [steps, allocation, vehicle] = await Promise.all([
+  const [steps, allocation, vehicle, requestingStation, providerStation] = await Promise.all([
     prisma.approvalStep.findMany({ where: { requestId }, orderBy: { stepOrder: 'asc' } }),
     prisma.allocation.findUnique({ where: { requestId } }),
-    request.vehicleId ? prisma.vehicle.findUnique({ where: { id: request.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null)
+    request.vehicleId ? prisma.vehicle.findUnique({ where: { id: request.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null),
+    request.requestingStationId ? prisma.station.findUnique({ where: { id: request.requestingStationId }, select: { name: true } }) : Promise.resolve(null),
+    request.providerStationId ? prisma.station.findUnique({ where: { id: request.providerStationId }, select: { name: true } }) : Promise.resolve(null)
   ]);
   // `tree` is hoisted from the caller — orgTree() inside this loop re-scanned the
   // whole organization table per request and dominated the snapshot latency.
@@ -218,6 +258,8 @@ async function buildRequestView(requestId: string, user: SessionUser, orgNameByI
   const vehicleOrgName = vehicle ? orgNameById.get(vehicle.organizationId) ?? null : null;
   return mapRequest(request, {
     requestingOrgName: orgNameById.get(request.requestingOrgId) ?? 'Unknown',
+    requestingStationName: requestingStation?.name ?? null,
+    providerStationName: providerStation?.name ?? null,
     vehicleOrgName,
     vehicleLabel,
     steps: steps.map((s) => mapApprovalStep(s, orgNameById.get(s.approverOrgId) ?? 'Unknown')),
@@ -227,16 +269,23 @@ async function buildRequestView(requestId: string, user: SessionUser, orgNameByI
 
 async function buildAllocationView(allocationId: string, user: SessionUser, tree: string[] | null, settings: FleetSettings): Promise<AllocationView> {
   const allocation = await prisma.allocation.findUniqueOrThrow({ where: { id: allocationId } });
-  const [vehicle, handover, returnRec, extensions] = await Promise.all([
-    prisma.vehicle.findUnique({ where: { id: allocation.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }),
+  const [vehicle, handover, returnRec, extensions, borrowingStation, lendingStation] = await Promise.all([
+    allocation.vehicleId ? prisma.vehicle.findUnique({ where: { id: allocation.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null),
     prisma.handoverRecord.findUnique({ where: { allocationId } }),
     prisma.returnRecord.findUnique({ where: { allocationId } }),
-    prisma.extensionRequest.findMany({ where: { allocationId }, orderBy: { createdAt: 'asc' } })
+    prisma.extensionRequest.findMany({ where: { allocationId }, orderBy: { createdAt: 'asc' } }),
+    allocation.borrowingStationId ? prisma.station.findUnique({ where: { id: allocation.borrowingStationId }, select: { name: true } }) : Promise.resolve(null),
+    allocation.lendingStationId ? prisma.station.findUnique({ where: { id: allocation.lendingStationId }, select: { name: true } }) : Promise.resolve(null)
   ]);
   const isOwn = vehicle ? tree === null || tree.includes(vehicle.organizationId) : false;
-  const label = vehicle ? (isOwn ? `${vehicle.displayName} ${vehicle.registrationNumber}`.trim() : maskRegistration(vehicle.registrationNumber)) : '';
+  let label = vehicle ? (isOwn ? `${vehicle.displayName} ${vehicle.registrationNumber}`.trim() : maskRegistration(vehicle.registrationNumber)) : '';
+  if (!label) {
+    label = allocation.quantity && allocation.quantity > 1 ? `${allocation.quantity} vehicles allocated` : 'Allocated vehicle';
+  }
   return mapAllocation(allocation, {
     vehicleLabel: label,
+    borrowingStationName: borrowingStation?.name ?? null,
+    lendingStationName: lendingStation?.name ?? null,
     handover: handover ? mapHandover(handover) : null,
     returnRecord: returnRec ? mapReturn(returnRec) : null,
     extensions: extensions.map(mapExtension),

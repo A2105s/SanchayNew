@@ -15,6 +15,8 @@ import { orgTree, parentOrgId } from '@/lib/auth/scope';
 import type { FleetSettings } from '@/types';
 import type { RequestInputParsed } from '@/lib/validation/schemas';
 
+import { recomputeStationInventory } from '@/lib/cloud/ops/transfers';
+
 type TxClient = Prisma.TransactionClient | typeof prisma;
 
 function invalidate() {
@@ -32,10 +34,23 @@ async function loadRequest(id: string): Promise<AssetRequest> {
   return request;
 }
 
-/** A request is visible when it was raised by the caller's org, or targets the caller's org for a decision. */
+/** A request is visible when it was raised by the caller's org/station, or targets the caller's org/station for a decision. */
 async function assertRequestAccess(user: SessionUser, request: AssetRequest): Promise<void> {
   const tree = await orgTree(user);
-  if (tree === null) return; // ADMIN may read (but not decide)
+  if (tree === null) return; // ADMIN may read
+
+  // Station officer scoping: can only see requests involving their station or raised by them
+  if (user.role === 'STATION_OFFICER' && user.stationId) {
+    if (
+      request.requestingStationId === user.stationId ||
+      request.providerStationId === user.stationId ||
+      request.requesterUsername === user.username
+    ) {
+      return;
+    }
+    throw new DomainError('Request not found.', 404);
+  }
+
   const inReq = tree.includes(request.requestingOrgId);
   const inApprover = request.approverOrgId ? tree.includes(request.approverOrgId) : false;
   if (!inReq && !inApprover) throw new DomainError('Request not found.', 404);
@@ -43,11 +58,13 @@ async function assertRequestAccess(user: SessionUser, request: AssetRequest): Pr
 
 async function buildView(requestId: string, user: SessionUser, tx: TxClient = prisma): Promise<AssetRequestView> {
   const request = await tx.assetRequest.findUniqueOrThrow({ where: { id: requestId } });
-  const [steps, allocation, requestingOrg, vehicle] = await Promise.all([
+  const [steps, allocation, requestingOrg, vehicle, reqStation, provStation] = await Promise.all([
     tx.approvalStep.findMany({ where: { requestId }, orderBy: { stepOrder: 'asc' } }),
     tx.allocation.findUnique({ where: { requestId } }),
     tx.organization.findUnique({ where: { id: request.requestingOrgId }, select: { name: true } }),
-    request.vehicleId ? tx.vehicle.findUnique({ where: { id: request.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null)
+    request.vehicleId ? tx.vehicle.findUnique({ where: { id: request.vehicleId }, select: { organizationId: true, displayName: true, registrationNumber: true } }) : Promise.resolve(null),
+    request.requestingStationId ? tx.station.findUnique({ where: { id: request.requestingStationId }, select: { name: true } }) : Promise.resolve(null),
+    request.providerStationId ? tx.station.findUnique({ where: { id: request.providerStationId }, select: { name: true } }) : Promise.resolve(null)
   ]);
   const orgIds = steps.map((s) => s.approverOrgId);
   const orgs = orgIds.length ? await tx.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } }) : [];
@@ -64,6 +81,8 @@ async function buildView(requestId: string, user: SessionUser, tx: TxClient = pr
 
   return mapRequest(request, {
     requestingOrgName: requestingOrg?.name ?? 'Unknown',
+    requestingStationName: reqStation?.name ?? null,
+    providerStationName: provStation?.name ?? null,
     vehicleOrgName,
     vehicleLabel,
     steps: steps.map((s) => mapApprovalStep(s, orgNameById.get(s.approverOrgId) ?? 'Unknown')),
@@ -106,17 +125,32 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
     if (existing) return buildView(existing.id, user);
   }
 
-  // Resolve approver org from the vehicle's owning org (if a specific vehicle), else the requester's org.
+  // Derive requesting station from authenticated user's session
+  const requestingStationId = user.stationId ?? input.requestingStationId ?? null;
+  const providerStationId = input.providerStationId ?? null;
+
+  if (providerStationId) {
+    const provStation = await prisma.station.findUnique({ where: { id: providerStationId } });
+    if (!provStation) throw new DomainError('Provider police station not found.', 404);
+    if (requestingStationId && requestingStationId === providerStationId) {
+      throw new DomainError('Request cannot target the same station as both requester and provider.', 400);
+    }
+  }
+
+  const quantity = Math.max(1, input.quantity ?? 1);
+
+  // Resolve approver org from provider station, vehicle's owning org, or default to effectiveOrgId
   let approverOrgId: string | null = null;
-  if (input.vehicleId) {
+  if (providerStationId) {
+    const provStation = await prisma.station.findUnique({ where: { id: providerStationId }, select: { organizationId: true } });
+    approverOrgId = provStation?.organizationId ?? effectiveOrgId;
+  } else if (input.vehicleId) {
     const vehicle = await prisma.vehicle.findUnique({ where: { id: input.vehicleId } });
     if (!vehicle) throw new DomainError('Requested vehicle not found.', 404);
-    // Visibility: must be own-org OR cross-org discoverable (eligible gov fleet).
     const tree = await orgTree(user);
     const isOwn = tree === null || tree.includes(vehicle.organizationId);
     const discoverable = vehicle.ownershipCategory === 'GOVERNMENT_FLEET' && vehicle.eligibilityState === 'ELIGIBLE' && vehicle.operationalStatus === 'ACTIVE';
     if (!isOwn && !discoverable) throw new DomainError('Requested vehicle not found.', 404);
-    // Eligibility must hold at request time.
     const eligibility = await evaluateEligibility(vehicle.id, prisma, settings, now);
     if (eligibility.state !== 'ELIGIBLE') {
       throw new DomainError(`Vehicle is not eligible: ${eligibility.reasons.filter((r) => r.blocking).map((r) => r.message).join('; ') || eligibility.state}.`, 409, 'NOT_ELIGIBLE');
@@ -131,13 +165,13 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
   }
 
   const accountablePhone = input.accountablePhone?.trim() || null;
-  if (accountablePhone && accountablePhone.length < 10) {
+  if (!accountablePhone || accountablePhone.length < 10) {
     throw new DomainError('Accountable officer phone number must have at least 10 digits.', 400);
   }
 
   let contactPhone = input.contactPhone ?? null;
-  if (user.stationId) {
-    const stn = await prisma.station.findUnique({ where: { id: user.stationId }, select: { phone: true } });
+  if (requestingStationId) {
+    const stn = await prisma.station.findUnique({ where: { id: requestingStationId }, select: { phone: true } });
     if (stn?.phone) {
       contactPhone = stn.phone;
     }
@@ -151,10 +185,13 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
       data: {
         requestCode,
         requestingOrgId: effectiveOrgId as string,
+        requestingStationId,
+        providerStationId,
         requesterUsername: user.username,
         requesterName: user.displayName,
         vehicleId: input.vehicleId ?? null,
         requestedClass: input.requestedClass,
+        quantity,
         purpose: input.purpose,
         destination: input.destination ?? null,
         passengers: input.passengers,
@@ -163,7 +200,7 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
         accountableOfficer: input.accountableOfficer,
         accountablePhone,
         contactPhone,
-        state: submit ? 'SUBMITTED' : 'DRAFT',
+        state: submit ? 'PENDING_APPROVAL' : 'DRAFT',
         approverOrgId,
         submittedAt: submit ? now : null,
         idempotencyKey: idempotencyKey ?? undefined
@@ -172,9 +209,30 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
     if (submit && approverOrgId) {
       await tx.approvalStep.create({ data: { requestId: created.id, stepOrder: 1, approverOrgId, decision: 'PENDING' } });
     }
-    await writeAudit(tx, { entityType: 'Request', entityId: created.id, action: submit ? 'RequestSubmitted' : 'RequestCreated', newValue: created.requestCode, performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId, reason: input.purpose });
+    await writeAudit(tx, {
+      entityType: 'Request',
+      entityId: created.id,
+      action: submit ? 'RequestSubmitted' : 'RequestCreated',
+      newValue: created.requestCode,
+      performedBy: user.username,
+      performedByRole: user.role,
+      organizationId: user.organizationId,
+      correlationId,
+      reason: input.purpose
+    });
     if (submit && approverOrgId) {
-      await notify({ eventKey: `request:${created.id}:SUBMITTED`, kind: 'REQUEST_SUBMITTED', title: 'New vehicle request', body: `Request ${created.requestCode} needs your decision.`, href: `/requests`, recipientOrgId: approverOrgId, recipientRole: 'DEPT_OFFICER' }, tx);
+      await notify(
+        {
+          eventKey: `request:${created.id}:PENDING_APPROVAL`,
+          kind: 'REQUEST_SUBMITTED',
+          title: 'New inter-station vehicle request',
+          body: `Request ${created.requestCode} for ${quantity} ${input.requestedClass} needs your decision.`,
+          href: `/requests`,
+          recipientOrgId: approverOrgId,
+          recipientRole: 'STATION_OFFICER'
+        },
+        tx
+      );
     }
     return created;
   }, { timeout: 30000, maxWait: 15000 });
@@ -242,9 +300,26 @@ export async function startReview(user: SessionUser, id: string, correlationId: 
   return buildView(id, user);
 }
 
-/** The caller must be a DEPT_OFFICER of the approver org (and not the requester unless self-approval allowed). */
+/** The caller must be a provider station officer or DEPT_OFFICER (and not the requester unless self-approval allowed). */
 async function assertDecider(user: SessionUser, request: AssetRequest): Promise<void> {
-  if (user.role !== 'DEPT_OFFICER') throw new DomainError('Only a department officer may decide requests.', 403);
+  // Station-to-station requests: provider station officer can decide
+  if (request.providerStationId) {
+    if (user.role === 'STATION_OFFICER') {
+      if (user.stationId !== request.providerStationId) {
+        throw new DomainError('Only the designated provider police station may decide this request.', 403);
+      }
+      return;
+    }
+    if (user.role === 'ADMIN' || user.role === 'ORG_ADMIN' || user.role === 'DEPT_OFFICER') {
+      return;
+    }
+    throw new DomainError('Not authorized to decide this request.', 403);
+  }
+
+  // Fallback for general org-level requests:
+  if (user.role !== 'DEPT_OFFICER' && user.role !== 'ADMIN' && user.role !== 'ORG_ADMIN') {
+    throw new DomainError('Only a department officer may decide requests.', 403);
+  }
   if (!request.approverOrgId) throw new DomainError('Request has no resolved approver organization.', 409);
   const tree = await orgTree(user);
   if (tree !== null && !tree.includes(request.approverOrgId)) {
@@ -253,7 +328,7 @@ async function assertDecider(user: SessionUser, request: AssetRequest): Promise<
 }
 
 // ---------------------------------------------------------------------------
-// Approve (transaction: lock vehicle, re-check, insert Allocation, idempotent)
+// Approve (transaction: lock vehicle(s), check availability, insert Allocation, update inventory atomically)
 // ---------------------------------------------------------------------------
 
 export async function approveRequest(user: SessionUser, id: string, comment: string | undefined, correlationId: string): Promise<AssetRequestView> {
@@ -264,15 +339,13 @@ export async function approveRequest(user: SessionUser, id: string, comment: str
   if (!settings.allowSelfApproval && request.requesterUsername === user.username) {
     throw new DomainError('You cannot approve your own request.', 403, 'SELF_APPROVAL');
   }
-  if (!['SUBMITTED', 'UNDER_REVIEW'].includes(request.state)) {
-    // Idempotent: a repeat approve on an already-APPROVED request returns the same allocation.
+  if (!['SUBMITTED', 'UNDER_REVIEW', 'PENDING_APPROVAL'].includes(request.state)) {
+    // Idempotent: a repeat approve on an already-APPROVED request returns the same view.
     if (request.state === 'APPROVED') return buildView(id, user);
     throw new DomainError(`Cannot approve a request in state ${request.state}.`, 409);
   }
-  if (!request.vehicleId) throw new DomainError('A specific vehicle must be chosen before approval.', 409);
 
   const now = new Date();
-  const vehicleId = request.vehicleId;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -280,29 +353,202 @@ export async function approveRequest(user: SessionUser, id: string, comment: str
       const fresh = await tx.assetRequest.findUniqueOrThrow({ where: { id } });
       if (fresh.state === 'APPROVED') return;
 
-      // Row-lock the vehicle to serialise concurrent approvals.
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${vehicleId} FOR UPDATE`);
-
-      // Re-run eligibility + availability inside the transaction.
-      const eligibility = await evaluateEligibility(vehicleId, tx, settings, now);
-      if (eligibility.state !== 'ELIGIBLE') {
-        throw new DomainError(`Vehicle is no longer eligible: ${eligibility.state}.`, 409, 'NOT_ELIGIBLE');
-      }
-      const availability = await computeAvailability(vehicleId, fresh.startAt, fresh.endAt, tx, settings, now);
-      if (availability.state !== 'AVAILABLE') {
-        throw new DomainError('Vehicle is no longer available.', 409, 'NOT_AVAILABLE');
-      }
-
       const allocationCode = await nextAllocationCode(tx);
-      // The DB EXCLUDE constraint is the final guard; a violation surfaces as P2010/23P01.
-      await tx.allocation.create({
-        data: { allocationCode, requestId: id, vehicleId, startAt: fresh.startAt, endAt: fresh.endAt, lifecycle: 'RESERVED', createdBy: user.username }
-      });
+      const reqQuantity = fresh.quantity || 1;
 
-      await tx.assetRequest.update({ where: { id }, data: { state: 'APPROVED', decidedAt: now, decisionReason: comment ?? null } });
-      await tx.approvalStep.updateMany({ where: { requestId: id, decision: 'PENDING' }, data: { decision: 'APPROVED', decidedBy: user.username, decidedByRole: user.role, comment: comment ?? null, decidedAt: now } });
+      // 1. Station-to-station multi-vehicle or class allocation
+      if (fresh.providerStationId) {
+        // Query eligible, active vehicles of the requested class belonging to the provider station
+        const vehicles = await tx.vehicle.findMany({
+          where: {
+            stationId: fresh.providerStationId,
+            vehicleClass: fresh.requestedClass,
+            ownershipCategory: 'GOVERNMENT_FLEET',
+            eligibilityState: 'ELIGIBLE',
+            operationalStatus: 'ACTIVE'
+          },
+          select: { id: true, registrationNumber: true, displayName: true }
+        });
 
-      await writeAudit(tx, { entityType: 'Request', entityId: id, action: 'RequestApproved', fieldName: 'state', oldValue: fresh.state, newValue: 'APPROVED', performedBy: user.username, performedByRole: user.role, organizationId: request.approverOrgId, correlationId, reason: comment });
+        // Row-lock these vehicles to serialise concurrent approvals
+        if (vehicles.length > 0) {
+          const ids = vehicles.map((v) => v.id);
+          await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id IN (${Prisma.join(ids)}) FOR UPDATE`);
+        }
+
+        // Find conflicting allocations during the overlapping period
+        const activeAllocs = await tx.allocation.findMany({
+          where: {
+            lendingStationId: fresh.providerStationId,
+            lifecycle: {
+              in: [
+                'RESERVED',
+                'AWAITING_HANDOVER',
+                'ACTIVE',
+                'PARTIALLY_RETURNED',
+                'RETURN_PENDING_CONFIRMATION',
+                'INCIDENT_HOLD'
+              ]
+            },
+            startAt: { lt: fresh.endAt },
+            endAt: { gt: fresh.startAt }
+          },
+          select: { assignedVehicleIds: true, vehicleId: true }
+        });
+
+        const busyIds = new Set<string>();
+        for (const a of activeAllocs) {
+          if (Array.isArray(a.assignedVehicleIds)) {
+            for (const vid of a.assignedVehicleIds) {
+              if (typeof vid === 'string') busyIds.add(vid);
+            }
+          } else if (a.vehicleId) {
+            busyIds.add(a.vehicleId);
+          }
+        }
+
+        const availableVehicles = vehicles.filter((v) => !busyIds.has(v.id));
+        if (availableVehicles.length < reqQuantity) {
+          throw new DomainError(
+            `Insufficient available ${fresh.requestedClass} vehicles. Requested: ${reqQuantity}, Available: ${availableVehicles.length}.`,
+            409,
+            'INSUFFICIENT_INVENTORY'
+          );
+        }
+
+        const assigned = availableVehicles.slice(0, reqQuantity);
+        const assignedIds = assigned.map((v) => v.id);
+        const primaryId = assignedIds[0] ?? null;
+
+        await tx.allocation.create({
+          data: {
+            allocationCode,
+            requestId: id,
+            vehicleId: primaryId,
+            quantity: reqQuantity,
+            returnedQuantity: 0,
+            assignedVehicleIds: assignedIds,
+            borrowingStationId: fresh.requestingStationId,
+            lendingStationId: fresh.providerStationId,
+            startAt: fresh.startAt,
+            endAt: fresh.endAt,
+            lifecycle: 'RESERVED',
+            createdBy: user.username
+          }
+        });
+
+        await tx.assetRequest.update({
+          where: { id },
+          data: {
+            state: 'APPROVED',
+            decidedAt: now,
+            decidedBy: user.username,
+            decisionReason: comment ?? null
+          }
+        });
+
+        await tx.approvalStep.updateMany({
+          where: { requestId: id, decision: 'PENDING' },
+          data: {
+            decision: 'APPROVED',
+            decidedBy: user.username,
+            decidedByRole: user.role,
+            comment: comment ?? null,
+            decidedAt: now
+          }
+        });
+
+        await writeAudit(tx, {
+          entityType: 'Request',
+          entityId: id,
+          action: 'RequestApproved',
+          fieldName: 'state',
+          oldValue: fresh.state,
+          newValue: 'APPROVED',
+          performedBy: user.username,
+          performedByRole: user.role,
+          organizationId: request.approverOrgId,
+          correlationId,
+          reason: comment
+        });
+
+        // Atomically recompute station inventory for lending (and borrowing) stations
+        await recomputeStationInventory(tx, fresh.providerStationId);
+        if (fresh.requestingStationId) {
+          await recomputeStationInventory(tx, fresh.requestingStationId);
+        }
+      } else {
+        // 2. Specific vehicle allocation (legacy/cross-org single vehicle flow)
+        if (!fresh.vehicleId) throw new DomainError('A specific vehicle or provider station must be chosen before approval.', 409);
+        const vehicleId = fresh.vehicleId;
+
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM "Vehicle" WHERE id = ${vehicleId} FOR UPDATE`);
+
+        const eligibility = await evaluateEligibility(vehicleId, tx, settings, now);
+        if (eligibility.state !== 'ELIGIBLE') {
+          throw new DomainError(`Vehicle is no longer eligible: ${eligibility.state}.`, 409, 'NOT_ELIGIBLE');
+        }
+        const availability = await computeAvailability(vehicleId, fresh.startAt, fresh.endAt, tx, settings, now);
+        if (availability.state !== 'AVAILABLE') {
+          throw new DomainError('Vehicle is no longer available.', 409, 'NOT_AVAILABLE');
+        }
+
+        await tx.allocation.create({
+          data: {
+            allocationCode,
+            requestId: id,
+            vehicleId,
+            quantity: 1,
+            returnedQuantity: 0,
+            assignedVehicleIds: [vehicleId],
+            borrowingStationId: fresh.requestingStationId,
+            lendingStationId: fresh.providerStationId,
+            startAt: fresh.startAt,
+            endAt: fresh.endAt,
+            lifecycle: 'RESERVED',
+            createdBy: user.username
+          }
+        });
+
+        await tx.assetRequest.update({
+          where: { id },
+          data: {
+            state: 'APPROVED',
+            decidedAt: now,
+            decidedBy: user.username,
+            decisionReason: comment ?? null
+          }
+        });
+
+        await tx.approvalStep.updateMany({
+          where: { requestId: id, decision: 'PENDING' },
+          data: {
+            decision: 'APPROVED',
+            decidedBy: user.username,
+            decidedByRole: user.role,
+            comment: comment ?? null,
+            decidedAt: now
+          }
+        });
+
+        await writeAudit(tx, {
+          entityType: 'Request',
+          entityId: id,
+          action: 'RequestApproved',
+          fieldName: 'state',
+          oldValue: fresh.state,
+          newValue: 'APPROVED',
+          performedBy: user.username,
+          performedByRole: user.role,
+          organizationId: request.approverOrgId,
+          correlationId,
+          reason: comment
+        });
+
+        if (fresh.providerStationId) {
+          await recomputeStationInventory(tx, fresh.providerStationId);
+        }
+      }
     }, { timeout: 30000, maxWait: 15000 });
   } catch (error) {
     if (
@@ -318,7 +564,7 @@ export async function approveRequest(user: SessionUser, id: string, comment: str
   }
 
   // Notifications after commit.
-  await notify({ eventKey: `request:${id}:APPROVED`, kind: 'REQUEST_APPROVED', title: 'Request approved', body: `Request ${request.requestCode} was approved and reserved.`, href: `/requests`, recipientUsername: request.requesterUsername });
+  await notify({ eventKey: `request:${id}:APPROVED`, kind: 'REQUEST_APPROVED', title: 'Request approved', body: `Request ${request.requestCode} was approved and allocated.`, href: `/requests`, recipientUsername: request.requesterUsername });
   await recordCloudEvent({ level: 'info', category: 'ops', action: 'approve-request', status: 'succeeded', message: 'Request approved.', details: { requestId: id } });
   invalidate();
   return buildView(id, user);
@@ -327,11 +573,14 @@ export async function approveRequest(user: SessionUser, id: string, comment: str
 export async function rejectRequest(user: SessionUser, id: string, reason: string, correlationId: string): Promise<AssetRequestView> {
   const request = await loadRequest(id);
   await assertDecider(user, request);
-  if (!['SUBMITTED', 'UNDER_REVIEW'].includes(request.state)) throw new DomainError(`Cannot reject a request in state ${request.state}.`, 409);
+  if (!['SUBMITTED', 'UNDER_REVIEW', 'PENDING_APPROVAL'].includes(request.state)) throw new DomainError(`Cannot reject a request in state ${request.state}.`, 409);
   await prisma.$transaction(async (tx) => {
-    await tx.assetRequest.update({ where: { id }, data: { state: 'REJECTED', decidedAt: new Date(), decisionReason: reason } });
+    await tx.assetRequest.update({ where: { id }, data: { state: 'REJECTED', decidedAt: new Date(), decidedBy: user.username, decisionReason: reason } });
     await tx.approvalStep.updateMany({ where: { requestId: id, decision: 'PENDING' }, data: { decision: 'REJECTED', decidedBy: user.username, decidedByRole: user.role, comment: reason, decidedAt: new Date() } });
     await writeAudit(tx, { entityType: 'Request', entityId: id, action: 'RequestRejected', fieldName: 'state', oldValue: request.state, newValue: 'REJECTED', performedBy: user.username, performedByRole: user.role, organizationId: request.approverOrgId, correlationId, reason });
+    if (request.providerStationId) {
+      await recomputeStationInventory(tx, request.providerStationId);
+    }
     await notify({ eventKey: `request:${id}:REJECTED`, kind: 'REQUEST_REJECTED', title: 'Request rejected', body: `Request ${request.requestCode} was rejected.`, href: `/requests`, recipientUsername: request.requesterUsername }, tx);
   });
   invalidate();
@@ -376,9 +625,10 @@ export async function cancelRequest(user: SessionUser, id: string, reason: strin
   const request = await loadRequest(id);
   await assertRequestAccess(user, request);
   const isRequester = request.requesterUsername === user.username;
+  const isStationRequester = Boolean(user.stationId && request.requestingStationId === user.stationId);
   const isAdmin = user.role === 'ADMIN';
   const isOrgOfficer = user.role === 'DEPT_OFFICER' || user.role === 'ORG_ADMIN';
-  if (!isRequester && !isAdmin && !isOrgOfficer) {
+  if (!isRequester && !isStationRequester && !isAdmin && !isOrgOfficer) {
     throw new DomainError('You cannot cancel this request.', 403);
   }
   if (request.state === 'CANCELLED') {
@@ -391,6 +641,9 @@ export async function cancelRequest(user: SessionUser, id: string, reason: strin
     await tx.assetRequest.update({ where: { id }, data: { state: 'CANCELLED', decidedAt: new Date(), decisionReason: reason ?? null } });
     await tx.approvalStep.updateMany({ where: { requestId: id, decision: 'PENDING' }, data: { decision: 'SKIPPED', decidedAt: new Date() } });
     await writeAudit(tx, { entityType: 'Request', entityId: id, action: 'RequestCancelled', fieldName: 'state', oldValue: request.state, newValue: 'CANCELLED', performedBy: user.username, performedByRole: user.role, organizationId: request.requestingOrgId, correlationId, reason });
+    if (request.providerStationId) {
+      await recomputeStationInventory(tx, request.providerStationId);
+    }
   }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, user);

@@ -92,16 +92,26 @@ model Station {
   transfersOut       TransferRequest[] @relation("TransferSource")
   transfersIn        TransferRequest[] @relation("TransferDestination")
   transfersRequested TransferRequest[] @relation("TransferRequester")
+  requestsOutgoing   AssetRequest[]    @relation("StationRequestsOutgoing")
+  requestsIncoming   AssetRequest[]    @relation("StationRequestsIncoming")
+  allocationsBorrowed Allocation[]     @relation("StationAllocationsBorrowed")
+  allocationsLent    Allocation[]      @relation("StationAllocationsLent")
 }
 
 /// Allocatable pool counts per vehicle class: ELIGIBLE government-fleet vehicles only.
 model StationInventory {
-  stationId  String   @id
-  patrolCar  Int      @default(0)
-  motorcycle Int      @default(0)
-  van        Int      @default(0)
-  heavy      Int      @default(0)
-  updatedAt  DateTime @updatedAt
+  stationId   String   @id
+  patrolCar   Int      @default(0)
+  motorcycle  Int      @default(0)
+  van         Int      @default(0)
+  heavy       Int      @default(0)
+  car         Int      @default(0)
+  truck       Int      @default(0)
+  bus         Int      @default(0)
+  jcb         Int      @default(0)
+  chhotaHathi Int      @default(0)
+  specialized Int      @default(0)
+  updatedAt   DateTime @updatedAt
 
   station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
 }
@@ -416,11 +426,14 @@ model AssetRequest {
   id                   String    @id @default(cuid())
   requestCode          String    @unique
   requestingOrgId      String
+  requestingStationId  String?
+  providerStationId    String?
   requesterUsername    String
   requesterName        String
   /// Specific vehicle (must be eligible) or null when only a class is requested
   vehicleId            String?
   requestedClass       String
+  quantity             Int       @default(1)
   purpose              String
   destination          String?
   passengers           Int       @default(1)
@@ -429,26 +442,31 @@ model AssetRequest {
   accountableOfficer   String
   accountablePhone     String?
   contactPhone         String?
-  /// DRAFT | SUBMITTED | UNDER_REVIEW | CHANGES_REQUESTED | APPROVED | REJECTED | CANCELLED | EXPIRED
+  /// DRAFT | SUBMITTED | UNDER_REVIEW | CHANGES_REQUESTED | APPROVED | REJECTED | CANCELLED | EXPIRED | PENDING_APPROVAL
   state                String    @default("DRAFT")
   /// Org whose approvers must decide (the vehicle's owning org, or its parent after escalation)
   approverOrgId        String?
   submittedAt          DateTime?
   decidedAt            DateTime?
+  decidedBy            String?
   decisionReason       String?
   /// Caller-supplied key making submit/approve retries idempotent
   idempotencyKey       String?   @unique
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  requestingOrg Organization @relation(fields: [requestingOrgId], references: [id])
-  vehicle       Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  steps         ApprovalStep[]
-  allocation    Allocation?
+  requestingOrg        Organization @relation(fields: [requestingOrgId], references: [id])
+  requestingStation    Station?     @relation("StationRequestsOutgoing", fields: [requestingStationId], references: [id], onDelete: SetNull)
+  providerStation      Station?     @relation("StationRequestsIncoming", fields: [providerStationId], references: [id], onDelete: SetNull)
+  vehicle              Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  steps                ApprovalStep[]
+  allocation           Allocation?
 
   @@index([state, startAt])
   @@index([requestingOrgId, state])
   @@index([approverOrgId, state])
+  @@index([requestingStationId])
+  @@index([providerStationId])
   @@index([vehicleId, startAt])
 }
 
@@ -473,29 +491,39 @@ model ApprovalStep {
 /// A reservation of one vehicle for a period. Overlap for the same vehicle is prevented by a PostgreSQL exclusion
 /// constraint (prisma/post-push.sql), not only by application checks.
 model Allocation {
-  id             String    @id @default(cuid())
-  allocationCode String    @unique
-  requestId      String    @unique
-  vehicleId      String
-  startAt        DateTime
-  endAt          DateTime
-  /// RESERVED | AWAITING_HANDOVER | ACTIVE | RETURNED_PENDING_INSPECTION | COMPLETED | CANCELLED | INCIDENT_HOLD
+  id                 String    @id @default(cuid())
+  allocationCode     String    @unique
+  requestId          String    @unique
+  vehicleId          String?
+  quantity           Int       @default(1)
+  returnedQuantity   Int       @default(0)
+  assignedVehicleIds Json?
+  returnDetails      Json?
+  borrowingStationId String?
+  lendingStationId   String?
+  startAt            DateTime
+  endAt              DateTime
+  /// RESERVED | AWAITING_HANDOVER | ACTIVE | PARTIALLY_RETURNED | RETURN_PENDING_CONFIRMATION | RETURNED | OVERDUE | CLOSED | RETURNED_PENDING_INSPECTION | COMPLETED | CANCELLED | INCIDENT_HOLD
   /// (RETURN_DUE is derived: ACTIVE and endAt in the past)
-  lifecycle      String    @default("RESERVED")
-  holdReason     String?
-  cancelReason   String?
-  createdBy      String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  lifecycle          String    @default("RESERVED")
+  holdReason         String?
+  cancelReason       String?
+  createdBy          String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  request    AssetRequest @relation(fields: [requestId], references: [id])
-  vehicle    Vehicle      @relation(fields: [vehicleId], references: [id])
-  handover   HandoverRecord?
-  returnRec  ReturnRecord?
-  extensions ExtensionRequest[]
+  request            AssetRequest @relation(fields: [requestId], references: [id])
+  vehicle            Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  borrowingStation   Station?     @relation("StationAllocationsBorrowed", fields: [borrowingStationId], references: [id], onDelete: SetNull)
+  lendingStation     Station?     @relation("StationAllocationsLent", fields: [lendingStationId], references: [id], onDelete: SetNull)
+  handover           HandoverRecord?
+  returnRec          ReturnRecord?
+  extensions         ExtensionRequest[]
 
   @@index([vehicleId, startAt])
   @@index([lifecycle, endAt])
+  @@index([borrowingStationId])
+  @@index([lendingStationId])
 }
 
 model HandoverRecord {

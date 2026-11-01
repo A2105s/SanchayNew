@@ -23,6 +23,7 @@ type FormKind =
   | 'prepareHandover'
   | 'recordHandover'
   | 'recordReturn'
+  | 'confirmReturn'
   | 'inspect'
   | 'requestExtension'
   | 'decideExtension'
@@ -82,6 +83,9 @@ export function AllocationDetail({ id }: { id: string }) {
   // Shared form fields
   const [receivedBy, setReceivedBy] = useState('');
   const [conditionNotes, setConditionNotes] = useState('');
+  const [returnQuantity, setReturnQuantity] = useState('1');
+  const [hasDamage, setHasDamage] = useState(false);
+  const [damagedNotes, setDamagedNotes] = useState('');
   const [odometerKm, setOdometerKm] = useState('');
   const [fuelPercent, setFuelPercent] = useState('');
   const [discrepancies, setDiscrepancies] = useState('');
@@ -96,6 +100,10 @@ export function AllocationDetail({ id }: { id: string }) {
   function resetForm() {
     setReceivedBy('');
     setConditionNotes('');
+    const unreturned = Math.max(1, (alloc?.quantity ?? 1) - (alloc?.returnedQuantity ?? 0));
+    setReturnQuantity(String(unreturned));
+    setHasDamage(false);
+    setDamagedNotes('');
     setOdometerKm('');
     setFuelPercent('');
     setDiscrepancies('');
@@ -147,9 +155,26 @@ export function AllocationDetail({ id }: { id: string }) {
         if (!conditionNotes.trim()) return setFormError('Condition notes are required.');
         return run({ type: 'recordHandover', receivedBy: receivedBy.trim(), conditionNotes: conditionNotes.trim(), odometerKm: odo, fuelPercent: fuel, checklist, evidenceRef: evidenceRef.trim() || undefined });
       case 'recordReturn':
-        if (!receivedBy.trim()) return setFormError('Received by is required.');
+        if (!receivedBy.trim()) return setFormError('Received by / returning officer is required.');
         if (!conditionNotes.trim()) return setFormError('Condition notes are required.');
-        return run({ type: 'recordReturn', receivedBy: receivedBy.trim(), conditionNotes: conditionNotes.trim(), odometerKm: odo, fuelPercent: fuel, discrepancies: discrepancies.trim() || undefined, evidenceRef: evidenceRef.trim() || undefined });
+        return run({
+          type: 'recordReturn',
+          receivedBy: receivedBy.trim(),
+          conditionNotes: conditionNotes.trim(),
+          returnQuantity: Number(returnQuantity) || undefined,
+          odometerKm: odo,
+          fuelPercent: fuel,
+          discrepancies: discrepancies.trim() || undefined,
+          evidenceRef: evidenceRef.trim() || undefined,
+          damageNotes: hasDamage ? (damagedNotes.trim() || 'Vehicle returned with damage requiring maintenance') : undefined
+        });
+      case 'confirmReturn':
+        return run({
+          type: 'confirmReturn',
+          receivedBy: receivedBy.trim() || undefined,
+          notes: conditionNotes.trim() || undefined,
+          damageNotes: hasDamage ? (damagedNotes.trim() || 'Vehicle returned with damage requiring maintenance') : undefined
+        });
       case 'inspect':
         return run({ type: 'inspect', decision: inspectDecision, notes: conditionNotes.trim() || undefined });
       case 'requestExtension':
@@ -224,6 +249,14 @@ export function AllocationDetail({ id }: { id: string }) {
       <div className="veh-detail-grid">
         <Panel title="Window & records">
           <div className="kv">
+            <span>Allocation code</span>
+            <span className="mono">{alloc.allocationCode}</span>
+            <span>Quantity</span>
+            <span><strong>{alloc.quantity ?? 1}</strong> vehicle(s) {alloc.returnedQuantity ? `(${alloc.returnedQuantity} returned)` : ''}</span>
+            <span>Borrowing station</span>
+            <span>{alloc.borrowingStationName ?? '—'}</span>
+            <span>Lending station</span>
+            <span>{alloc.lendingStationName ?? '—'}</span>
             <span>Start</span>
             <span>{fmtDateTime(alloc.startAt)}</span>
             <span>End</span>
@@ -240,7 +273,7 @@ export function AllocationDetail({ id }: { id: string }) {
             ) : null}
             {alloc.returnRecord ? (
               <>
-                <span>Return</span>
+                <span>Return record</span>
                 <span>{alloc.returnRecord.receivedBy} · {alloc.returnRecord.inspectionStatus}</span>
               </>
             ) : null}
@@ -279,16 +312,23 @@ export function AllocationDetail({ id }: { id: string }) {
           {(lc === 'RESERVED' || lc === 'AWAITING_HANDOVER') && canHandover ? (
             <Button variant="primary" onClick={() => open('recordHandover')}>Record handover</Button>
           ) : null}
-          {lc === 'ACTIVE' && canReturn ? (
-            <Button variant="primary" onClick={() => open('recordReturn')}>Record return</Button>
+          {(lc === 'ACTIVE' || lc === 'PARTIALLY_RETURNED' || lc === 'OVERDUE') && canReturn ? (
+            <Button variant="primary" onClick={() => open('recordReturn')}>
+              {alloc.quantity && alloc.quantity > 1 ? 'Return Vehicles' : 'Record Return'}
+            </Button>
+          ) : null}
+          {lc === 'RETURN_PENDING_CONFIRMATION' ? (
+            <Button variant="primary" onClick={() => open('confirmReturn')}>
+              Confirm & Verify Return
+            </Button>
           ) : null}
           {lc === 'RETURNED_PENDING_INSPECTION' && canInspect ? (
             <Button variant="primary" onClick={() => open('inspect')}>Inspect</Button>
           ) : null}
-          {lc === 'ACTIVE' ? (
+          {lc === 'ACTIVE' || lc === 'PARTIALLY_RETURNED' ? (
             <Button variant="secondary" onClick={() => open('requestExtension')}>Request extension</Button>
           ) : null}
-          {lc === 'ACTIVE' ? (
+          {lc === 'ACTIVE' || lc === 'PARTIALLY_RETURNED' ? (
             <Button variant="secondary" onClick={() => open('hold')}>Hold (incident)</Button>
           ) : null}
           {lc === 'INCIDENT_HOLD' ? (
@@ -312,6 +352,7 @@ export function AllocationDetail({ id }: { id: string }) {
               prepareHandover: 'Prepare handover',
               recordHandover: 'Record handover',
               recordReturn: 'Record return',
+              confirmReturn: 'Confirm & verify return',
               inspect: 'Inspect return',
               requestExtension: 'Request extension',
               decideExtension: 'Decide extension',
@@ -347,9 +388,24 @@ export function AllocationDetail({ id }: { id: string }) {
 
             {(form === 'recordHandover' || form === 'recordReturn') ? (
               <>
-                <Field label="Received by" required>
+                <Field label="Received by / Returning officer" required>
                   <input className="input" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} />
                 </Field>
+                {form === 'recordReturn' && alloc.quantity && alloc.quantity > 1 ? (
+                  <Field label="Number of vehicles being returned" required>
+                    <input
+                      className="input"
+                      type="number"
+                      min="1"
+                      max={Math.max(1, (alloc.quantity ?? 1) - (alloc.returnedQuantity ?? 0))}
+                      value={returnQuantity}
+                      onChange={(e) => setReturnQuantity(e.target.value)}
+                    />
+                    <span className="text-muted" style={{ fontSize: '0.78rem' }}>
+                      Max {Math.max(1, (alloc.quantity ?? 1) - (alloc.returnedQuantity ?? 0))} unreturned vehicle(s)
+                    </span>
+                  </Field>
+                ) : null}
                 <Field label="Condition notes" required>
                   <textarea className="input" rows={2} value={conditionNotes} onChange={(e) => setConditionNotes(e.target.value)} />
                   <PolishButton kind={form === 'recordHandover' ? 'handover' : 'return'} value={conditionNotes} onApply={setConditionNotes} />
@@ -363,9 +419,32 @@ export function AllocationDetail({ id }: { id: string }) {
                   </Field>
                 </div>
                 {form === 'recordReturn' ? (
-                  <Field label="Discrepancies">
-                    <textarea className="input" rows={2} value={discrepancies} onChange={(e) => setDiscrepancies(e.target.value)} />
-                  </Field>
+                  <>
+                    <Field label="Discrepancies">
+                      <textarea className="input" rows={2} value={discrepancies} onChange={(e) => setDiscrepancies(e.target.value)} />
+                    </Field>
+                    <label className="cluster" style={{ gap: '0.4rem', cursor: 'pointer', margin: '0.3rem 0' }}>
+                      <input
+                        type="checkbox"
+                        checked={hasDamage}
+                        onChange={(e) => setHasDamage(e.target.checked)}
+                      />
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#dc2626' }}>
+                        Vehicle returned with damage / requires maintenance
+                      </span>
+                    </label>
+                    {hasDamage ? (
+                      <Field label="Damage details" required>
+                        <textarea
+                          className="input"
+                          rows={2}
+                          value={damagedNotes}
+                          onChange={(e) => setDamagedNotes(e.target.value)}
+                          placeholder="Describe damage (damaged vehicle will be set to INELIGIBLE/MAINTENANCE)..."
+                        />
+                      </Field>
+                    ) : null}
+                  </>
                 ) : null}
                 {form === 'recordHandover' ? (
                   <div className="stack">
@@ -400,6 +479,41 @@ export function AllocationDetail({ id }: { id: string }) {
                   <input className="input" value={evidenceRef} onChange={(e) => setEvidenceRef(e.target.value)} placeholder="e.g. photo/document ref" />
                 </Field>
               </>
+            ) : null}
+
+            {form === 'confirmReturn' ? (
+              <div className="stack">
+                <p className="modal-copy">
+                  Verify and confirm vehicle return. Eligible vehicles returned in good order will immediately restore your station&apos;s available sharing pool.
+                </p>
+                <Field label="Receiving officer">
+                  <input className="input" value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} placeholder="Officer username/name" />
+                </Field>
+                <Field label="Inspection / Verification notes">
+                  <textarea className="input" rows={2} value={conditionNotes} onChange={(e) => setConditionNotes(e.target.value)} placeholder="Condition verified upon return..." />
+                </Field>
+                <label className="cluster" style={{ gap: '0.4rem', cursor: 'pointer', margin: '0.3rem 0' }}>
+                  <input
+                    type="checkbox"
+                    checked={hasDamage}
+                    onChange={(e) => setHasDamage(e.target.checked)}
+                  />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#dc2626' }}>
+                    Flag returned vehicle as damaged (route to MAINTENANCE)
+                  </span>
+                </label>
+                {hasDamage ? (
+                  <Field label="Damage details" required>
+                    <textarea
+                      className="input"
+                      rows={2}
+                      value={damagedNotes}
+                      onChange={(e) => setDamagedNotes(e.target.value)}
+                      placeholder="Specify defects or maintenance required..."
+                    />
+                  </Field>
+                ) : null}
+              </div>
             ) : null}
 
             {form === 'inspect' ? (

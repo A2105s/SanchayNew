@@ -123,12 +123,13 @@ export function RequestDetail({ id }: { id: string }) {
     );
   }
 
-  const isRequester = me?.username === request.requesterUsername;
-  const canReview = can('request.review');
+  const isRequester = me?.username === request.requesterUsername || (Boolean(me?.stationId) && me?.stationId === request.requestingStationId);
+  const isProvider = Boolean(me?.stationId) && me?.stationId === request.providerStationId;
+  const canReview = can('request.review') || isProvider;
   const state = request.state;
 
   // Approver cannot act on their own request (separation of duties).
-  const reviewBlockedReason = isRequester
+  const reviewBlockedReason = isRequester && !isProvider
     ? 'You raised this request — a different officer must review it (separation of duties).'
     : !canReview
       ? 'You do not have permission to review requests.'
@@ -188,8 +189,14 @@ export function RequestDetail({ id }: { id: string }) {
           <div className="kv">
             <span>Requested class</span>
             <span>{CLASS_LABEL[request.requestedClass]}</span>
+            <span>Quantity</span>
+            <span><strong>{request.quantity ?? 1}</strong> vehicle(s)</span>
+            <span>Requesting station</span>
+            <span>{request.requestingStationName ?? request.requestingOrgName}</span>
+            <span>Providing station</span>
+            <span>{request.providerStationName ?? 'Any Station'}</span>
             <span>Vehicle</span>
-            <span>{request.vehicleLabel ?? 'To be assigned by approver'}</span>
+            <span>{request.vehicleLabel ?? 'To be assigned on approval'}</span>
             <span>Owning org</span>
             <span>{request.vehicleOrgName ?? '—'}</span>
             <span>Destination</span>
@@ -202,6 +209,12 @@ export function RequestDetail({ id }: { id: string }) {
             <span>{request.accountableOfficer}{request.accountablePhone ? ` · ${request.accountablePhone}` : ''}</span>
             <span>Contact</span>
             <span>{request.contactPhone ?? '—'}</span>
+            {request.decidedBy ? (
+              <>
+                <span>Decided by</span>
+                <span>{request.decidedBy}</span>
+              </>
+            ) : null}
             {request.decisionReason ? (
               <>
                 <span>Decision reason</span>
@@ -222,7 +235,7 @@ export function RequestDetail({ id }: { id: string }) {
         </Panel>
       </div>
 
-      {canReview && !reviewBlockedReason && (state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') ? (
+      {canReview && !reviewBlockedReason && (state === 'PENDING_APPROVAL' || state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') ? (
         <AiRequestTriagePanel
           requestId={request.id}
           onApplyDecision={(actionType, suggestedComment) => {
@@ -264,9 +277,9 @@ export function RequestDetail({ id }: { id: string }) {
           ) : null}
 
           {/* Reviewer actions */}
-          {(state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') && !reviewBlockedReason ? (
+          {(state === 'PENDING_APPROVAL' || state === 'SUBMITTED' || state === 'UNDER_REVIEW' || state === 'CHANGES_REQUESTED') && !reviewBlockedReason ? (
             <>
-              {state === 'SUBMITTED' ? (
+              {state === 'SUBMITTED' || state === 'PENDING_APPROVAL' ? (
                 <Button variant="secondary" onClick={() => openAction({ kind: 'startReview', title: 'Start review', confirmLabel: 'Start review' })}>
                   Start review
                 </Button>
@@ -298,7 +311,7 @@ export function RequestDetail({ id }: { id: string }) {
             </>
           ) : null}
         </div>
-        {reviewBlockedReason && (state === 'SUBMITTED' || state === 'UNDER_REVIEW') ? (
+        {reviewBlockedReason && (state === 'PENDING_APPROVAL' || state === 'SUBMITTED' || state === 'UNDER_REVIEW') ? (
           <p className="text-muted" style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}>
             {reviewBlockedReason}
           </p>

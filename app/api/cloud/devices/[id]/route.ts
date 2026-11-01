@@ -71,6 +71,44 @@ export async function GET(request: Request, ctx: { params: Promise<{ id: string 
       throw new DomainError('Device not found.', 404, 'NOT_FOUND');
     }
 
+    // If on localhost / development, mirror live telemetry from cloud if local is stale
+    if (process.env.NODE_ENV !== 'production' && device.deviceCode === 'SANCHAY-IOT-001') {
+      const isStaleLocally = !device.lastSeenAt || (Date.now() - new Date(device.lastSeenAt).getTime() > 15000);
+      if (isStaleLocally) {
+        try {
+          const cloudRes = await fetch('https://sanchaynew.vercel.app/api/iot/live?code=SANCHAY-IOT-001', {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(2000),
+          });
+          if (cloudRes.ok) {
+            const cloudJson = await cloudRes.json();
+            if (cloudJson.success && cloudJson.device?.lastSeenAt) {
+              const cloudLastSeen = new Date(cloudJson.device.lastSeenAt);
+              if (Date.now() - cloudLastSeen.getTime() < 120000) {
+                device.lastSeenAt = cloudLastSeen;
+                device.status = 'ONLINE';
+                device.signalDbm = cloudJson.device.signalDbm ?? device.signalDbm;
+                if (cloudJson.device.sensors) {
+                  device.notes = JSON.stringify(cloudJson.device.sensors);
+                }
+                await prisma.iotDevice.update({
+                  where: { id: device.id },
+                  data: {
+                    lastSeenAt: cloudLastSeen,
+                    status: 'ONLINE',
+                    signalDbm: device.signalDbm,
+                    notes: device.notes,
+                  },
+                }).catch(() => {});
+              }
+            }
+          }
+        } catch {
+          // ignore fetch error
+        }
+      }
+    }
+
     // Fetch up to 50 recent telemetry points
     const telemetryPoints = await prisma.telemetryPoint.findMany({
       where: {

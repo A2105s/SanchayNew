@@ -75,8 +75,8 @@ async function handleRequest(request: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
-  // IoT ingest uses its own per-device key, not the cookie session.
-  if (pathname.startsWith('/api/iot/ingest')) {
+  // IoT ingest and public edge telemetry endpoints use per-device auth or are public.
+  if (pathname.startsWith('/api/iot/')) {
     return withSecurityHeaders(NextResponse.next());
   }
 

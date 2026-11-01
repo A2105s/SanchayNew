@@ -108,14 +108,13 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT,
 const char *WIFI_SSID = "NASA";
 const char *WIFI_PASS = "9936@Pari";
 
-// Set to true to push telemetry directly to production Sanchay Fleet Cloud on Vercel (HTTPS).
-// Laptop IP is NOT required when USE_SANCHAY_CLOUD is true!
+// Dual-Dispatch: Stream directly to Vercel Cloud AND push to laptop when running!
 const bool USE_SANCHAY_CLOUD = true;
 const char *SANCHAY_CLOUD_URL = "https://sanchaynew.vercel.app/api/iot/ingest";
 
-// Fallback Local Server (Only used if USE_SANCHAY_CLOUD = false)
-const char *SANCHAY_SERVER_IP = "192.168.1.32";
-const uint16_t SANCHAY_SERVER_PORT = 3000;
+const bool ALSO_POST_TO_LOCAL = true;
+const char *SANCHAY_LOCAL_IP = "192.168.1.32";
+const uint16_t SANCHAY_LOCAL_PORT = 3000;
 const char *DEVICE_CODE = "SANCHAY-IOT-001";
 const char *DEVICE_INGEST_KEY = "sk_sanchay_iot_edge_2026";
 
@@ -613,7 +612,7 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
     secureClient.setTimeout(2500);
     beginOk = http.begin(secureClient, SANCHAY_CLOUD_URL);
   } else {
-    String url = "http://" + String(SANCHAY_SERVER_IP) + ":" + String(SANCHAY_SERVER_PORT) + "/api/iot/ingest";
+    String url = "http://" + String(SANCHAY_LOCAL_IP) + ":" + String(SANCHAY_LOCAL_PORT) + "/api/iot/ingest";
     beginOk = http.begin(plainClient, url);
   }
 
@@ -655,6 +654,21 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
       cloudUploadFail++;
     }
     http.end();
+
+    // Dual-dispatch to laptop localhost if enabled (non-blocking fast 300ms timeout)
+    if (ALSO_POST_TO_LOCAL && USE_SANCHAY_CLOUD) {
+      WiFiClient localClient;
+      HTTPClient localHttp;
+      String localUrl = "http://" + String(SANCHAY_LOCAL_IP) + ":" + String(SANCHAY_LOCAL_PORT) + "/api/iot/ingest";
+      if (localHttp.begin(localClient, localUrl)) {
+        localHttp.setTimeout(300);
+        localHttp.addHeader("Content-Type", "application/json");
+        localHttp.addHeader("X-Device-Code", DEVICE_CODE);
+        localHttp.addHeader("Authorization", "Bearer " + String(DEVICE_INGEST_KEY));
+        localHttp.POST(json);
+        localHttp.end();
+      }
+    }
   } else {
     cloudUploadFail++;
   }

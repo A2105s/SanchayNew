@@ -8,6 +8,7 @@ import type { Role } from '@/types';
 import { canAny, type Permission } from '@/lib/client/permissions';
 import { useFleet } from '@/components/providers/FleetProvider';
 import { useActiveModule, setModuleCookie } from '@/lib/client/useModule';
+import { useTranslation } from '@/lib/i18n/context';
 import type { AnimatedIconProps } from '@/components/ui/AnimatedIcons';
 import {
   AnimatedDashboard,
@@ -112,17 +113,24 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
   const router = useRouter();
   const pathname = usePathname();
   const { me } = useFleet();
+  const { t } = useTranslation();
   const activeModule = useActiveModule(pathname);
   const [hoveredHref, setHoveredHref] = useState<string | null>(null);
+
+  const effectiveModule = useMemo(() => {
+    if (me?.role === 'ADMIN') return activeModule;
+    if (me?.stationId || me?.role === 'STATION_OFFICER' || me?.role === 'FIELD_STAFF') return 'vehicles';
+    return 'spaces';
+  }, [me, activeModule]);
 
   const items = useMemo(() => {
     const role = me?.role ?? null;
     return NAV_ITEMS.filter((item) => {
-      if (activeModule === 'spaces') {
+      if (effectiveModule === 'spaces') {
         // Strictly Spaces navigation items (/spaces, /spaces/bookings, /spaces/requests, /spaces/settings, plus /reports, /audit, /settings)
         if (!SPACES_HREFS.has(item.href) && !SHARED_HREFS.has(item.href)) return false;
       } else {
-        // activeModule === 'vehicles': hide all space-specific links
+        // effectiveModule === 'vehicles': hide all space-specific links
         if (SPACES_HREFS.has(item.href)) return false;
         if (item.showIfStation && !me?.stationId) return false;
         if (role === 'FIELD_STAFF' && !FIELD_STAFF_HREFS.has(item.href)) return false;
@@ -130,9 +138,9 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
       if (item.requiresAny && !canAny(role, item.requiresAny)) return false;
       return true;
     });
-  }, [me, activeModule]);
+  }, [me, effectiveModule]);
 
-  const activeGroups = activeModule === 'spaces' ? SPACES_GROUPS : VEHICLES_GROUPS;
+  const activeGroups = effectiveModule === 'spaces' ? SPACES_GROUPS : VEHICLES_GROUPS;
 
   // Group the permitted items under headings (a heading only shows when at least one of its items is visible).
   const grouped = useMemo(() => {
@@ -177,37 +185,6 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
         </button>
       </div>
 
-      <div className="sidebar__modules" role="tablist" aria-label="Active module">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeModule === 'vehicles'}
-          className={`sidebar__module ${activeModule === 'vehicles' ? 'sidebar__module--active' : ''}`}
-          onClick={() => {
-            setModuleCookie('vehicles');
-            onMobileClose();
-            onNavigate('/dashboard');
-            router.push('/dashboard');
-          }}
-        >
-          Fleet
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeModule === 'spaces'}
-          className={`sidebar__module ${activeModule === 'spaces' ? 'sidebar__module--active' : ''}`}
-          onClick={() => {
-            setModuleCookie('spaces');
-            onMobileClose();
-            onNavigate('/spaces');
-            router.push('/spaces');
-          }}
-        >
-          Spaces
-        </button>
-      </div>
-
       <nav className="sidebar__nav">
         {grouped.map(({ item, heading }) => {
           const Icon = item.icon;
@@ -215,35 +192,35 @@ export function Sidebar({ mobileOpen, onMobileClose, pendingHref, onNavigate, on
           const pending = pendingHref === item.href;
           return (
             <Fragment key={item.href}>
-            {heading ? <div className="sidebar__group" aria-hidden="true">{heading}</div> : null}
-            <Link
-              href={item.href}
-              prefetch
-              title={item.label}
-              className={`${active ? 'is-active' : ''} ${pending ? 'is-pending' : ''}`.trim()}
-              aria-current={active ? 'page' : undefined}
-              aria-busy={pending || undefined}
-              onMouseEnter={() => setHoveredHref(item.href)}
-              onMouseLeave={() => setHoveredHref(null)}
-              onClick={(event) => {
-                onMobileClose();
-                if (
-                  pathname !== item.href &&
-                  event.button === 0 &&
-                  !event.metaKey &&
-                  !event.ctrlKey &&
-                  !event.shiftKey &&
-                  !event.altKey
-                ) {
-                  onNavigate(item.href);
-                }
-              }}
-            >
-              <Icon size={18} isHovered={hoveredHref === item.href} />
-              <span>{item.label}</span>
-              {item.badge ? <span className="sidebar__nav-badge">{item.badge}</span> : null}
-              {pending ? <LoaderCircle className="sidebar__nav-pending spin" size={15} aria-hidden="true" /> : null}
-            </Link>
+              {heading ? <div className="sidebar__group" aria-hidden="true">{t(heading)}</div> : null}
+              <Link
+                href={item.href}
+                prefetch
+                title={t(item.label)}
+                className={`${active ? 'is-active' : ''} ${pending ? 'is-pending' : ''}`.trim()}
+                aria-current={active ? 'page' : undefined}
+                aria-busy={pending || undefined}
+                onMouseEnter={() => setHoveredHref(item.href)}
+                onMouseLeave={() => setHoveredHref(null)}
+                onClick={(event) => {
+                  onMobileClose();
+                  if (
+                    pathname !== item.href &&
+                    event.button === 0 &&
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    onNavigate(item.href);
+                  }
+                }}
+              >
+                <Icon size={18} isHovered={hoveredHref === item.href} />
+                <span>{t(item.label)}</span>
+                {item.badge ? <span className="sidebar__nav-badge">{item.badge}</span> : null}
+                {pending ? <LoaderCircle className="sidebar__nav-pending spin" size={15} aria-hidden="true" /> : null}
+              </Link>
             </Fragment>
           );
         })}

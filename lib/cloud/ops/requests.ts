@@ -130,6 +130,19 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
     approverOrgId = effectiveOrgId;
   }
 
+  const accountablePhone = input.accountablePhone?.trim() || null;
+  if (accountablePhone && accountablePhone.length < 10) {
+    throw new DomainError('Accountable officer phone number must have at least 10 digits.', 400);
+  }
+
+  let contactPhone = input.contactPhone ?? null;
+  if (user.stationId) {
+    const stn = await prisma.station.findUnique({ where: { id: user.stationId }, select: { phone: true } });
+    if (stn?.phone) {
+      contactPhone = stn.phone;
+    }
+  }
+
   const submit = input.submit === true;
 
   const request = await prisma.$transaction(async (tx) => {
@@ -148,8 +161,8 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
         startAt,
         endAt,
         accountableOfficer: input.accountableOfficer,
-        accountablePhone: input.accountablePhone ?? null,
-        contactPhone: input.contactPhone ?? null,
+        accountablePhone,
+        contactPhone,
         state: submit ? 'SUBMITTED' : 'DRAFT',
         approverOrgId,
         submittedAt: submit ? now : null,
@@ -164,7 +177,7 @@ export async function createRequest(user: SessionUser, input: RequestInputParsed
       await notify({ eventKey: `request:${created.id}:SUBMITTED`, kind: 'REQUEST_SUBMITTED', title: 'New vehicle request', body: `Request ${created.requestCode} needs your decision.`, href: `/requests`, recipientOrgId: approverOrgId, recipientRole: 'DEPT_OFFICER' }, tx);
     }
     return created;
-  });
+  }, { timeout: 30000, maxWait: 15000 });
 
   await recordCloudEvent({ level: 'info', category: 'ops', action: 'create-request', status: 'succeeded', message: 'Request created.', details: { requestId: request.id } });
   invalidate();
@@ -290,7 +303,7 @@ export async function approveRequest(user: SessionUser, id: string, comment: str
       await tx.approvalStep.updateMany({ where: { requestId: id, decision: 'PENDING' }, data: { decision: 'APPROVED', decidedBy: user.username, decidedByRole: user.role, comment: comment ?? null, decidedAt: now } });
 
       await writeAudit(tx, { entityType: 'Request', entityId: id, action: 'RequestApproved', fieldName: 'state', oldValue: fresh.state, newValue: 'APPROVED', performedBy: user.username, performedByRole: user.role, organizationId: request.approverOrgId, correlationId, reason: comment });
-    });
+    }, { timeout: 30000, maxWait: 15000 });
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -363,17 +376,22 @@ export async function cancelRequest(user: SessionUser, id: string, reason: strin
   const request = await loadRequest(id);
   await assertRequestAccess(user, request);
   const isRequester = request.requesterUsername === user.username;
-  if (!isRequester && user.role !== 'DEPT_OFFICER' && user.role !== 'ORG_ADMIN') {
+  const isAdmin = user.role === 'ADMIN';
+  const isOrgOfficer = user.role === 'DEPT_OFFICER' || user.role === 'ORG_ADMIN';
+  if (!isRequester && !isAdmin && !isOrgOfficer) {
     throw new DomainError('You cannot cancel this request.', 403);
   }
-  if (['APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(request.state)) {
+  if (request.state === 'CANCELLED') {
+    throw new DomainError('Request is already cancelled.', 409);
+  }
+  if (['APPROVED', 'REJECTED', 'EXPIRED'].includes(request.state) && !isAdmin) {
     throw new DomainError(`Cannot cancel a request in state ${request.state}.`, 409);
   }
   await prisma.$transaction(async (tx) => {
     await tx.assetRequest.update({ where: { id }, data: { state: 'CANCELLED', decidedAt: new Date(), decisionReason: reason ?? null } });
     await tx.approvalStep.updateMany({ where: { requestId: id, decision: 'PENDING' }, data: { decision: 'SKIPPED', decidedAt: new Date() } });
     await writeAudit(tx, { entityType: 'Request', entityId: id, action: 'RequestCancelled', fieldName: 'state', oldValue: request.state, newValue: 'CANCELLED', performedBy: user.username, performedByRole: user.role, organizationId: request.requestingOrgId, correlationId, reason });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, user);
 }

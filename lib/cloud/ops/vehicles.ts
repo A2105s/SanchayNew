@@ -14,7 +14,7 @@ import { reevaluateEligibility } from '@/lib/cloud/eligibility';
 import { recomputeStationInventoryForVehicle } from '@/lib/cloud/ops/transfers';
 import { orgTree } from '@/lib/auth/scope';
 import { getCaseByCnr } from '@/lib/integrations/ecourts/client';
-import type { VehicleInputParsed, VehicleActionParsed } from '@/lib/validation/schemas';
+import type { VehicleInputParsed, VehicleActionParsed, SeizedVehicleInputParsed } from '@/lib/validation/schemas';
 
 type TxClient = Prisma.TransactionClient;
 
@@ -705,6 +705,238 @@ export async function markAuctionReady(user: SessionUser, id: string, authority:
   return mapWithOrg(vehicle);
 }
 
+/** Register a seized/impounded vehicle under police custody (spec Point 10). */
+export async function registerSeizedVehicle(user: SessionUser, input: SeizedVehicleInputParsed, correlationId: string): Promise<VehicleView> {
+  const stationId = input.stationId || user.stationId;
+  if (!stationId) throw new DomainError('Police station is required to register a seized vehicle.', 400);
+  if (user.role === 'STATION_OFFICER' && user.stationId && stationId !== user.stationId) {
+    throw new DomainError('You can only register seized vehicles under your assigned police station.', 403);
+  }
+
+  const station = await prisma.station.findUnique({ where: { id: stationId } });
+  if (!station) throw new DomainError('Selected police station not found.', 404);
+
+  const orgId = station.organizationId ?? user.organizationId;
+  if (!orgId) throw new DomainError('No organization associated with this station.', 400);
+
+  const rawReg = input.registrationNumber?.trim() || `SEIZED-${Date.now().toString().slice(-6)}`;
+  const normalized = normalizeRegistration(rawReg) || `SEIZED-${Date.now()}`;
+
+  const vehicle = await prisma.$transaction(async (tx) => {
+    const assetCode = await nextAssetCode(tx);
+    const created = await tx.vehicle.create({
+      data: {
+        assetCode,
+        registrationNumber: rawReg,
+        registrationNormalized: normalized,
+        displayName: input.displayName.trim(),
+        sector: 'POLICE_PATROL',
+        vehicleClass: input.vehicleClass,
+        vehicleType: input.vehicleType.trim(),
+        organizationId: orgId,
+        stationId,
+        ownershipCategory: 'SEIZED_IMPOUNDED',
+        custodyState: 'IN_CUSTODY',
+        custodyNote: `Custody at ${input.custodyLocation}. FIR: ${input.firNumber}. ${input.remarks ?? ''}`.trim(),
+        custodyUpdatedAt: new Date(),
+        operationalStatus: 'ACTIVE',
+        eligibilityState: 'INELIGIBLE',
+        eligibilityReasons: [{ ruleId: 'LEGAL_CUSTODY', passed: false, detail: 'Seized vehicle under police custody; pending administrative utilization approval.' }],
+        makeModel: input.makeModel?.trim() || null,
+        chassisNumber: input.chassisNumber?.trim() || null,
+        engineNumber: input.engineNumber?.trim() || null,
+        notes: `Seized on ${input.seizureDate} at ${input.seizureLocation}. FIR: ${input.firNumber}. Custody: ${input.custodyLocation}`,
+        createdBy: user.username
+      }
+    });
+
+    // Record the legal custody restriction preventing allocation
+    await tx.vehicleRestriction.create({
+      data: {
+        vehicleId: created.id,
+        type: 'LEGAL_CUSTODY',
+        reasonCode: 'SEIZED_IMPOUNDED',
+        description: `Seized vehicle under police custody. FIR: ${input.firNumber}`,
+        authority: station.name,
+        evidenceRef: input.evidenceRef?.trim() || input.firNumber,
+        decidedBy: user.username,
+        decidedAt: new Date()
+      }
+    });
+
+    // Create the formal seizure legal record
+    await tx.legalRecord.create({
+      data: {
+        vehicleId: created.id,
+        type: 'SEIZURE',
+        referenceNo: input.firNumber,
+        date: new Date(input.seizureDate),
+        description: `Seizure registered by ${station.name}. Location: ${input.seizureLocation}. Storage/Custody: ${input.custodyLocation}${input.remarks ? ` · ${input.remarks.trim()}` : ''}`,
+        status: 'ACTIVE',
+        authority: station.name
+      }
+    });
+
+    await writeAudit(tx, {
+      entityType: 'Vehicle',
+      entityId: created.id,
+      action: 'SeizedVehicleRegistered',
+      newValue: created.assetCode,
+      performedBy: user.username,
+      performedByRole: user.role,
+      organizationId: orgId,
+      correlationId,
+      reason: `FIR: ${input.firNumber} at ${station.name}`
+    });
+
+    return created;
+  }, { timeout: 20000, maxWait: 10000 });
+
+  invalidate();
+  return mapWithOrg(vehicle);
+}
+
+/** Administrative approval of seized vehicle for government fleet utilization (spec Point 10.3). */
+export async function approveSeizedForUtilization(
+  user: SessionUser,
+  id: string,
+  args: { approvalReason: string; legalClearanceRef: string; courtOrderRef?: string },
+  correlationId: string
+): Promise<VehicleView> {
+  if (user.role !== 'ADMIN' && user.role !== 'ORG_ADMIN') {
+    throw new DomainError('Only platform administrators or fleet desk administrators can approve seized vehicles for utilization.', 403);
+  }
+
+  const current = await loadOwnVehicle(user, id);
+  if (current.ownershipCategory !== 'SEIZED_IMPOUNDED') {
+    throw new DomainError('Only seized/impounded vehicles follow the utilization approval workflow.', 400);
+  }
+  if (current.custodyState && current.custodyState !== 'IN_CUSTODY') {
+    throw new DomainError(`Vehicle is in ${current.custodyState} state and cannot be approved for utilization.`, 409);
+  }
+
+  // A vehicle that is still subject to unresolved court proceedings or release restrictions must not be made available
+  const activeCourtCases = await prisma.legalRecord.findMany({
+    where: { vehicleId: id, type: 'COURT_CASE', status: { not: 'RESOLVED' } }
+  });
+  if (activeCourtCases.length > 0) {
+    throw new DomainError('Vehicle is still subject to active court proceedings. All cases must be resolved before operational utilization.', 409);
+  }
+
+  const vehicle = await prisma.$transaction(async (tx) => {
+    // 1. Lift custody restrictions
+    await tx.vehicleRestriction.updateMany({
+      where: { vehicleId: id, liftedAt: null, type: { in: ['LEGAL_CUSTODY', 'COURT_ORDER'] } },
+      data: {
+        liftedAt: new Date(),
+        liftedBy: user.username,
+        liftReason: `Approved for operational fleet utilization by ${user.username}: ${args.approvalReason}`
+      }
+    });
+
+    // 2. Mark seizure legal record as resolved
+    await tx.legalRecord.updateMany({
+      where: { vehicleId: id, type: 'SEIZURE', status: { not: 'RESOLVED' } },
+      data: {
+        status: 'RESOLVED'
+      }
+    });
+
+    // 3. Record verified government fleet ownership verification
+    await tx.vehicleOwnershipVerification.create({
+      data: {
+        vehicleId: id,
+        category: 'GOVERNMENT_FLEET',
+        status: 'VERIFIED',
+        evidenceRef: args.legalClearanceRef,
+        evidenceNote: `Seized vehicle utilization approved by ${user.role} ${user.username}: ${args.approvalReason}${args.courtOrderRef ? ` (Court Order: ${args.courtOrderRef})` : ''}`,
+        submittedBy: user.username,
+        verifiedBy: user.username,
+        verifiedAt: new Date()
+      }
+    });
+
+    // 4. Update vehicle ownership to GOVERNMENT_FLEET, custodyState to RELEASED
+    await tx.vehicle.update({
+      where: { id },
+      data: {
+        ownershipCategory: 'GOVERNMENT_FLEET',
+        custodyState: 'RELEASED',
+        custodyNote: `Approved for fleet utilization by ${user.username}. Clearance Ref: ${args.legalClearanceRef}`,
+        custodyUpdatedAt: new Date(),
+        operationalStatus: 'ACTIVE'
+      }
+    });
+
+    // 5. Re-evaluate eligibility with rules
+    await reevaluateEligibility(id, tx);
+
+    // 6. Write audit trail
+    await writeAudit(tx, {
+      entityType: 'Vehicle',
+      entityId: id,
+      action: 'SeizedVehicleApprovedForUtilization',
+      fieldName: 'ownershipCategory',
+      oldValue: 'SEIZED_IMPOUNDED',
+      newValue: 'GOVERNMENT_FLEET',
+      performedBy: user.username,
+      performedByRole: user.role,
+      organizationId: current.organizationId,
+      correlationId,
+      reason: args.approvalReason
+    });
+
+    const refreshed = await tx.vehicle.findUniqueOrThrow({ where: { id } });
+    await recomputeStationInventoryForVehicle(tx, refreshed.stationId);
+    return refreshed;
+  }, { timeout: 20000, maxWait: 10000 });
+
+  invalidate();
+  return mapWithOrg(vehicle);
+}
+
+export async function rejectSeizedForUtilization(
+  user: SessionUser,
+  id: string,
+  reason: string,
+  correlationId: string
+): Promise<VehicleView> {
+  if (user.role !== 'ADMIN' && user.role !== 'ORG_ADMIN') {
+    throw new DomainError('Only platform administrators or fleet desk administrators can reject seized vehicle utilization.', 403);
+  }
+
+  const current = await loadOwnVehicle(user, id);
+  if (current.ownershipCategory !== 'SEIZED_IMPOUNDED') {
+    throw new DomainError('Only seized/impounded vehicles follow this workflow.', 400);
+  }
+
+  const vehicle = await prisma.$transaction(async (tx) => {
+    await tx.vehicle.update({
+      where: { id },
+      data: {
+        custodyNote: `Utilization rejected by ${user.username}: ${reason}`,
+        custodyUpdatedAt: new Date()
+      }
+    });
+
+    await writeAudit(tx, {
+      entityType: 'Vehicle',
+      entityId: id,
+      action: 'SeizedVehicleUtilizationRejected',
+      performedBy: user.username,
+      performedByRole: user.role,
+      organizationId: current.organizationId,
+      correlationId,
+      reason
+    });
+
+    return tx.vehicle.findUniqueOrThrow({ where: { id } });
+  });
+
+  invalidate();
+  return mapWithOrg(vehicle);
+}
+
 // ---------------------------------------------------------------------------
 // Action dispatcher
 // ---------------------------------------------------------------------------
@@ -786,6 +1018,10 @@ export async function applyVehicleAction(user: SessionUser, id: string, action: 
       return { vehicle: await releaseCustody(user, id, action, correlationId) };
     case 'markAuctionReady':
       return { vehicle: await markAuctionReady(user, id, action.authority, correlationId) };
+    case 'approveSeizedForUtilization':
+      return { vehicle: await approveSeizedForUtilization(user, id, action, correlationId) };
+    case 'rejectSeizedForUtilization':
+      return { vehicle: await rejectSeizedForUtilization(user, id, action.reason, correlationId) };
     case 'retire':
       return { vehicle: await retireVehicle(user, id, action.reason, correlationId) };
     default: {

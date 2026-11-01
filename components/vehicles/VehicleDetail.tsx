@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, LoaderCircle, EyeOff, RefreshCw, FileText, Building2, ShieldCheck, Sliders, FileCheck, Wrench, Calendar, Radio, History } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, LoaderCircle, EyeOff, RefreshCw, FileText, Building2, ShieldCheck, Sliders, FileCheck, Wrench, Calendar, Radio, History, ShieldAlert } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
+import { Modal } from '@/components/ui/Modal';
+import { Field } from '@/components/ui/Field';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Timeline, type TimelineEntry } from '@/components/ui/Timeline';
 import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
@@ -34,7 +36,9 @@ import type {
   VehicleAction,
   VehicleDetail as VehicleDetailData,
   VehicleView,
-  AllocationLifecycle
+  AllocationLifecycle,
+  LegalRecordView,
+  RestrictionView
 } from '@/types';
 
 type TabId =
@@ -171,6 +175,16 @@ export function VehicleDetail({ id }: { id: string }) {
             position) are masked.
           </span>
         </div>
+      ) : null}
+
+      {full && v.ownershipCategory === 'SEIZED_IMPOUNDED' ? (
+        <SeizedVehicleUtilizationBanner
+          vehicle={v}
+          legal={legal}
+          restrictions={restrictions}
+          canApprove={me?.role === 'ADMIN' || me?.role === 'ORG_ADMIN'}
+          onDone={refetch}
+        />
       ) : null}
 
       <Tabs
@@ -945,6 +959,257 @@ function TelemetrySection({ vehicle, devices, masked }: { vehicle: VehicleDetail
             </ul>
           )}
         </Panel>
+      ) : null}
+    </div>
+  );
+}
+
+/* ---------------- Seized Vehicle Custody & Utilization Workflow (spec Point 10) ---------------- */
+
+function SeizedVehicleUtilizationBanner({
+  vehicle,
+  legal,
+  restrictions,
+  canApprove,
+  onDone
+}: {
+  vehicle: VehicleView;
+  legal: LegalRecordView[];
+  restrictions: RestrictionView[];
+  canApprove: boolean;
+  onDone: () => void;
+}) {
+  const { toast } = useToast();
+  const [modalMode, setModalMode] = useState<null | 'approve' | 'reject'>(null);
+  const [approvalReason, setApprovalReason] = useState('');
+  const [legalClearanceRef, setLegalClearanceRef] = useState('');
+  const [courtOrderRef, setCourtOrderRef] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const activeCourtCases = legal.filter((l) => l.type === 'COURT_CASE' && l.status !== 'RESOLVED');
+  const seizureRecord = legal.find((l) => l.type === 'SEIZURE');
+
+  async function handleApprove() {
+    if (!legalClearanceRef.trim() || !approvalReason.trim()) {
+      setErrorMsg('Legal clearance reference and approval justification are required.');
+      return;
+    }
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      await api.post(`/api/cloud/vehicles/${vehicle.id}/actions`, {
+        type: 'approveSeizedForUtilization',
+        approvalReason: approvalReason.trim(),
+        legalClearanceRef: legalClearanceRef.trim(),
+        courtOrderRef: courtOrderRef.trim() || undefined
+      });
+      toast('Seized vehicle cleared and approved for government fleet utilization', 'success');
+      setModalMode(null);
+      onDone();
+    } catch (err) {
+      setErrorMsg(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Approval failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleReject() {
+    if (!rejectReason.trim()) {
+      setErrorMsg('Rejection reason is required.');
+      return;
+    }
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      await api.post(`/api/cloud/vehicles/${vehicle.id}/actions`, {
+        type: 'rejectSeizedForUtilization',
+        reason: rejectReason.trim()
+      });
+      toast('Utilization request rejected; vehicle remains in custody', 'info');
+      setModalMode(null);
+      onDone();
+    } catch (err) {
+      setErrorMsg(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Rejection failed');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="panel"
+      style={{
+        border: '1.5px solid #d97706',
+        background: 'rgba(217, 119, 6, 0.05)',
+        padding: '1rem',
+        borderRadius: '10px'
+      }}
+    >
+      <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+          <ShieldAlert size={24} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: '1rem', color: '#b45309' }}>
+                Seized Asset in Police Custody ({vehicle.custodyState ?? 'IN_CUSTODY'})
+              </strong>
+              <Badge tone="danger">Non-Allocatable</Badge>
+              {activeCourtCases.length > 0 ? (
+                <Badge tone="warning">{activeCourtCases.length} Active Court Case(s)</Badge>
+              ) : null}
+            </div>
+            <p style={{ margin: '0.35rem 0 0', fontSize: '0.84rem', color: 'var(--color-text-secondary)' }}>
+              {seizureRecord
+                ? `FIR / Case Ref: ${seizureRecord.referenceNo} · Seized on ${fmtDate(seizureRecord.date)}.`
+                : 'Vehicle is currently impounded under police legal custody.'}{' '}
+              {vehicle.custodyNote ? `Storage note: ${vehicle.custodyNote}.` : ''}
+            </p>
+          </div>
+        </div>
+
+        {canApprove && vehicle.custodyState === 'IN_CUSTODY' ? (
+          <div className="cluster" style={{ gap: '0.5rem', flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setErrorMsg(null);
+                setRejectReason('');
+                setModalMode('reject');
+              }}
+            >
+              Reject Utilization
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<ShieldCheck size={14} />}
+              onClick={() => {
+                setErrorMsg(null);
+                setApprovalReason('');
+                setLegalClearanceRef('');
+                setCourtOrderRef('');
+                setModalMode('approve');
+              }}
+            >
+              Review & Approve Utilization
+            </Button>
+          </div>
+        ) : null}
+      </div>
+
+      {modalMode === 'approve' ? (
+        <Modal
+          title="Approve Seized Vehicle for Fleet Utilization"
+          onClose={() => setModalMode(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setModalMode(null)} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                loading={submitting}
+                onClick={() => void handleApprove()}
+                disabled={activeCourtCases.length > 0}
+              >
+                Approve & Admit to Fleet
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            {errorMsg ? (
+              <div className="toast-inline toast-inline--danger" role="alert">
+                <span className="toast-inline__message">{errorMsg}</span>
+              </div>
+            ) : null}
+
+            {activeCourtCases.length > 0 ? (
+              <div className="toast-inline toast-inline--danger" role="alert">
+                <AlertTriangle size={16} className="toast-inline__icon" aria-hidden="true" />
+                <span className="toast-inline__message">
+                  Cannot approve: vehicle has {activeCourtCases.length} unresolved court case(s). Court clearance or case disposal is mandatory before utilization.
+                </span>
+              </div>
+            ) : (
+              <p className="text-muted" style={{ margin: 0, fontSize: '0.84rem' }}>
+                Approving this vehicle lifts legal custody restrictions, updates ownership to <strong>Government Fleet</strong>, re-evaluates eligibility, and adds it to the station's available pool for official duties.
+              </p>
+            )}
+
+            <Field label="Legal clearance reference / Authority order" required>
+              <input
+                className="input"
+                value={legalClearanceRef}
+                onChange={(e) => setLegalClearanceRef(e.target.value)}
+                placeholder="e.g. DM Sanction Order No. 2026/G-881"
+              />
+            </Field>
+
+            <Field label="Court order / release ref (if applicable)">
+              <input
+                className="input"
+                value={courtOrderRef}
+                onChange={(e) => setCourtOrderRef(e.target.value)}
+                placeholder="e.g. CJM Court Order dated 12-01-2026"
+              />
+            </Field>
+
+            <Field label="Justification / utilization purpose" required>
+              <textarea
+                className="textarea"
+                rows={2}
+                value={approvalReason}
+                onChange={(e) => setApprovalReason(e.target.value)}
+                placeholder="State the operational justification for utilizing this seized vehicle in government fleet..."
+              />
+            </Field>
+          </div>
+        </Modal>
+      ) : null}
+
+      {modalMode === 'reject' ? (
+        <Modal
+          title="Reject Vehicle Utilization"
+          onClose={() => setModalMode(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setModalMode(null)} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                loading={submitting}
+                onClick={() => void handleReject()}
+              >
+                Confirm Rejection
+              </Button>
+            </>
+          }
+        >
+          <div className="stack">
+            {errorMsg ? (
+              <div className="toast-inline toast-inline--danger" role="alert">
+                <span className="toast-inline__message">{errorMsg}</span>
+              </div>
+            ) : null}
+            <p className="text-muted" style={{ margin: 0, fontSize: '0.84rem' }}>
+              The vehicle will remain in custody under police storage and will not be admitted into the usable government fleet.
+            </p>
+            <Field label="Rejection reason" required>
+              <textarea
+                className="textarea"
+                rows={2}
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Specify why fleet utilization is rejected (e.g. pending ownership dispute, mechanical unfitness)..."
+              />
+            </Field>
+          </div>
+        </Modal>
       ) : null}
     </div>
   );

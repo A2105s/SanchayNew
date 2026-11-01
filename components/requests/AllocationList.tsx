@@ -12,7 +12,7 @@ import { SearchField } from '@/components/ui/SearchField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useApiResource } from '@/hooks/useApiResource';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
-import { ALLOCATION_LABEL, allocationTone, fmtDateTime } from '@/lib/fleet/format';
+import { ALLOCATION_LABEL, allocationTone, fmtDateTime, formatReturnDue } from '@/lib/fleet/format';
 import type { AllocationView, AllocationLifecycle } from '@/types';
 
 type TabId = 'active' | 'upcoming' | 'awaiting' | 'overdue' | 'history';
@@ -110,16 +110,20 @@ export function AllocationList() {
           <table>
             <thead>
               <tr>
+                <th style={{ width: 44, textAlign: 'center' }}>#</th>
                 <th>Code</th>
                 <th>Vehicle</th>
                 <th>Window</th>
                 <th>Lifecycle</th>
-                <th>Return</th>
+                <th>Return status</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
+              {rows.map((a, idx) => (
                 <tr key={a.id} className="veh-row">
+                  <td className="text-muted" style={{ textAlign: 'center', fontWeight: 600, fontSize: '0.82rem' }}>
+                    {idx + 1}
+                  </td>
                   <td className="mono">
                     <Link href={`/allocations/${a.id}`}>{a.allocationCode}</Link>
                   </td>
@@ -131,11 +135,9 @@ export function AllocationList() {
                     <Badge tone={allocationTone(a.lifecycle)}>{ALLOCATION_LABEL[a.lifecycle as AllocationLifecycle]}</Badge>
                   </td>
                   <td>
-                    {a.returnDue ? (
-                      <Badge tone="danger">Return due{a.overdueHours > 0 ? ` · ${a.overdueHours}h overdue` : ''}</Badge>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
+                    <span style={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                      {formatReturnDue(a.endAt, a.lifecycle as AllocationLifecycle)}
+                    </span>
                   </td>
                 </tr>
               ))}
@@ -144,7 +146,7 @@ export function AllocationList() {
         </div>
       ) : (
         <div className="veh-cards">
-          {rows.map((a) => (
+          {rows.map((a, idx) => (
             <Link
               key={a.id}
               href={`/allocations/${a.id}`}
@@ -153,8 +155,11 @@ export function AllocationList() {
             >
               <div className="veh-card-head">
                 <div>
-                  <div className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
-                    {a.allocationCode}
+                  <div className="cluster" style={{ gap: '0.4rem', alignItems: 'baseline' }}>
+                    <span className="text-muted" style={{ fontSize: '0.75rem', fontWeight: 700 }}>#{idx + 1}</span>
+                    <span className="mono" style={{ fontWeight: 700, color: 'var(--color-brand)' }}>
+                      {a.allocationCode}
+                    </span>
                   </div>
                   <div className="veh-card-sub" style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>
                     {a.vehicleLabel}
@@ -168,11 +173,9 @@ export function AllocationList() {
                 <div><strong>Window:</strong> {fmtDateTime(a.startAt)} → {fmtDateTime(a.endAt)}</div>
               </div>
               <div className="veh-card-foot">
-                {a.returnDue ? (
-                  <Badge tone="danger">Return due{a.overdueHours > 0 ? ` · ${a.overdueHours}h overdue` : ''}</Badge>
-                ) : (
-                  <span className="text-muted">On schedule</span>
-                )}
+                <span style={{ fontSize: '0.82rem', fontWeight: 500 }}>
+                  {formatReturnDue(a.endAt, a.lifecycle as AllocationLifecycle)}
+                </span>
                 <span style={{ fontWeight: 600, color: 'var(--color-brand)', fontSize: '0.8rem' }}>
                   Manage →
                 </span>

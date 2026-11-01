@@ -38,11 +38,24 @@ export function NewTransferModal({
   onDone: () => void;
   toast: ToastFn;
 }) {
-  const [source, setSource] = useState(defaultSource ?? '');
-  const [dest, setDest] = useState(me.stationId ?? '');
+  const isStationUser = Boolean(me.stationId && me.role !== 'ADMIN');
+  const initialSource = isStationUser ? me.stationId! : (defaultSource ?? '');
+  const [source, setSource] = useState(initialSource);
+  const [dest, setDest] = useState(isStationUser ? '' : (me.stationId ?? ''));
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
-  const [counts, setCounts] = useState<Record<VehicleClass, number>>({ PATROL_CAR: 0, MOTORCYCLE: 0, VAN: 0, HEAVY: 0 });
+  const [counts, setCounts] = useState<Record<VehicleClass, number>>({
+    PATROL_CAR: 0,
+    MOTORCYCLE: 0,
+    VAN: 0,
+    HEAVY: 0,
+    CAR: 0,
+    CHHOTA_HATHI: 0,
+    TRUCK: 0,
+    BUS: 0,
+    JCB: 0,
+    SPECIALIZED: 0,
+  });
   const [purpose, setPurpose] = useState('');
   const [comments, setComments] = useState('');
   const [saving, setSaving] = useState(false);
@@ -90,22 +103,33 @@ export function NewTransferModal({
     >
       <div className="stack">
         <div className="grid-2">
-          <Field label="Source station" required>
-            <Select
-              ariaLabel="Source"
-              value={source}
-              onChange={setSource}
-              placeholder="Lending station"
-              options={stations.map((s) => ({ value: s.id, label: s.name }))}
-            />
-          </Field>
+          {isStationUser ? (
+            <Field label="Source station (origin)" hint="Fixed to your authenticated police station" required>
+              <input
+                className="input"
+                disabled
+                readOnly
+                value={sourceStation ? `${sourceStation.name} (${sourceStation.code})` : 'Your Assigned Station'}
+              />
+            </Field>
+          ) : (
+            <Field label="Source station" required>
+              <Select
+                ariaLabel="Source"
+                value={source}
+                onChange={setSource}
+                placeholder="Lending station"
+                options={stations.map((s) => ({ value: s.id, label: s.name }))}
+              />
+            </Field>
+          )}
           <Field label="Destination station" required error={sameStation ? 'Source and destination must differ' : undefined}>
             <Select
               ariaLabel="Destination"
               value={dest}
               onChange={setDest}
               placeholder="Receiving station"
-              options={stations.map((s) => ({ value: s.id, label: s.name }))}
+              options={stations.filter((s) => s.id !== source).map((s) => ({ value: s.id, label: s.name }))}
             />
           </Field>
         </div>
@@ -364,34 +388,34 @@ export function TransferDrawer({
             confirm === 'grant_clearance'
               ? 'Grant Station Clearance?'
               : confirm === 'grant_sanction'
-              ? 'Issue District Movement Sanction?'
-              : confirm === 'handover'
-              ? 'Confirm Handover & Departure?'
-              : confirm === 'complete'
-              ? 'Inbound Return Inspection & Completion?'
-              : 'Cancel request?'
+                ? 'Issue District Movement Sanction?'
+                : confirm === 'handover'
+                  ? 'Confirm Handover & Departure?'
+                  : confirm === 'complete'
+                    ? 'Inbound Return Inspection & Completion?'
+                    : 'Cancel request?'
           }
           message={
             confirm === 'grant_clearance'
               ? 'This certifies that the lending station has local reserve capacity and clears the requisition for SP Fleet Desk review.'
               : confirm === 'grant_sanction'
-              ? 'This grants SP Fleet Desk district movement sanction and transfers vehicle allocation quotas.'
-              : confirm === 'handover'
-              ? 'This marks vehicles as physically dispatched and active in transit to the destination station.'
-              : confirm === 'complete'
-              ? 'This verifies inbound physical return and restores vehicle inventory to the lending station pool.'
-              : 'This withdraws the transfer request.'
+                ? 'This grants SP Fleet Desk district movement sanction and transfers vehicle allocation quotas.'
+                : confirm === 'handover'
+                  ? 'This marks vehicles as physically dispatched and active in transit to the destination station.'
+                  : confirm === 'complete'
+                    ? 'This verifies inbound physical return and restores vehicle inventory to the lending station pool.'
+                    : 'This withdraws the transfer request.'
           }
           confirmLabel={
             confirm === 'grant_clearance'
               ? 'Grant Clearance'
               : confirm === 'grant_sanction'
-              ? 'Issue Sanction'
-              : confirm === 'handover'
-              ? 'Confirm Handover'
-              : confirm === 'complete'
-              ? 'Complete'
-              : 'Cancel request'
+                ? 'Issue Sanction'
+                : confirm === 'handover'
+                  ? 'Confirm Handover'
+                  : confirm === 'complete'
+                    ? 'Complete'
+                    : 'Cancel request'
           }
           tone={confirm === 'cancel' ? 'danger' : 'primary'}
           loading={busy}

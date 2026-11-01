@@ -23,11 +23,68 @@ export const SECTOR_LABEL: Record<Sector, string> = {
 };
 
 export const CLASS_LABEL: Record<VehicleClass, string> = {
-  PATROL_CAR: 'Patrol car',
+  PATROL_CAR: 'Patrol cruiser',
+  CAR: 'Car / Official Sedan',
   MOTORCYCLE: 'Motorcycle',
   VAN: 'Van',
-  HEAVY: 'Heavy vehicle'
+  CHHOTA_HATHI: 'Chhota Hathi (Mini truck)',
+  TRUCK: 'Truck (Commercial)',
+  BUS: 'Bus',
+  JCB: 'JCB / Earthmover',
+  HEAVY: 'Heavy vehicle',
+  SPECIALIZED: 'Specialized machinery'
 };
+
+/**
+ * Format remaining duration until return is due in days and hours.
+ * Examples:
+ * - "2 days, 5 hours remaining"
+ * - "1 day, 0 hours remaining"
+ * - "6 hours remaining"
+ * - "Overdue by 1 day, 3 hours"
+ */
+export function formatReturnDue(
+  endAt: string | Date | null | undefined,
+  lifecycle?: string | null,
+  now: Date = new Date()
+): string {
+  if (!endAt) return '—';
+  if (lifecycle === 'COMPLETED') return 'Returned';
+  if (lifecycle === 'CANCELLED') return 'Cancelled';
+  if (lifecycle === 'RETURNED_PENDING_INSPECTION') return 'Returned (pending inspection)';
+
+  const targetDate = typeof endAt === 'string' ? new Date(endAt) : endAt;
+  const targetTime = targetDate.getTime();
+  if (Number.isNaN(targetTime)) return '—';
+
+  const diffMs = targetTime - now.getTime();
+  if (diffMs > 0) {
+    const totalHours = Math.floor(diffMs / 3600000);
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    if (days > 0) {
+      return `${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    }
+    if (hours > 0) {
+      return `${hours} hour${hours === 1 ? '' : 's'} remaining`;
+    }
+    return 'Due in less than 1 hour';
+  } else {
+    const overdueMs = Math.abs(diffMs);
+    const totalHours = Math.floor(overdueMs / 3600000);
+    const days = Math.floor(totalHours / 24);
+    const hours = totalHours % 24;
+
+    if (totalHours === 0) {
+      return 'Due immediately';
+    }
+    if (days > 0) {
+      return `Overdue by ${days} day${days === 1 ? '' : 's'}, ${hours} hour${hours === 1 ? '' : 's'}`;
+    }
+    return `Overdue by ${hours} hour${hours === 1 ? '' : 's'}`;
+  }
+}
 
 export const STATUS_LABEL: Record<VehicleStatus, string> = {
   MOVING: 'Moving',

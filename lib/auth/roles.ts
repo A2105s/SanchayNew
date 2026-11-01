@@ -106,6 +106,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ],
   DEPT_OFFICER: [
     'fleet.read',
+    'vehicle.register',
     'restriction.manage',
     'maintenance.write',
     'trip.write',
@@ -128,6 +129,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   ],
   STATION_OFFICER: [
     'fleet.read',
+    'vehicle.register',
     'vehicle.edit',
     'maintenance.write',
     'trip.write',

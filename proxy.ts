@@ -153,7 +153,7 @@ function withSecurityHeaders(response: NextResponse): NextResponse {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' data: https://fonts.gstatic.com",
     `img-src 'self' data: blob: ${MAP_ORIGINS} https://*.supabase.co https://*.supabase.in`,
-    `connect-src 'self' ${MAP_ORIGINS} https://*.supabase.co https://*.supabase.in`,
+    `connect-src 'self' ${MAP_ORIGINS} https://*.supabase.co https://*.supabase.in https://translate.googleapis.com`,
     "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'"

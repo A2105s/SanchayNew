@@ -80,7 +80,18 @@ const iso = (d: Date | null | undefined): string | null => (d ? d.toISOString() 
 const isoReq = (d: Date): string => d.toISOString();
 
 export function emptyInventory(): Record<VehicleClass, number> {
-  return { PATROL_CAR: 0, MOTORCYCLE: 0, VAN: 0, HEAVY: 0 };
+  return {
+    PATROL_CAR: 0,
+    MOTORCYCLE: 0,
+    VAN: 0,
+    HEAVY: 0,
+    CAR: 0,
+    CHHOTA_HATHI: 0,
+    TRUCK: 0,
+    BUS: 0,
+    JCB: 0,
+    SPECIALIZED: 0
+  };
 }
 
 export function inventoryToRecord(inv: StationInventory | null | undefined): Record<VehicleClass, number> {
@@ -88,15 +99,27 @@ export function inventoryToRecord(inv: StationInventory | null | undefined): Rec
     PATROL_CAR: inv?.patrolCar ?? 0,
     MOTORCYCLE: inv?.motorcycle ?? 0,
     VAN: inv?.van ?? 0,
-    HEAVY: inv?.heavy ?? 0
+    HEAVY: inv?.heavy ?? 0,
+    CAR: inv?.patrolCar ?? 0,
+    CHHOTA_HATHI: 0,
+    TRUCK: inv?.heavy ?? 0,
+    BUS: 0,
+    JCB: inv?.heavy ?? 0,
+    SPECIALIZED: 0
   };
 }
 
 export const VEHICLE_CLASS_TO_INVENTORY_FIELD: Record<VehicleClass, 'patrolCar' | 'motorcycle' | 'van' | 'heavy'> = {
   PATROL_CAR: 'patrolCar',
+  CAR: 'patrolCar',
   MOTORCYCLE: 'motorcycle',
   VAN: 'van',
-  HEAVY: 'heavy'
+  CHHOTA_HATHI: 'heavy',
+  TRUCK: 'heavy',
+  BUS: 'heavy',
+  JCB: 'heavy',
+  HEAVY: 'heavy',
+  SPECIALIZED: 'heavy'
 };
 
 export function mapOrganization(row: Organization): OrganizationView {
@@ -473,7 +496,18 @@ export function mapAllocation(row: Allocation, opts: AllocationMapOptions): Allo
 }
 
 export function transferCountsToRecord(row: TransferRequest): Record<VehicleClass, number> {
-  return { PATROL_CAR: row.patrolCar, MOTORCYCLE: row.motorcycle, VAN: row.van, HEAVY: row.heavy };
+  return {
+    PATROL_CAR: row.patrolCar,
+    MOTORCYCLE: row.motorcycle,
+    VAN: row.van,
+    HEAVY: row.heavy,
+    CAR: 0,
+    CHHOTA_HATHI: 0,
+    TRUCK: 0,
+    BUS: 0,
+    JCB: 0,
+    SPECIALIZED: 0,
+  };
 }
 
 export function mapTransfer(row: TransferRequest): TransferView {

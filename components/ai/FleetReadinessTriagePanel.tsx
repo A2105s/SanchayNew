@@ -243,7 +243,8 @@ export function FleetReadinessTriagePanel({
   const uncommittedActions = data?.actions.filter((a) => !committedActionIds.has(a.id)) ?? [];
 
   return (
-    <div className="ai-triage-panel" role="region" aria-label="AI Fleet Readiness and Dispatch Desk">
+    <div className="ai-pulse-card-wrap" style={{ margin: 'var(--space-4) 0' }}>
+      <div className="ai-pulse-card-inner ai-triage-panel" role="region" aria-label="AI Fleet Readiness and Dispatch Desk" style={{ margin: 0 }}>
       {/* Header Banner */}
       <div className="ai-triage-header">
         <div className="ai-triage-title-group">
@@ -653,6 +654,7 @@ export function FleetReadinessTriagePanel({
           </div>
         ) : null}
       </div>
+    </div>
     </div>
   );
 }

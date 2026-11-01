@@ -78,12 +78,12 @@ export async function listSpaceRequests(user: SessionUser, scope: 'mine' | 'revi
     scope === 'mine'
       ? { requestedBy: user.username }
       : await (async () => {
-          if (user.username === 'spaces.admin' || user.role === 'ADMIN') return {};
-          const tree = await orgTree(user);
-          if (tree === null) return {};
-          // Review scope: requests on own-org spaces, plus own-org REGISTER requests
-          return { OR: [{ space: { organizationId: { in: tree } } }, { spaceId: null, requestedBy: { in: await requesterUsernames(tree) } }] };
-        })();
+        if (user.username === 'spaces.admin' || user.role === 'ADMIN') return {};
+        const tree = await orgTree(user);
+        if (tree === null) return {};
+        // Review scope: requests on own-org spaces, plus own-org REGISTER requests
+        return { OR: [{ space: { organizationId: { in: tree } } }, { spaceId: null, requestedBy: { in: await requesterUsernames(tree) } }] };
+      })();
   const [rows, total] = await Promise.all([
     prisma.spaceRequest.findMany({ where, orderBy: { createdAt: 'desc' }, take: 200, include: { space: { select: { name: true } } } }),
     prisma.spaceRequest.count({ where })
@@ -100,14 +100,33 @@ export async function applySpaceRequestAction(user: SessionUser, id: string, act
   const request = await prisma.spaceRequest.findUnique({ where: { id }, include: { space: { select: { name: true, organizationId: true } } } });
   if (!request) throw new DomainError('Request not found.', 404);
 
-  if (action.type === 'withdraw') {
-    if (request.requestedBy !== user.username) throw new DomainError('Only the requester can withdraw this request.', 403);
-    if (request.status !== 'SUBMITTED' && request.status !== 'UNDER_REVIEW' && request.status !== 'NEEDS_INFO') {
-      throw new DomainError(`A ${request.status.toLowerCase()} request cannot be withdrawn.`, 409);
+  if (action.type === 'withdraw' || action.type === 'cancel') {
+    if (user.role !== 'ADMIN' && request.requestedBy !== user.username) {
+      throw new DomainError('Only the requester or an administrator can cancel this request.', 403);
     }
+    if (request.status !== 'SUBMITTED' && request.status !== 'UNDER_REVIEW' && request.status !== 'NEEDS_INFO') {
+      throw new DomainError(`A ${request.status.toLowerCase()} request cannot be cancelled.`, 409);
+    }
+    const reasonText = 'reason' in action && action.reason ? action.reason : undefined;
     const row = await prisma.$transaction(async (tx) => {
-      const updated = await tx.spaceRequest.update({ where: { id }, data: { status: 'WITHDRAWN' }, include: { space: { select: { name: true } } } });
-      await writeAudit(tx, { entityType: 'SpaceRequest', entityId: id, action: 'SpaceRequestWithdrawn', fieldName: 'status', oldValue: request.status, newValue: 'WITHDRAWN', performedBy: user.username, performedByRole: user.role, organizationId: user.organizationId, correlationId });
+      const updated = await tx.spaceRequest.update({
+        where: { id },
+        data: { status: 'WITHDRAWN', reviewNote: reasonText },
+        include: { space: { select: { name: true } } }
+      });
+      await writeAudit(tx, {
+        entityType: 'SpaceRequest',
+        entityId: id,
+        action: action.type === 'cancel' ? 'SpaceRequestCancelled' : 'SpaceRequestWithdrawn',
+        fieldName: 'status',
+        oldValue: request.status,
+        newValue: 'WITHDRAWN',
+        performedBy: user.username,
+        performedByRole: user.role,
+        organizationId: user.organizationId,
+        correlationId,
+        reason: reasonText
+      });
       return updated;
     });
     invalidate();

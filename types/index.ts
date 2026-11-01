@@ -50,7 +50,17 @@ export type VehicleStatus = 'MOVING' | 'IDLE' | 'BREAKDOWN' | 'OFFLINE'; // live
 export type OperationalStatus = 'ACTIVE' | 'MAINTENANCE' | 'OUT_OF_SERVICE' | 'RETIRED';
 export type OwnershipCategory = 'GOVERNMENT_FLEET' | 'SEIZED_IMPOUNDED' | 'OTHER_UNVERIFIED';
 export type EligibilityState = 'ELIGIBLE' | 'RESTRICTED' | 'PENDING_VERIFICATION' | 'INELIGIBLE';
-export type VehicleClass = 'PATROL_CAR' | 'MOTORCYCLE' | 'VAN' | 'HEAVY';
+export type VehicleClass =
+  | 'PATROL_CAR'
+  | 'MOTORCYCLE'
+  | 'VAN'
+  | 'HEAVY'
+  | 'CAR'
+  | 'CHHOTA_HATHI'
+  | 'TRUCK'
+  | 'BUS'
+  | 'JCB'
+  | 'SPECIALIZED';
 export type Sector =
   | 'GMC_WASTE'
   | 'AMBULANCE_108'
@@ -731,7 +741,30 @@ export type VehicleAction =
   | { type: 'logFuel'; liters: number; costInr?: number; odometerKm?: number }
   | { type: 'addLegalRecord'; record: Omit<LegalRecordView, 'id' | 'vehicleId'> }
   | { type: 'updateLegalRecord'; recordId: string; status: LegalRecordView['status']; nextActionAt?: string | null }
+  | { type: 'linkCourtCase'; cnr: string }
+  | { type: 'refreshCourtCase'; recordId: string }
+  | { type: 'releaseCustody'; reason: string; authority: string; releasedTo?: string }
+  | { type: 'markAuctionReady'; authority: string }
+  | { type: 'approveSeizedForUtilization'; approvalReason: string; legalClearanceRef: string; courtOrderRef?: string }
+  | { type: 'rejectSeizedForUtilization'; reason: string }
   | { type: 'retire'; reason: string }; // never a hard delete of lifecycle records
+
+export interface SeizedVehicleInput {
+  registrationNumber?: string | null;
+  displayName: string;
+  vehicleClass: VehicleClass;
+  vehicleType: string;
+  makeModel?: string | null;
+  chassisNumber?: string | null;
+  engineNumber?: string | null;
+  stationId: string;
+  seizureDate: string;
+  seizureLocation: string;
+  firNumber: string;
+  evidenceRef?: string | null;
+  custodyLocation: string;
+  remarks?: string | null;
+}
 
 /** POST /api/cloud/vehicles/bulk */
 export type VehicleBulkAction =

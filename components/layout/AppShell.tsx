@@ -7,6 +7,7 @@ import { Clock3, Command, LoaderCircle, Menu, TriangleAlert, X } from 'lucide-re
 import { useGlobalScrollEdgeSpring } from '@/hooks/useScrollEdgeSpring';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { LanguageSelector } from '@/components/layout/LanguageSelector';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { CommandPalette } from '@/components/layout/CommandPalette';
 import { AiCopilotModal } from '@/components/ai/AiCopilotModal';
@@ -292,32 +293,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               </Link>
             </div>
-            <div className="module-toggle-pill" role="tablist" aria-label="Active module">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeModule === 'vehicles'}
-                className={`module-pill-btn ${activeModule === 'vehicles' ? 'is-active' : ''}`}
-                onClick={() => {
-                  setModuleCookie('vehicles');
-                  router.push('/dashboard');
-                }}
-              >
-                Fleet
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeModule === 'spaces'}
-                className={`module-pill-btn ${activeModule === 'spaces' ? 'is-active' : ''}`}
-                onClick={() => {
-                  setModuleCookie('spaces');
-                  router.push('/spaces');
-                }}
-              >
-                Spaces
-              </button>
-            </div>
+            {me?.role === 'ADMIN' ? (
+              <div className="module-toggle-pill" role="tablist" aria-label="Active module">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeModule === 'vehicles'}
+                  className={`module-pill-btn ${activeModule === 'vehicles' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setModuleCookie('vehicles');
+                    router.push('/dashboard');
+                  }}
+                >
+                  Fleet
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeModule === 'spaces'}
+                  className={`module-pill-btn ${activeModule === 'spaces' ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setModuleCookie('spaces');
+                    router.push('/spaces');
+                  }}
+                >
+                  Spaces
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="top-nav__actions">
             <AiCopilotModal />
@@ -331,6 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Command size={16} aria-hidden="true" />
             </button>
             <NotificationBell />
+            <LanguageSelector />
             <ThemeToggle />
             <CloudStatusPopover
               badge={badge}

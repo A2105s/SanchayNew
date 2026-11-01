@@ -254,7 +254,7 @@ export function RequestDetail({ id }: { id: string }) {
               Submit
             </Button>
           ) : null}
-          {isRequester && !['APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(state) ? (
+          {(isRequester || me?.role === 'ADMIN') && !['APPROVED', 'REJECTED', 'CANCELLED', 'EXPIRED'].includes(state) ? (
             <Button
               variant="danger"
               onClick={() => openAction({ kind: 'cancel', title: 'Cancel request', needsComment: true, commentLabel: 'Reason (optional)', confirmLabel: 'Cancel request', tone: 'danger' })}

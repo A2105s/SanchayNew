@@ -19,11 +19,33 @@ function invalidate() {
 const CLASS_KEYS: VehicleClass[] = ['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY'];
 
 function countsFromInput(counts: Partial<Record<VehicleClass, number>>): Record<VehicleClass, number> {
-  return { PATROL_CAR: counts.PATROL_CAR ?? 0, MOTORCYCLE: counts.MOTORCYCLE ?? 0, VAN: counts.VAN ?? 0, HEAVY: counts.HEAVY ?? 0 };
+  return {
+    CAR: counts.CAR ?? 0,
+    PATROL_CAR: counts.PATROL_CAR ?? 0,
+    MOTORCYCLE: counts.MOTORCYCLE ?? 0,
+    VAN: counts.VAN ?? 0,
+    CHHOTA_HATHI: counts.CHHOTA_HATHI ?? 0,
+    TRUCK: counts.TRUCK ?? 0,
+    BUS: counts.BUS ?? 0,
+    JCB: counts.JCB ?? 0,
+    HEAVY: counts.HEAVY ?? 0,
+    SPECIALIZED: counts.SPECIALIZED ?? 0,
+  };
 }
 
 function countsFromRow(row: TransferRequest): Record<VehicleClass, number> {
-  return { PATROL_CAR: row.patrolCar, MOTORCYCLE: row.motorcycle, VAN: row.van, HEAVY: row.heavy };
+  return {
+    PATROL_CAR: row.patrolCar,
+    MOTORCYCLE: row.motorcycle,
+    VAN: row.van,
+    HEAVY: row.heavy,
+    CAR: 0,
+    CHHOTA_HATHI: 0,
+    TRUCK: 0,
+    BUS: 0,
+    JCB: 0,
+    SPECIALIZED: 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -117,6 +139,9 @@ async function assertCanReviewSource(tx: TxClient, user: SessionUser, transfer: 
 // ---------------------------------------------------------------------------
 
 export async function createTransfer(user: SessionUser, input: { sourceStationId: string; destinationStationId: string; startAt: string; endAt: string; counts: Partial<Record<VehicleClass, number>>; purpose: string; comments?: string }, correlationId: string): Promise<TransferView> {
+  if (user.role === 'STATION_OFFICER' && user.stationId && input.sourceStationId !== user.stationId) {
+    throw new DomainError('You are only authorized to initiate transfers originating from your assigned station.', 403);
+  }
   if (input.sourceStationId === input.destinationStationId) {
     throw new DomainError('Source and destination stations must be different.', 400);
   }

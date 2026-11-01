@@ -4,7 +4,18 @@ import { z } from 'zod';
 // Enums (aligned with types/index.ts and prisma CHECK constraints)
 // ---------------------------------------------------------------------------
 
-export const zVehicleClass = z.enum(['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY']);
+export const zVehicleClass = z.enum([
+  'PATROL_CAR',
+  'MOTORCYCLE',
+  'VAN',
+  'HEAVY',
+  'CAR',
+  'CHHOTA_HATHI',
+  'TRUCK',
+  'BUS',
+  'JCB',
+  'SPECIALIZED'
+]);
 export const zSector = z.enum(['GMC_WASTE', 'AMBULANCE_108', 'POLICE_PATROL', 'PWD_HEAVY', 'HEALTH_VAN', 'ELECTION_REQUISITION']);
 export const zGpsSource = z.enum(['AIS_140', 'QR_PWA', 'MANUAL_CSV', 'SIMULATED']);
 export const zOperationalStatus = z.enum(['ACTIVE', 'MAINTENANCE', 'OUT_OF_SERVICE', 'RETIRED']);
@@ -135,8 +146,37 @@ export const vehicleActionSchema = z.discriminatedUnion('type', [
     authority: z.string().trim().min(1).max(200),
     releasedTo: z.string().trim().max(200).optional()
   }),
-  z.object({ type: z.literal('markAuctionReady'), authority: z.string().trim().min(1).max(200) })
+  z.object({ type: z.literal('markAuctionReady'), authority: z.string().trim().min(1).max(200) }),
+  z.object({
+    type: z.literal('approveSeizedForUtilization'),
+    approvalReason: z.string().trim().min(1).max(1000),
+    legalClearanceRef: z.string().trim().min(1).max(300),
+    courtOrderRef: z.string().trim().max(300).optional()
+  }),
+  z.object({
+    type: z.literal('rejectSeizedForUtilization'),
+    reason: z.string().trim().min(1).max(1000)
+  })
 ]);
+
+export const seizedVehicleInputSchema = z.object({
+  registrationNumber: z.string().trim().max(32).nullish(),
+  displayName: z.string().trim().min(1).max(120),
+  vehicleClass: zVehicleClass,
+  vehicleType: z.string().trim().min(1).max(80),
+  makeModel: z.string().trim().max(120).nullish(),
+  chassisNumber: z.string().trim().max(64).nullish(),
+  engineNumber: z.string().trim().max(64).nullish(),
+  stationId: z.string().trim().min(1),
+  seizureDate: isoDate,
+  seizureLocation: z.string().trim().min(1).max(300),
+  firNumber: z.string().trim().min(1).max(120),
+  evidenceRef: z.string().trim().max(300).nullish(),
+  custodyLocation: z.string().trim().min(1).max(300),
+  remarks: z.string().trim().max(2000).nullish()
+});
+
+export type SeizedVehicleInputParsed = z.infer<typeof seizedVehicleInputSchema>;
 
 export const vehicleBulkActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('import'), rows: z.array(vehicleInputSchema).min(1).max(5000) }),
@@ -181,7 +221,7 @@ export const requestInputSchema = z.object({
   startAt: isoDate,
   endAt: isoDate,
   accountableOfficer: z.string().trim().min(1).max(120),
-  accountablePhone: z.string().trim().max(20).optional(),
+  accountablePhone: z.string().trim().min(10, 'Accountable officer phone number must have at least 10 digits').max(20).optional(),
   contactPhone: z.string().trim().max(20).optional(),
   submit: z.boolean().optional()
 });
@@ -238,9 +278,29 @@ export const transferCountsSchema = z
     PATROL_CAR: z.number().int().min(0).optional(),
     MOTORCYCLE: z.number().int().min(0).optional(),
     VAN: z.number().int().min(0).optional(),
-    HEAVY: z.number().int().min(0).optional()
+    HEAVY: z.number().int().min(0).optional(),
+    CAR: z.number().int().min(0).optional(),
+    CHHOTA_HATHI: z.number().int().min(0).optional(),
+    TRUCK: z.number().int().min(0).optional(),
+    BUS: z.number().int().min(0).optional(),
+    JCB: z.number().int().min(0).optional(),
+    SPECIALIZED: z.number().int().min(0).optional()
   })
-  .refine((c) => (c.PATROL_CAR ?? 0) + (c.MOTORCYCLE ?? 0) + (c.VAN ?? 0) + (c.HEAVY ?? 0) > 0, 'At least one vehicle must be requested.');
+  .refine(
+    (c) =>
+      (c.PATROL_CAR ?? 0) +
+      (c.MOTORCYCLE ?? 0) +
+      (c.VAN ?? 0) +
+      (c.HEAVY ?? 0) +
+      (c.CAR ?? 0) +
+      (c.CHHOTA_HATHI ?? 0) +
+      (c.TRUCK ?? 0) +
+      (c.BUS ?? 0) +
+      (c.JCB ?? 0) +
+      (c.SPECIALIZED ?? 0) >
+      0,
+    'At least one vehicle must be requested.'
+  );
 
 export const transferInputSchema = z.object({
   sourceStationId: z.string().trim().min(1),
@@ -471,7 +531,8 @@ export const spaceRequestActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('requestInfo'), reason: z.string().trim().min(1).max(500) }),
   z.object({ type: z.literal('approve'), note: z.string().trim().max(2000).optional() }),
   z.object({ type: z.literal('reject'), reason: z.string().trim().min(1).max(500) }),
-  z.object({ type: z.literal('withdraw') })
+  z.object({ type: z.literal('withdraw') }),
+  z.object({ type: z.literal('cancel'), reason: z.string().trim().max(500).optional() })
 ]);
 
 export type SpaceInputParsed = z.infer<typeof spaceInputSchema>;

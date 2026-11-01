@@ -14,7 +14,8 @@ import {
   CarFront,
   AlertTriangle,
   LoaderCircle,
-  Lock
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import { PageTitle } from '@/components/ui/PageTitle';
 import { Panel } from '@/components/ui/Panel';
@@ -30,6 +31,7 @@ import { useFleet } from '@/lib/client/useFleet';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
 import { fmtDate, SECTOR_LABEL, CLASS_LABEL } from '@/lib/fleet/format';
+import { ALL_VEHICLE_CLASSES } from '@/lib/fleet/classification';
 import type { VehicleSearchResult, VehicleView } from '@/types';
 import { ComplianceBadge } from './shared';
 import { VehicleCard, isVehicleView, registrationLabel, stationLabelOf } from './card-view';
@@ -43,6 +45,7 @@ import {
   type RegistryFilters
 } from './registry-filters';
 import { RegisterWizard } from './RegisterWizard';
+import { RegisterSeizedModal } from './RegisterSeizedModal';
 import { ImportModal } from './ImportModal';
 import { BulkReassignModal } from './BulkModals';
 import { FleetReadinessTriagePanel } from '@/components/ai/FleetReadinessTriagePanel';
@@ -54,7 +57,7 @@ const SEARCH_PLACEHOLDERS = [
 ];
 
 const SECTORS = ['GMC_WASTE', 'AMBULANCE_108', 'POLICE_PATROL', 'PWD_HEAVY', 'HEALTH_VAN', 'ELECTION_REQUISITION'];
-const CLASSES = ['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY'];
+const CLASSES = ALL_VEHICLE_CLASSES;
 const OPERATIONAL = ['ACTIVE', 'MAINTENANCE', 'OUT_OF_SERVICE', 'RETIRED'];
 const ELIGIBILITY = ['ELIGIBLE', 'RESTRICTED', 'PENDING_VERIFICATION', 'INELIGIBLE'];
 const OWNERSHIP = ['GOVERNMENT_FLEET', 'SEIZED_IMPOUNDED', 'OTHER_UNVERIFIED'];
@@ -104,6 +107,7 @@ export function VehicleRegistry() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showRegister, setShowRegister] = useState(false);
+  const [showRegisterSeized, setShowRegisterSeized] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showReassign, setShowReassign] = useState(false);
   const reqSeq = useRef(0);
@@ -116,9 +120,15 @@ export function VehicleRegistry() {
     [stationById]
   );
 
-  // Hydrate filters from URL on back/forward.
+  // Hydrate filters from URL on back/forward and support direct register links.
   useEffect(() => {
     setFilters(parseFilters(new URLSearchParams(searchParams.toString())));
+    const regParam = searchParams.get('register') ?? searchParams.get('action');
+    if (regParam === '1' || regParam === 'true' || regParam === 'new' || regParam === 'register') {
+      setShowRegister(true);
+    } else if (regParam === 'seized') {
+      setShowRegisterSeized(true);
+    }
   }, [searchParams]);
 
   // Server-side search whenever filters change.
@@ -204,15 +214,15 @@ export function VehicleRegistry() {
 
   const metrics = snapshot
     ? {
-        total: snapshot.vehicleTotal,
-        active: snapshot.vehicles.filter((v) => v.operationalStatus === 'ACTIVE').length,
-        maintenance: snapshot.vehicles.filter((v) => v.operationalStatus === 'MAINTENANCE').length,
-        restricted: snapshot.vehicles.filter(
-          (v) => v.eligibilityState === 'RESTRICTED' || v.eligibilityState === 'INELIGIBLE'
-        ).length,
-        pending: snapshot.vehicles.filter((v) => v.eligibilityState === 'PENDING_VERIFICATION').length,
-        stale: snapshot.vehicles.filter((v) => v.telemetryFreshness === 'STALE').length
-      }
+      total: snapshot.vehicleTotal,
+      active: snapshot.vehicles.filter((v) => v.operationalStatus === 'ACTIVE').length,
+      maintenance: snapshot.vehicles.filter((v) => v.operationalStatus === 'MAINTENANCE').length,
+      restricted: snapshot.vehicles.filter(
+        (v) => v.eligibilityState === 'RESTRICTED' || v.eligibilityState === 'INELIGIBLE'
+      ).length,
+      pending: snapshot.vehicles.filter((v) => v.eligibilityState === 'PENDING_VERIFICATION').length,
+      stale: snapshot.vehicles.filter((v) => v.telemetryFreshness === 'STALE').length
+    }
     : null;
 
   function exportCurrent() {
@@ -289,6 +299,11 @@ export function VehicleRegistry() {
             {canRegister ? (
               <Button variant="secondary" icon={<Upload size={16} />} onClick={() => setShowImport(true)}>
                 Import CSV
+              </Button>
+            ) : null}
+            {canRegister ? (
+              <Button variant="secondary" icon={<ShieldAlert size={16} />} onClick={() => setShowRegisterSeized(true)}>
+                Register seized
               </Button>
             ) : null}
             {canRegister ? (
@@ -575,6 +590,17 @@ export function VehicleRegistry() {
             setShowRegister(false);
             setFilters((f) => ({ ...f }));
             toast('Vehicle registered', 'success');
+          }}
+        />
+      ) : null}
+      {showRegisterSeized ? (
+        <RegisterSeizedModal
+          stations={stations}
+          onClose={() => setShowRegisterSeized(false)}
+          onDone={(created) => {
+            setShowRegisterSeized(false);
+            setFilters((f) => ({ ...f }));
+            router.push(`/vehicles/${created.id}`);
           }}
         />
       ) : null}

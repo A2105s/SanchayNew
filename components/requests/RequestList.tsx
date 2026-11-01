@@ -14,11 +14,14 @@ import { Select } from '@/components/ui/Select';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useFleet } from '@/lib/client/useFleet';
 import { useApiResource } from '@/hooks/useApiResource';
-import { api } from '@/lib/client/api';
+import { useToast } from '@/lib/client/useToast';
+import { api, ApiError } from '@/lib/client/api';
 import { CLASS_LABEL, REQUEST_STATE_LABEL, requestStateTone, fmtDateTime } from '@/lib/fleet/format';
 import type { AssetRequestView, RequestState } from '@/types';
 import { RequestWizard } from '@/components/requests/RequestWizard';
 import { ViewToggle, type ViewMode } from '@/components/ui/ViewToggle';
+import { Modal } from '@/components/ui/Modal';
+import { Field } from '@/components/ui/Field';
 
 const STATES: RequestState[] = [
   'DRAFT',
@@ -35,6 +38,7 @@ type TabId = 'mine' | 'needs' | 'all';
 
 export function RequestList() {
   const { me, can } = useFleet();
+  const { toast } = useToast();
   const router = useRouter();
   const params = useSearchParams();
   const urlTab = params.get('tab');
@@ -44,6 +48,9 @@ export function RequestList() {
   const [q, setQ] = useState('');
   const [stateFilter, setStateFilter] = useState(params.get('state') ?? '');
   const [showWizard, setShowWizard] = useState(params.get('new') === '1');
+  const [cancelTarget, setCancelTarget] = useState<AssetRequestView | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const prefillVehicleId = params.get('vehicleId');
   // Approvers land on the queue that needs them when there is no explicit tab in the URL.
   const autoSwitched = useRef(false);
@@ -89,6 +96,13 @@ export function RequestList() {
     { id: 'all', label: 'All in scope', icon: <Layers size={14} /> }
   ];
 
+  const isEligibleToCancel = (r: AssetRequestView) => {
+    return (
+      (r.requesterUsername === me?.username || me?.role === 'ADMIN') &&
+      ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'CHANGES_REQUESTED'].includes(r.state)
+    );
+  };
+
   return (
     <div className="page stack">
       <PageTitle
@@ -115,18 +129,18 @@ export function RequestList() {
       <Panel>
         <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="veh-toolbar-row" style={{ flex: '1 1 auto' }}>
-              <SearchField
-                value={q}
-                onChange={setQ}
-                placeholder="Search by code, purpose, vehicle"
-                placeholders={[
-                  'Search by request code (e.g. "REQ-2026-")…',
-                  'Search by purpose or project…',
-                  'Search by requester or station…',
-                  'Search by vehicle registration…'
-                ]}
-                ariaLabel="Search requests"
-              />
+            <SearchField
+              value={q}
+              onChange={setQ}
+              placeholder="Search by code, purpose, vehicle"
+              placeholders={[
+                'Search by request code (e.g. "REQ-2026-")…',
+                'Search by purpose or project…',
+                'Search by requester or station…',
+                'Search by vehicle registration…'
+              ]}
+              ariaLabel="Search requests"
+            />
             <Select
               value={stateFilter}
               onChange={setStateFilter}
@@ -176,6 +190,7 @@ export function RequestList() {
                 <th>Requesting org</th>
                 <th>Window</th>
                 <th>State</th>
+                <th aria-label="Actions" />
               </tr>
             </thead>
             <tbody>
@@ -199,6 +214,21 @@ export function RequestList() {
                   </td>
                   <td>
                     <Badge tone={requestStateTone(r.state)}>{REQUEST_STATE_LABEL[r.state]}</Badge>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    {isEligibleToCancel(r) ? (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCancelReason('');
+                          setCancelTarget(r);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -234,9 +264,24 @@ export function RequestList() {
               </div>
               <div className="veh-card-foot">
                 <span>{fmtDateTime(r.startAt)} → {fmtDateTime(r.endAt)}</span>
-                <Link href={`/requests/${r.id}`} style={{ fontWeight: 600, fontSize: '0.8rem' }} onClick={(e) => e.stopPropagation()}>
-                  View details →
-                </Link>
+                <div className="cluster" style={{ gap: '0.5rem', alignItems: 'center' }}>
+                  {isEligibleToCancel(r) ? (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCancelReason('');
+                        setCancelTarget(r);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  ) : null}
+                  <Link href={`/requests/${r.id}`} style={{ fontWeight: 600, fontSize: '0.8rem' }} onClick={(e) => e.stopPropagation()}>
+                    View details →
+                  </Link>
+                </div>
               </div>
             </div>
           ))}
@@ -253,7 +298,56 @@ export function RequestList() {
           }}
         />
       ) : null}
-      {me ? null : null}
+
+      {cancelTarget ? (
+        <Modal
+          title={`Cancel Request ${cancelTarget.requestCode}`}
+          onClose={() => setCancelTarget(null)}
+        >
+          <div className="stack">
+            <p style={{ margin: 0 }}>
+              Are you sure you want to cancel request <strong>{cancelTarget.requestCode}</strong> ({cancelTarget.purpose})?
+              This action cannot be undone.
+            </p>
+            <Field label="Cancellation reason (optional)">
+              <input
+                className="input"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="e.g. Schedule revised / duty requirement changed"
+              />
+            </Field>
+            <div className="cluster" style={{ justifyContent: 'flex-end', marginTop: '1rem', gap: '0.5rem' }}>
+              <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+                Keep request
+              </Button>
+              <Button
+                variant="danger"
+                loading={cancelling}
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    await api.post(`/api/cloud/requests/${cancelTarget.id}/actions`, {
+                      type: 'cancel',
+                      reason: cancelReason.trim() || undefined
+                    });
+                    toast(`Request ${cancelTarget.requestCode} cancelled`, 'success');
+                    setCancelTarget(null);
+                    refetch();
+                  } catch (err) {
+                    const msg = err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Could not cancel request';
+                    toast(msg, 'danger');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+              >
+                Yes, cancel request
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

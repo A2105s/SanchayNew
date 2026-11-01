@@ -47,18 +47,10 @@ interface RoleConfig {
 
 const ROLES: RoleConfig[] = [
   {
-    id: 'admin',
-    label: 'Admin',
-    icon: ShieldCheck,
-    title: 'Admin sign-in',
-    sub: 'Platform administration and DM governance.',
-    fallbackNext: '/dashboard'
-  },
-  {
     id: 'police',
-    label: 'Police station',
+    label: 'Station Officer',
     icon: Car,
-    title: 'Station sign-in',
+    title: 'Station officer sign-in',
     sub: 'Police stations request and share vehicles between each other.',
     fallbackNext: '/dashboard'
   },
@@ -69,6 +61,14 @@ const ROLES: RoleConfig[] = [
     title: 'Spaces sign-in',
     sub: 'Civic spaces and department facility bookings.',
     fallbackNext: '/spaces'
+  },
+  {
+    id: 'admin',
+    label: 'Admin',
+    icon: ShieldCheck,
+    title: 'Admin sign-in',
+    sub: 'Platform administration and DM governance.',
+    fallbackNext: '/dashboard'
   }
 ];
 
@@ -119,7 +119,7 @@ function LoginForm() {
   }, []);
 
   const activeRoleConfig = useMemo(
-    () => ROLES.find((r) => r.id === role) ?? ROLES[1],
+    () => ROLES.find((r) => r.id === role) ?? ROLES[0],
     [role]
   );
 
@@ -247,7 +247,10 @@ function LoginForm() {
           <p>{activeRoleConfig.title} — {activeRoleConfig.sub}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="login-form">
+        <form onSubmit={handleSubmit} className="login-form" autoComplete="off">
+          {/* Prevent browser credential manager from auto-filling saved 'admin' username into the station search box */}
+          <input type="text" name="fake_user" style={{ display: 'none', position: 'absolute', opacity: 0, height: 0, width: 0 }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
+          <input type="password" name="fake_pass" style={{ display: 'none', position: 'absolute', opacity: 0, height: 0, width: 0 }} tabIndex={-1} aria-hidden="true" autoComplete="off" />
           {error ? (
             <div className="login-error" role="alert">
               <AlertCircle size={16} aria-hidden="true" />

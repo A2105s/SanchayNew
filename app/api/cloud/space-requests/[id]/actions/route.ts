@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** withdraw is the requester's action; the rest are review actions (self-review is blocked in the op). */
 function permissionFor(action: SpaceRequestActionParsed) {
-  return action.type === 'withdraw' ? 'space.book' : 'space.review';
+  return action.type === 'withdraw' || action.type === 'cancel' ? 'space.book' : 'space.review';
 }
 
 export async function POST(request: Request, ctx: { params: Promise<{ id: string }> }) {

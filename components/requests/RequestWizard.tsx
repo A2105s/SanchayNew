@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, LoaderCircle, Save, Send } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -12,10 +12,11 @@ import { Select } from '@/components/ui/Select';
 import { AvailabilityBadge } from '@/components/ui/StatusBadges';
 import { api, ApiError, newIdempotencyKey } from '@/lib/client/api';
 import { useToast } from '@/lib/client/useToast';
-import { CLASS_LABEL } from '@/lib/fleet/format';
+import { useFleet } from '@/lib/client/useFleet';
+import { VEHICLE_CLASSIFICATIONS } from '@/lib/fleet/classification';
 import type { AssetRequestView, AvailabilityView, VehicleClass, RequestInput, VehicleSearchResult } from '@/types';
 
-const CLASSES: VehicleClass[] = ['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY'];
+const CLASSES: VehicleClass[] = VEHICLE_CLASSIFICATIONS.map((c) => c.key);
 
 export interface RequestWizardPrefill {
   vehicleId?: string | null;
@@ -43,6 +44,10 @@ export function RequestWizard({
   onDone: (request: AssetRequestView) => void;
 }) {
   const { toast } = useToast();
+  const { me, snapshot, stationById } = useFleet();
+  const userStation = me?.stationId ? (stationById(me.stationId) ?? snapshot?.stations.find((s) => s.id === me.stationId)) : null;
+  const stationPhone = userStation?.phone ?? null;
+
   const [vehicleId, setVehicleId] = useState<string | null>(prefill?.vehicleId ?? null);
   const [vehicleLabel, setVehicleLabel] = useState<string | null>(prefill?.vehicleLabel ?? null);
   const [requestedClass, setRequestedClass] = useState<VehicleClass>(prefill?.requestedClass ?? 'PATROL_CAR');
@@ -53,8 +58,14 @@ export function RequestWizard({
   const [endAt, setEndAt] = useState(toLocalInput(prefill?.to));
   const [accountableOfficer, setAccountableOfficer] = useState('');
   const [accountablePhone, setAccountablePhone] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  const [contactPhone, setContactPhone] = useState(stationPhone ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (stationPhone) {
+      setContactPhone(stationPhone);
+    }
+  }, [stationPhone]);
   const [serverError, setServerError] = useState<string | null>(null);
   const [saving, setSaving] = useState<null | 'draft' | 'submit'>(null);
   const [availability, setAvailability] = useState<AvailabilityView | null>(null);
@@ -88,7 +99,15 @@ export function RequestWizard({
     if (startAt && new Date(startAt).getTime() < Date.now() - 60_000) e.startAt = 'Start cannot be in the past.';
     const p = Number(passengers);
     if (!Number.isFinite(p) || p < 0) e.passengers = 'Enter a valid passenger count.';
-    if (!accountableOfficer.trim()) e.accountableOfficer = 'Accountable officer is required.';
+    if (!accountableOfficer.trim()) e.accountableOfficer = 'Accountable officer name is required.';
+    if (!accountablePhone.trim()) {
+      e.accountablePhone = "Accountable officer's phone number is mandatory.";
+    } else {
+      const digits = accountablePhone.replace(/\D/g, '');
+      if (digits.length < 10) {
+        e.accountablePhone = 'Enter a valid 10-digit phone number.';
+      }
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -193,7 +212,10 @@ export function RequestWizard({
             <Select
               value={requestedClass}
               onChange={(v) => setRequestedClass(v as VehicleClass)}
-              options={CLASSES.map((c) => ({ value: c, label: CLASS_LABEL[c] }))}
+              options={VEHICLE_CLASSIFICATIONS.map((c) => ({
+                value: c.key,
+                label: `${c.label} (${c.categoryLabel})`
+              }))}
               ariaLabel="Requested class"
             />
           </Field>
@@ -201,7 +223,7 @@ export function RequestWizard({
 
         <DraftRequestPanel onApply={applyDraft} onPickVehicle={pickDraftVehicle} />
 
-          <Field label="Purpose" required error={errors.purpose}>
+        <Field label="Purpose" required error={errors.purpose}>
           <input className="input" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. VIP escort duty" />
           <PolishButton kind="request-purpose" value={purpose} onApply={setPurpose} />
         </Field>
@@ -239,12 +261,22 @@ export function RequestWizard({
           <Field label="Accountable officer" required error={errors.accountableOfficer}>
             <input className="input" value={accountableOfficer} onChange={(e) => setAccountableOfficer(e.target.value)} />
           </Field>
-          <Field label="Accountable officer phone">
-            <input className="input" value={accountablePhone} onChange={(e) => setAccountablePhone(e.target.value)} inputMode="tel" />
+          <Field label="Accountable officer phone" required error={errors.accountablePhone}>
+            <input className="input" value={accountablePhone} onChange={(e) => setAccountablePhone(e.target.value)} inputMode="tel" placeholder="10-digit mobile number" />
           </Field>
         </div>
-        <Field label="Contact phone">
-          <input className="input" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} inputMode="tel" />
+        <Field
+          label="Contact phone"
+          hint={stationPhone ? `Auto-populated from ${userStation?.name ?? 'police station'} registered records` : undefined}
+        >
+          <input
+            className="input"
+            value={contactPhone}
+            onChange={(e) => setContactPhone(e.target.value)}
+            disabled={Boolean(stationPhone)}
+            inputMode="tel"
+            placeholder={stationPhone ? undefined : 'Station or landline contact number'}
+          />
         </Field>
       </div>
     </Modal>

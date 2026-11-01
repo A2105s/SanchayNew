@@ -16,13 +16,30 @@ import type {
   VehicleView
 } from '@/types';
 
-export const VEHICLE_CLASSES: VehicleClass[] = ['PATROL_CAR', 'MOTORCYCLE', 'VAN', 'HEAVY'];
+export const VEHICLE_CLASSES: VehicleClass[] = [
+  'PATROL_CAR',
+  'MOTORCYCLE',
+  'VAN',
+  'CAR',
+  'CHHOTA_HATHI',
+  'TRUCK',
+  'BUS',
+  'JCB',
+  'HEAVY',
+  'SPECIALIZED',
+];
 
 export const CLASS_LABEL_LOCAL: Record<VehicleClass, string> = {
-  PATROL_CAR: 'Patrol car',
+  CAR: 'Car / Staff vehicle',
+  PATROL_CAR: 'Patrol Car',
   MOTORCYCLE: 'Motorcycle',
-  VAN: 'Van',
-  HEAVY: 'Heavy'
+  VAN: 'Van / Ambulance',
+  CHHOTA_HATHI: 'Chhota Hathi',
+  TRUCK: 'Truck / Dump Truck',
+  BUS: 'Bus / Personnel Carrier',
+  JCB: 'JCB / Earth Mover',
+  HEAVY: 'Heavy Machinery',
+  SPECIALIZED: 'Specialized',
 };
 
 /** Friendly greeting based on local time of day. */

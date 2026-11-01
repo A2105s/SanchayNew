@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import { ToastProvider } from '@/components/ui/Toast';
 import { FleetProvider } from '@/components/providers/FleetProvider';
+import { I18nProvider } from '@/lib/i18n/context';
 
 /**
  * App-wide client providers. ToastProvider must wrap FleetProvider so that
@@ -10,8 +11,10 @@ import { FleetProvider } from '@/components/providers/FleetProvider';
  */
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <ToastProvider>
-      <FleetProvider>{children}</FleetProvider>
-    </ToastProvider>
+    <I18nProvider>
+      <ToastProvider>
+        <FleetProvider>{children}</FleetProvider>
+      </ToastProvider>
+    </I18nProvider>
   );
 }

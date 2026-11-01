@@ -16,7 +16,7 @@ import { useFleet } from '@/lib/client/useFleet';
 import { useApiResource } from '@/hooks/useApiResource';
 import { useToast } from '@/lib/client/useToast';
 import { api, ApiError } from '@/lib/client/api';
-import { ALLOCATION_LABEL, allocationTone, fmtDateTime } from '@/lib/fleet/format';
+import { ALLOCATION_LABEL, allocationTone, fmtDateTime, formatReturnDue } from '@/lib/fleet/format';
 import type { AllocationAction, AllocationView, AllocationLifecycle } from '@/types';
 
 type FormKind =
@@ -216,12 +216,9 @@ export function AllocationDetail({ id }: { id: string }) {
 
       <Panel title="Lifecycle">
         <Stepper steps={buildSteps(alloc)} label="Allocation lifecycle" />
-        {alloc.returnDue ? (
-          <p className="text-muted" style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}>
-            Return is due{alloc.overdueHours > 0 ? ` — ${alloc.overdueHours}h overdue` : ''}. “Return due” is derived from
-            the end time and grace period; it does not change the stored lifecycle.
-          </p>
-        ) : null}
+        <p className="text-muted" style={{ marginTop: '0.75rem', fontSize: '0.88rem', fontWeight: 500 }}>
+          <strong>Return Status:</strong> {formatReturnDue(alloc.endAt, lc as AllocationLifecycle)}
+        </p>
       </Panel>
 
       <div className="veh-detail-grid">
@@ -231,6 +228,8 @@ export function AllocationDetail({ id }: { id: string }) {
             <span>{fmtDateTime(alloc.startAt)}</span>
             <span>End</span>
             <span>{fmtDateTime(alloc.endAt)}</span>
+            <span>Return due</span>
+            <span style={{ fontWeight: 600 }}>{formatReturnDue(alloc.endAt, lc as AllocationLifecycle)}</span>
             <span>Request</span>
             <span><Link href={`/requests/${alloc.requestId}`}>View request</Link></span>
             {alloc.handover ? (

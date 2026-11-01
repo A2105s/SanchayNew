@@ -95,7 +95,7 @@ export async function prepareHandover(user: SessionUser, id: string, correlation
   await prisma.$transaction(async (tx) => {
     await tx.allocation.update({ where: { id }, data: { lifecycle: 'AWAITING_HANDOVER' } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'HandoverPrepared', fieldName: 'lifecycle', oldValue: allocation.lifecycle, newValue: 'AWAITING_HANDOVER', performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -114,7 +114,7 @@ export async function recordHandover(user: SessionUser, id: string, args: { rece
     await tx.allocation.update({ where: { id }, data: { lifecycle: 'ACTIVE' } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'HandoverRecorded', fieldName: 'lifecycle', oldValue: from, newValue: 'ACTIVE', performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId });
     await notify({ eventKey: `allocation:${id}:ACTIVE`, kind: 'ALLOCATION_ACTIVE', title: 'Vehicle handed over', body: `Allocation ${allocation.allocationCode} is now active.`, href: `/allocations`, recipientOrgId: requestingOrgId }, tx);
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -151,7 +151,7 @@ export async function recordReturn(user: SessionUser, id: string, args: { receiv
     assertTransition('ACTIVE', nextLifecycle);
     await tx.allocation.update({ where: { id }, data: { lifecycle: nextLifecycle } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'ReturnRecorded', fieldName: 'lifecycle', oldValue: 'ACTIVE', newValue: nextLifecycle, performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -176,7 +176,7 @@ export async function inspect(user: SessionUser, id: string, decision: 'ACCEPTED
       await tx.allocation.update({ where: { id }, data: { lifecycle: 'INCIDENT_HOLD', holdReason: 'Return inspection disputed' } });
     }
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'ReturnInspected', fieldName: 'inspectionStatus', newValue: decision, performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId, reason: notes });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -198,7 +198,7 @@ export async function requestExtension(user: SessionUser, id: string, newEndAt: 
     const ext = await tx.extensionRequest.create({ data: { allocationId: id, requestedBy: user.username, newEndAt: newEnd, reason, status: 'PENDING' } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'ExtensionRequested', newValue: newEnd.toISOString(), performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId, reason });
     await notify({ eventKey: `extension:${ext.id}:REQUESTED`, kind: 'EXTENSION_REQUESTED', title: 'Extension requested', body: `Extension requested for allocation ${allocation.allocationCode}.`, href: `/allocations`, recipientOrgId: vehicleOrgId, recipientRole: 'DEPT_OFFICER' }, tx);
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   void requestingOrgId;
   return buildView(id, true);
@@ -232,7 +232,7 @@ export async function decideExtension(user: SessionUser, id: string, extensionId
     }
     await tx.extensionRequest.update({ where: { id: extensionId }, data: { status: decision, decidedBy: user.username, decidedAt: new Date(), decisionNote: note ?? null } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'ExtensionDecided', fieldName: 'extension', newValue: decision, performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId, reason: note });
-  }).catch((error) => {
+  }, { timeout: 30000, maxWait: 15000 }).catch((error) => {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.message.includes('allocation_no_overlap')) {
       throw new DomainError('Extension overlaps another allocation (database guard).', 409, 'EXTENSION_CONFLICT');
     }
@@ -253,7 +253,7 @@ export async function hold(user: SessionUser, id: string, reason: string, correl
   await prisma.$transaction(async (tx) => {
     await tx.allocation.update({ where: { id }, data: { lifecycle: 'INCIDENT_HOLD', holdReason: reason } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'AllocationHeld', fieldName: 'lifecycle', oldValue: allocation.lifecycle, newValue: 'INCIDENT_HOLD', performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId, reason });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -268,7 +268,7 @@ export async function releaseHold(user: SessionUser, id: string, correlationId: 
   await prisma.$transaction(async (tx) => {
     await tx.allocation.update({ where: { id }, data: { lifecycle: next, holdReason: null } });
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'AllocationHoldReleased', fieldName: 'lifecycle', oldValue: 'INCIDENT_HOLD', newValue: next, performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }
@@ -284,7 +284,7 @@ export async function cancelAllocation(user: SessionUser, id: string, reason: st
     await tx.allocation.update({ where: { id }, data: { lifecycle: 'CANCELLED', cancelReason: reason } });
     // Also move the request back out of APPROVED (its vehicle is freed).
     await writeAudit(tx, { entityType: 'Allocation', entityId: id, action: 'AllocationCancelled', fieldName: 'lifecycle', oldValue: allocation.lifecycle, newValue: 'CANCELLED', performedBy: user.username, performedByRole: user.role, organizationId: vehicleOrgId, correlationId, reason });
-  });
+  }, { timeout: 30000, maxWait: 15000 });
   invalidate();
   return buildView(id, true);
 }

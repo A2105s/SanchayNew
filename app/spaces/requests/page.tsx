@@ -28,6 +28,8 @@ export default function SpaceRequestsPage() {
   const { data, loading, error, refetch } = useApiResource<{ requests: SpaceRequestView[]; total: number }>(`/api/cloud/space-requests?scope=${scope}`);
   const requests = data?.requests ?? [];
   const [dialog, setDialog] = useState<{ request: SpaceRequestView; action: 'approve' | 'reject' | 'info' } | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState<SpaceRequestView | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   return (
     <div className="page stack">
@@ -76,7 +78,7 @@ export default function SpaceRequestsPage() {
                       {r.reviewNote ? <div className="text-muted" style={{ fontSize: '0.78rem' }}>{r.reviewNote}</div> : null}
                     </td>
                     <td>
-                      <RequestActions request={r} reviewMode={reviewMode} onAction={(action) => setDialog({ request: r, action })} onWithdraw={() => void makeWithdraw(refetch, toast)(r)} />
+                      <RequestActions request={r} reviewMode={reviewMode} onAction={(action) => setDialog({ request: r, action })} onCancel={() => setConfirmCancel(r)} />
                     </td>
                   </tr>
                 ))}
@@ -94,25 +96,48 @@ export default function SpaceRequestsPage() {
           onDone={() => { setDialog(null); refetch(); }}
         />
       ) : null}
+
+      {confirmCancel ? (
+        <Modal title="Cancel space request" onClose={() => setConfirmCancel(null)}>
+          <div className="stack">
+            <p style={{ margin: 0 }}>
+              Are you sure you want to cancel the request for <strong>{confirmCancel.spaceName || (typeof confirmCancel.payload?.name === 'string' ? confirmCancel.payload.name : 'this space')}</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="cluster" style={{ justifyContent: 'flex-end', marginTop: '1rem' }}>
+              <Button variant="secondary" onClick={() => setConfirmCancel(null)} disabled={cancelling}>
+                Keep request
+              </Button>
+              <Button
+                variant="danger"
+                loading={cancelling}
+                onClick={async () => {
+                  setCancelling(true);
+                  try {
+                    await api.post(`/api/cloud/space-requests/${confirmCancel.id}/actions`, { type: 'cancel' });
+                    toast('Request cancelled successfully', 'success');
+                    setConfirmCancel(null);
+                    refetch();
+                  } catch (e) {
+                    toast(e instanceof ApiError ? e.message : 'Could not cancel request', 'danger');
+                  } finally {
+                    setCancelling(false);
+                  }
+                }}
+              >
+                Yes, cancel request
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }
 
-function makeWithdraw(refetch: () => void, toast: (m: string, t?: 'success' | 'danger' | 'warning') => void) {
-  return async function withdraw(request: SpaceRequestView) {
-    try {
-      await api.post(`/api/cloud/space-requests/${request.id}/actions`, { type: 'withdraw' });
-      toast('Request withdrawn', 'success');
-      refetch();
-    } catch (e) {
-      toast(e instanceof ApiError ? e.message : 'Failed', 'danger');
-    }
-  };
-}
-
-function RequestActions({ request, reviewMode, onAction, onWithdraw }: { request: SpaceRequestView; reviewMode: boolean; onAction: (a: 'approve' | 'reject' | 'info') => void; onWithdraw: () => void }) {
+function RequestActions({ request, reviewMode, onAction, onCancel }: { request: SpaceRequestView; reviewMode: boolean; onAction: (a: 'approve' | 'reject' | 'info') => void; onCancel: () => void }) {
   const reviewable = reviewMode && (request.status === 'SUBMITTED' || request.status === 'UNDER_REVIEW' || request.status === 'NEEDS_INFO');
-  const withdrawable = !reviewMode && (request.status === 'SUBMITTED' || request.status === 'UNDER_REVIEW' || request.status === 'NEEDS_INFO');
+  const cancellable = !reviewMode && (request.status === 'SUBMITTED' || request.status === 'UNDER_REVIEW' || request.status === 'NEEDS_INFO');
   return (
     <div className="cluster" style={{ flexWrap: 'wrap' }}>
       {reviewable ? (
@@ -122,7 +147,7 @@ function RequestActions({ request, reviewMode, onAction, onWithdraw }: { request
           <Button variant="ghost" size="sm" onClick={() => onAction('info')}>Request info</Button>
         </>
       ) : null}
-      {withdrawable ? <Button variant="ghost" size="sm" onClick={onWithdraw}>Withdraw</Button> : null}
+      {cancellable ? <Button variant="danger" size="sm" onClick={onCancel}>Cancel request</Button> : null}
     </div>
   );
 }

@@ -149,7 +149,7 @@ export async function writeAudit(
   if (isTransactionClient(client)) {
     return run(client);
   }
-  return (client as typeof prisma).$transaction((tx) => run(tx));
+  return (client as typeof prisma).$transaction((tx) => run(tx), { timeout: 30000, maxWait: 15000 });
 }
 
 function mapRow(row: {

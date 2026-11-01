@@ -115,16 +115,28 @@ function fakePhone(rng: Rng): string {
 
 const PATROL_CLASSES: VehicleClass[] = ['PATROL_CAR', 'MOTORCYCLE', 'VAN'];
 const VEHICLE_TYPE_BY_CLASS: Record<VehicleClass, string[]> = {
+  CAR: ['Staff Car', 'Official Sedan', 'Inspection Car'],
   PATROL_CAR: ['Interceptor Sedan', 'Patrol SUV', 'Pilot Car'],
   MOTORCYCLE: ['Patrol Motorcycle', 'Highway Rider'],
   VAN: ['Police Van', 'Prisoner Transport', 'Command Van'],
-  HEAVY: ['Water Cannon', 'Riot Control Truck', 'Recovery Truck']
+  CHHOTA_HATHI: ['Mini Goods Carrier', 'Utility Pickup'],
+  TRUCK: ['Transport Truck', 'Dump Truck', 'Logistics Carrier'],
+  BUS: ['Personnel Carrier Bus', 'Force Traveller Bus'],
+  JCB: ['Earth Mover JCB 3DX', 'Backhoe Loader'],
+  HEAVY: ['Water Cannon', 'Riot Control Truck', 'Recovery Truck'],
+  SPECIALIZED: ['Mobile Command Post', 'Bomb Squad Van', 'Hazmat Unit']
 };
 const MAKE_MODEL_BY_CLASS: Record<VehicleClass, string[]> = {
+  CAR: ['Maruti Dzire', 'Honda City', 'Hyundai Verna'],
   PATROL_CAR: ['Mahindra Scorpio', 'Toyota Innova', 'Maruti Ciaz', 'Tata Safari'],
   MOTORCYCLE: ['Royal Enfield Bullet 350', 'Bajaj Pulsar 150', 'Hero Splendor'],
   VAN: ['Force Traveller', 'Mahindra Bolero Camper', 'Tata Winger'],
-  HEAVY: ['Ashok Leyland 2518', 'Tata LPT 1613', 'BharatBenz 1617']
+  CHHOTA_HATHI: ['Tata Ace Gold', 'Mahindra Jeeto', 'Maruti Super Carry'],
+  TRUCK: ['Tata LPT 1613', 'Ashok Leyland 1618', 'Eicher Pro 2049'],
+  BUS: ['Tata Starbus', 'Ashok Leyland Viking', 'Eicher Skyline'],
+  JCB: ['JCB 3DX Super', 'CAT 424B', 'Escorts Digmax'],
+  HEAVY: ['Ashok Leyland 2518', 'Tata LPT 1613', 'BharatBenz 1617'],
+  SPECIALIZED: ['Tata Xenon Recon', 'Mahindra Marksman', 'Force Gurkha Emergency']
 };
 
 function daysFromNow(days: number): Date {
@@ -239,7 +251,7 @@ export async function seedDemoData(prisma: PrismaClient): Promise<SeedResult> {
   let assetSeq = 0;
   const usedRegs = new Set<string>();
   const makeReg = (sector?: Sector, ownership?: string): string => {
-    for (;;) {
+    for (; ;) {
       let prefix = 'MP07-GA';
       if (ownership === 'SEIZED_IMPOUNDED') {
         prefix = rng.pick(FLEET_BLUEPRINTS.seriesConventions.IMPOUNDED);

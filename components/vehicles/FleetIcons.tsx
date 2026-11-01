@@ -169,6 +169,70 @@ export function MotorcycleIcon() {
   );
 }
 
+/** Top-down JCB Excavator / Earthmoving Machinery */
+export function JcbIcon() {
+  return (
+    <svg viewBox="0 0 40 40" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Front Loader Bucket */}
+      <path d="M12 4H28L26 8H14L12 4Z" fill="#eab308" stroke="#ca8a04" strokeWidth="1.2" />
+      {/* Main JCB Cabin Body */}
+      <rect x="13" y="10" width="14" height="18" rx="2.5" fill="#facc15" stroke="#ca8a04" strokeWidth="1.5" />
+      {/* Black Glass Cabin */}
+      <path d="M15 13H25L24 19H16L15 13Z" fill="#0f172a" />
+      {/* Rear Excavator Boom Arm */}
+      <rect x="18" y="28" width="4" height="8" rx="1.5" fill="#ca8a04" />
+      {/* Rear Digging Scoop */}
+      <path d="M17 36H23L22 39H18L17 36Z" fill="#475569" stroke="#1e293b" strokeWidth="1" />
+      {/* Heavy Heavy Tracks/Tires */}
+      <rect x="10" y="12" width="2.5" height="14" rx="1" fill="#1e293b" />
+      <rect x="27.5" y="12" width="2.5" height="14" rx="1" fill="#1e293b" />
+    </svg>
+  );
+}
+
+/** Top-down Chhota Hathi / Tata Ace Mini Commercial Goods Vehicle */
+export function ChhotaHathiIcon() {
+  return (
+    <svg viewBox="0 0 40 40" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Front Compact Driver Cab */}
+      <rect x="14" y="6" width="12" height="9" rx="2.5" fill="#ffffff" stroke="#0284c7" strokeWidth="1.5" />
+      {/* Windshield */}
+      <path d="M15.5 8H24.5L24 11H16L15.5 8Z" fill="#0284c7" fillOpacity="0.85" />
+      {/* Cargo Cargo Bed */}
+      <rect x="13" y="16" width="14" height="17" rx="1.5" fill="#e0f2fe" stroke="#0284c7" strokeWidth="1.5" />
+      {/* Internal cargo divider slats */}
+      <line x1="15" y1="21" x2="25" y2="21" stroke="#38bdf8" strokeWidth="1.2" />
+      <line x1="15" y1="26" x2="25" y2="26" stroke="#38bdf8" strokeWidth="1.2" />
+      {/* Wheels */}
+      <rect x="11.5" y="9" width="2" height="4" rx="1" fill="#1e293b" />
+      <rect x="26.5" y="9" width="2" height="4" rx="1" fill="#1e293b" />
+      <rect x="11.5" y="25" width="2" height="5" rx="1" fill="#1e293b" />
+      <rect x="26.5" y="25" width="2" height="5" rx="1" fill="#1e293b" />
+    </svg>
+  );
+}
+
+/** Top-down Passenger Bus / Personnel Coach */
+export function BusIcon() {
+  return (
+    <svg viewBox="0 0 40 40" width="30" height="30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Long Bus Body */}
+      <rect x="13" y="4" width="14" height="32" rx="3.5" fill="#0284c7" stroke="#0369a1" strokeWidth="1.5" />
+      {/* Front Windshield */}
+      <path d="M15 6C15 5.5 16 5 20 5C24 5 25 5.5 25 6L24.5 9H15.5L15 6Z" fill="#f8fafc" />
+      {/* Side Window Strip */}
+      <rect x="14" y="11" width="1.5" height="19" rx="0.5" fill="#f8fafc" />
+      <rect x="24.5" y="11" width="1.5" height="19" rx="0.5" fill="#f8fafc" />
+      {/* Roof emergency vents */}
+      <rect x="18" y="13" width="4" height="4" rx="1" fill="#38bdf8" />
+      <rect x="18" y="23" width="4" height="4" rx="1" fill="#38bdf8" />
+      {/* Mirrors */}
+      <rect x="11.5" y="7" width="1.5" height="3" rx="0.75" fill="#475569" />
+      <rect x="27" y="7" width="1.5" height="3" rx="0.75" fill="#475569" />
+    </svg>
+  );
+}
+
 /** Select proper icon by vehicle sector / class */
 export function getFleetIcon(sector?: string, vehicleClass?: string) {
   if (sector === 'AMBULANCE_108') return <AmbulanceIcon />;
@@ -178,8 +242,12 @@ export function getFleetIcon(sector?: string, vehicleClass?: string) {
   if (sector === 'HEALTH_VAN') return <HealthVanIcon />;
 
   if (vehicleClass === 'MOTORCYCLE') return <MotorcycleIcon />;
-  if (vehicleClass === 'HEAVY') return <HeavyTruckIcon />;
+  if (vehicleClass === 'JCB') return <JcbIcon />;
+  if (vehicleClass === 'CHHOTA_HATHI') return <ChhotaHathiIcon />;
+  if (vehicleClass === 'BUS') return <BusIcon />;
+  if (vehicleClass === 'HEAVY' || vehicleClass === 'TRUCK' || vehicleClass === 'SPECIALIZED') return <HeavyTruckIcon />;
   if (vehicleClass === 'VAN') return <HealthVanIcon />;
+  if (vehicleClass === 'PATROL_CAR') return <PoliceIcon />;
   return <SedanIcon />;
 }
 

@@ -5,6 +5,7 @@ import { createRequest, buildRequestView } from '@/lib/cloud/ops/requests';
 import { requestInputSchema } from '@/lib/validation/schemas';
 import { orgTree } from '@/lib/auth/scope';
 import { handleRouteError, ok, readJson } from '@/lib/cloud/http';
+import { DomainError } from '@/lib/cloud/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await readJson(request);
     const input = requestInputSchema.parse(body);
+    if (!input.accountablePhone || input.accountablePhone.trim().length < 10) {
+      throw new DomainError('Accountable officer phone number is required and must have at least 10 digits.', 400);
+    }
     const idempotencyKey = request.headers.get('Idempotency-Key');
     const view = await createRequest(auth.user, input, idempotencyKey, auth.correlationId);
     return ok(view);

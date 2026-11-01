@@ -42,6 +42,9 @@ function permissionFor(action: VehicleActionParsed): Permission {
     case 'releaseCustody':
     case 'markAuctionReady':
       return 'restriction.manage';
+    case 'approveSeizedForUtilization':
+    case 'rejectSeizedForUtilization':
+      return 'eligibility.verify';
     default:
       return 'vehicle.edit';
   }

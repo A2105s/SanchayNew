@@ -29,8 +29,10 @@ import { FreshnessBadge } from '@/components/ui/FreshnessBadge';
 import {
   createFleetMarkerElement,
   updateFleetMarkerElement,
+  getFleetIcon,
   STATUS_GLOW,
 } from '@/components/vehicles/FleetIcons';
+import { VEHICLE_CLASSIFICATIONS } from '@/lib/fleet/classification';
 import { getVehicleSimState } from '@/lib/client/telemetry-sim';
 import type { Sector, VehicleStatus, VehicleView } from '@/types';
 
@@ -75,6 +77,7 @@ export function LiveMap() {
   const [statusFilter, setStatusFilter] = useState('');
   const [sectorFilter, setSectorFilter] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [showVehicles, setShowVehicles] = useState(true);
   const [showStations, setShowStations] = useState(true);
   const [showTrail, setShowTrail] = useState(true);
@@ -101,12 +104,48 @@ export function LiveMap() {
   const selected = selectedId ? liveVehicles.find((v) => v.id === selectedId) ?? null : null;
   const simState = selectedId ? getVehicleSimState(selectedId) : undefined;
 
+  const selectedStation = selectedStationId ? stations.find((s) => s.id === selectedStationId) ?? null : null;
+  const stationVehicles = useMemo(() => {
+    if (!selectedStationId) return [];
+    return (fleet.snapshot?.vehicles ?? []).filter((v) => v.stationId === selectedStationId);
+  }, [selectedStationId, fleet.snapshot?.vehicles]);
+
+  const stationTotalVehicles = useMemo(() => {
+    if (!selectedStation) return 0;
+    const invTotal = Object.values(selectedStation.inventory ?? {}).reduce((a, b) => a + (b || 0), 0);
+    return Math.max(stationVehicles.length, invTotal);
+  }, [selectedStation, stationVehicles]);
+
+  const stationAvailableCount = useMemo(() => {
+    if (!selectedStation) return 0;
+    const fromVehicles = stationVehicles.filter(
+      (v) => v.operationalStatus === 'ACTIVE' && v.eligibilityState === 'ELIGIBLE' && v.ownershipCategory === 'GOVERNMENT_FLEET'
+    ).length;
+    const invTotal = Object.values(selectedStation.inventory ?? {}).reduce((a, b) => a + (b || 0), 0);
+    return Math.max(fromVehicles, invTotal);
+  }, [selectedStation, stationVehicles]);
+
+  const stationAllocatedCount = useMemo(() => {
+    return stationVehicles.filter((v) => v.status === 'MOVING').length;
+  }, [stationVehicles]);
+
+  const stationMaintenanceCount = useMemo(() => {
+    return stationVehicles.filter(
+      (v) => v.operationalStatus === 'MAINTENANCE' || v.operationalStatus === 'OUT_OF_SERVICE'
+    ).length;
+  }, [stationVehicles]);
+
+  const stationSeizedCount = useMemo(() => {
+    return stationVehicles.filter((v) => v.ownershipCategory === 'SEIZED_IMPOUNDED').length;
+  }, [stationVehicles]);
+
   const simCount = useMemo(() => Object.values(fleet.live).filter((d) => d.simulated).length, [fleet.live]);
   const realCount = useMemo(() => Object.values(fleet.live).filter((d) => !d.simulated).length, [fleet.live]);
 
   // Center & smooth fly to vehicle (always uses latest live coordinates)
   const flyTo = useCallback((v: VehicleView) => {
     setSelectedId(v.id);
+    setSelectedStationId(null);
     const map = mapRef.current;
     if (!map) return;
     const latest = fleet.liveVehicles.find((item) => item.id === v.id) ?? v;
@@ -225,7 +264,7 @@ export function LiveMap() {
             const styleLayers = map.getStyle().layers || [];
             let beforeId: string | undefined = undefined;
             for (const l of styleLayers) {
-              if (l.type === 'symbol') {
+              if (l.type === 'line' || l.type === 'symbol') {
                 beforeId = l.id;
                 break;
               }
@@ -453,6 +492,13 @@ export function LiveMap() {
         '</div>'
       ].join('\n');
 
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        setSelectedStationId(s.id);
+        setSelectedId(null);
+        map.flyTo({ center: [s.lng, s.lat], zoom: 14, duration: 600 });
+      });
+
       const popup = new ml.Popup({ offset: 16, closeButton: true, className: 'ps-station-popup' }).setHTML(popupHtml);
       const marker = new ml.Marker({ element: el }).setLngLat([s.lng, s.lat]).setPopup(popup).addTo(map);
       stationMarkersRef.current.push(marker);
@@ -544,12 +590,23 @@ export function LiveMap() {
     });
   }, []);
 
-  // Sync satellite layer visibility with state
+  // Sync satellite layer visibility with state and toggle base fill layers
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !readyRef.current) return;
     if (map.getLayer('satellite-layer')) {
       map.setLayoutProperty('satellite-layer', 'visibility', isSatellite ? 'visible' : 'none');
+      const styleLayers = map.getStyle()?.layers || [];
+      for (const l of styleLayers) {
+        if (l.id === 'satellite-layer' || l.id === 'trail-glow' || l.id === 'trail-core' || l.id === 'route-glow' || l.id === 'route-core') continue;
+        if (l.type === 'background' || l.type === 'fill' || l.type === 'fill-extrusion') {
+          try {
+            map.setLayoutProperty(l.id, 'visibility', isSatellite ? 'none' : 'visible');
+          } catch {
+            // ignore layout mutation exceptions
+          }
+        }
+      }
     }
   }, [isSatellite, mapReady]);
 
@@ -710,6 +767,135 @@ export function LiveMap() {
           <div className="cluster" style={{ gap: '0.4rem' }}>
             <ButtonLink href={`/vehicles/${selected.id}`} variant="primary" size="sm">Open passport</ButtonLink>
             <ButtonLink href={`/vehicles/${selected.id}`} variant="secondary" size="sm">Report incident</ButtonLink>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Police Station details & vehicle inventory side panel (spec Point 9) */}
+      {selectedStation && !selected ? (
+        <div className="veh-map-detail" style={{ maxHeight: 'calc(100vh - 120px)', overflowY: 'auto', width: '340px' }}>
+          <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <div style={{ fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-brand)' }}>
+                Police Station Details
+              </div>
+              <span className="mono" style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--color-text-primary)' }}>
+                {selectedStation.name}
+              </span>
+            </div>
+            <button className="veh-map-ctrl-btn" style={{ width: 28, height: 28 }} onClick={() => setSelectedStationId(null)} aria-label="Close station details">
+              <X size={15} />
+            </button>
+          </div>
+
+          <div className="cluster" style={{ gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+            <span className="badge badge--brand">{selectedStation.code}</span>
+            <span className="badge badge--neutral">{selectedStation.zone} Zone</span>
+            <span className="badge badge--neutral">{selectedStation.district}</span>
+          </div>
+
+          <div className="kv" style={{ fontSize: '0.82rem', marginTop: '0.5rem' }}>
+            <span>In-charge</span>
+            <span style={{ fontWeight: 600 }}>{selectedStation.inchargeName ?? 'Officer in Charge'}</span>
+            <span>CUG Contact</span>
+            <span>
+              {selectedStation.phone ? (
+                <a href={`tel:${selectedStation.phone}`} style={{ color: 'var(--color-brand)', fontWeight: 600 }}>
+                  {selectedStation.phone}
+                </a>
+              ) : (
+                '—'
+              )}
+            </span>
+            <span>Location</span>
+            <span className="mono" style={{ fontSize: '0.78rem' }}>
+              {selectedStation.lat.toFixed(4)}°N, {selectedStation.lng.toFixed(4)}°E
+            </span>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--color-border)', margin: '0.75rem 0' }} />
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <strong style={{ fontSize: '0.85rem' }}>Vehicle Inventory Breakdown</strong>
+              <span className="badge badge--brand" style={{ fontSize: '0.75rem' }}>
+                {stationTotalVehicles} Total
+              </span>
+            </div>
+
+            {/* Quick status breakdown */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', marginBottom: '0.75rem' }}>
+              <div style={{ padding: '6px 8px', borderRadius: '6px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Available</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#16a34a' }}>{stationAvailableCount}</div>
+              </div>
+              <div style={{ padding: '6px 8px', borderRadius: '6px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Allocated / In Use</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#0284c7' }}>{stationAllocatedCount}</div>
+              </div>
+              <div style={{ padding: '6px 8px', borderRadius: '6px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Maintenance</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#d97706' }}>{stationMaintenanceCount}</div>
+              </div>
+              <div style={{ padding: '6px 8px', borderRadius: '6px', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>Seized / Custody</div>
+                <div style={{ fontSize: '1rem', fontWeight: 800, color: '#dc2626' }}>{stationSeizedCount}</div>
+              </div>
+            </div>
+
+            {/* Breakdown by vehicle class */}
+            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Fleet by Class & Machinery
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {VEHICLE_CLASSIFICATIONS.map((c) => {
+                const classVehicles = stationVehicles.filter((v) => v.vehicleClass === c.key);
+                const invVal = selectedStation.inventory?.[c.key] ?? 0;
+                const count = Math.max(classVehicles.length, invVal);
+                if (count === 0 && !['CAR', 'PATROL_CAR', 'MOTORCYCLE', 'VAN'].includes(c.key)) return null;
+                const availCount = classVehicles.filter((v) => v.operationalStatus === 'ACTIVE' && v.eligibilityState === 'ELIGIBLE' && v.ownershipCategory === 'GOVERNMENT_FLEET').length || invVal;
+                return (
+                  <div
+                    key={c.key}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '5px 8px',
+                      borderRadius: '6px',
+                      background: 'var(--color-bg-secondary)',
+                      border: '1px solid var(--color-border)',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', width: 22, height: 22 }}>
+                        {getFleetIcon(undefined, c.key)}
+                      </span>
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{c.label.split('/')[0].trim()}</div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-text-muted)' }}>{c.categoryLabel}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <span className="mono" style={{ fontWeight: 800, fontSize: '0.9rem' }}>{count}</span>
+                      <span style={{ fontSize: '0.68rem', color: '#16a34a', display: 'block' }}>
+                        {availCount} avail
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="cluster" style={{ gap: '0.4rem', marginTop: '0.75rem' }}>
+            <ButtonLink href={`/vehicles?stationId=${selectedStation.id}`} variant="primary" size="sm">
+              View station fleet →
+            </ButtonLink>
+            <ButtonLink href={`/transfers?source=${selectedStation.id}`} variant="secondary" size="sm">
+              Transfer vehicles
+            </ButtonLink>
           </div>
         </div>
       ) : null}

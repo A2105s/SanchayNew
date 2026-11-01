@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
 import { unstable_cache } from 'next/cache';
 import { CLOUD_CACHE_TAGS } from '@/lib/cloud/cached-queries';
 import { prisma } from '@/lib/db/prisma';
@@ -170,10 +171,55 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
   // police station logins so every station officer can demonstrate real-time telemetry!
   let realIotVehicleId: string | null = null;
   try {
-    const realDev = await prisma.iotDevice.findFirst({
-      where: { simulated: false, vehicleId: { not: null } },
+    let realDev = await prisma.iotDevice.findFirst({
+      where: {
+        OR: [{ deviceCode: 'SANCHAY-IOT-001' }, { simulated: false, vehicleId: { not: null } }]
+      },
       select: { vehicleId: true }
     });
+
+    if (!realDev) {
+      const flagship = await prisma.vehicle.findFirst({
+        where: {
+          OR: [
+            { registrationNumber: 'MP07-DG-6386' },
+            { registrationNormalized: 'MP07DG6386' },
+            { sector: 'POLICE_PATROL' }
+          ]
+        }
+      });
+      if (flagship) {
+        const iotKeyHash = createHash('sha256').update('sk_sanchay_iot_edge_2026').digest('hex');
+        await prisma.iotDevice.upsert({
+          where: { deviceCode: 'SANCHAY-IOT-001' },
+          update: {
+            vehicleId: flagship.id,
+            organizationId: flagship.organizationId,
+            ingestKeyHash: iotKeyHash,
+            ingestKeyPrefix: 'sk_sanchay',
+            status: 'ONLINE',
+            protocol: 'HTTP',
+            simulated: false,
+            firmware: 'v1.0-espnow-wifi'
+          },
+          create: {
+            id: 'cmvxs10q20001fpnf08beroes',
+            deviceCode: 'SANCHAY-IOT-001',
+            kind: 'GPS_TRACKER',
+            protocol: 'HTTP',
+            status: 'ONLINE',
+            simulated: false,
+            vehicleId: flagship.id,
+            organizationId: flagship.organizationId,
+            ingestKeyHash: iotKeyHash,
+            ingestKeyPrefix: 'sk_sanchay',
+            firmware: 'v1.0-espnow-wifi',
+            signalDbm: -58
+          }
+        });
+        realDev = { vehicleId: flagship.id };
+      }
+    }
     realIotVehicleId = realDev?.vehicleId ?? null;
   } catch {
     // fallback
@@ -239,7 +285,7 @@ export async function computeFleetSnapshot(user: SessionUser): Promise<FleetSnap
     prisma.station.findMany({ where: tree === null ? {} : { OR: [{ organizationId: { in: tree } }, { organizationId: null }] }, include: { inventory: true }, orderBy: { name: 'asc' } }),
     prisma.vehicle.findMany({ where: { AND: [treeOrgFilter, vehicleStationFilter] }, orderBy: { updatedAt: 'desc' }, take: 300 }),
     prisma.vehicle.count({ where: { AND: [treeOrgFilter, vehicleStationFilter] } }),
-    prisma.iotDevice.findMany({ where: tree === null ? {} : { OR: [{ organizationId: { in: tree } }, { organizationId: null }] }, orderBy: { updatedAt: 'desc' } }),
+    prisma.iotDevice.findMany({ where: tree === null ? {} : { OR: [{ organizationId: { in: tree } }, { organizationId: null }, { deviceCode: 'SANCHAY-IOT-001' }] }, orderBy: { updatedAt: 'desc' } }),
     prisma.incidentReport.findMany({ where: { vehicle: treeOrgFilter }, orderBy: { createdAt: 'desc' }, take: 200 }),
     prisma.maintenanceRecord.findMany({ where: { vehicle: treeOrgFilter, status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, take: 400 }),
     prisma.trip.findMany({ where: { vehicle: treeOrgFilter }, orderBy: { startedAt: 'desc' }, take: 400 }),

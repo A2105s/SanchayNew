@@ -129,7 +129,31 @@ function getSectorSpeed(sector?: string, vehicleClass?: string): { target: numbe
 
 /** Is this vehicle driven by the simulator? */
 export function isSimulated(vehicle: VehicleView, devices: DeviceView[]): boolean {
-  if (vehicle.gpsSource === 'SIMULATED') return true;
+  // Flagship physical hardware IoT edge cruiser is NEVER simulated
+  if (vehicle.registrationNumber === 'MP07-DG-6386' || vehicle.registrationNormalized === 'MP07DG6386' || vehicle.assetCode === 'SCH-V-0001') {
+    return false;
+  }
+  if (devices.some((d) => d.vehicleId === vehicle.id && !d.simulated)) {
+    return false;
+  }
+
+  // Seized in court custody, or under active maintenance stay parked in station compound
+  if (
+    vehicle.ownershipCategory === 'SEIZED_IMPOUNDED' ||
+    vehicle.operationalStatus === 'MAINTENANCE' ||
+    vehicle.operationalStatus === 'OUT_OF_SERVICE'
+  ) {
+    return false;
+  }
+
+  // Active police patrol fleet or simulated GPS source
+  if (
+    vehicle.operationalStatus === 'ACTIVE' &&
+    (vehicle.gpsSource === 'SIMULATED' || vehicle.sector === 'POLICE_PATROL')
+  ) {
+    return true;
+  }
+
   return devices.some(
     (d) => d.vehicleId === vehicle.id && d.simulated && d.kind === 'GPS_TRACKER'
   );

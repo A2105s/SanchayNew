@@ -495,8 +495,36 @@ export async function seedPoint14Fleet(prisma: PrismaClient): Promise<Point14See
           restrictionType = 'COURT_ORDER';
         }
 
-        const latOffset = (Math.sin(stationVehicleSeq * 2.3) * 0.005);
-        const lngOffset = (Math.cos(stationVehicleSeq * 2.3) * 0.005);
+        // Realistic spatial distribution (NO concentric circles):
+        let latOffset = 0;
+        let lngOffset = 0;
+        const isStationCompound =
+          stationVehicleSeq <= 4 ||
+          operationalStatus === 'MAINTENANCE' ||
+          ownershipCategory === 'SEIZED_IMPOUNDED';
+
+        if (isStationCompound) {
+          const bayRow = stationVehicleSeq % 3;
+          const bayCol = Math.floor(stationVehicleSeq / 3);
+          latOffset = (bayRow - 1) * 0.00015 + (((stationVehicleSeq * 17) % 7) - 3) * 0.000018;
+          lngOffset = (bayCol - 1) * 0.00022 + (((stationVehicleSeq * 31) % 7) - 3) * 0.000018;
+        } else {
+          const PATROL_DISTANCES = [
+            0.0038, 0.0076, 0.0124, 0.0182, 0.0052,
+            0.0094, 0.0148, 0.0205, 0.0044, 0.0086,
+            0.0132, 0.0191, 0.0064, 0.0112, 0.0165
+          ];
+          const PATROL_ANGLES = [
+            0.38, 1.12, 1.95, 2.78, 3.52,
+            4.28, 5.12, 5.86, 0.75, 1.55,
+            2.38, 3.18, 3.98, 4.75, 5.55
+          ];
+          const pIdx = (stationVehicleSeq - 5) % PATROL_DISTANCES.length;
+          const dist = PATROL_DISTANCES[pIdx];
+          const angle = PATROL_ANGLES[pIdx] + ((t.lat * 100) % 1);
+          latOffset = Math.sin(angle) * dist;
+          lngOffset = Math.cos(angle) * dist * 1.15;
+        }
 
         const vehicle = await prisma.vehicle.upsert({
           where: { assetCode },
@@ -522,6 +550,7 @@ export async function seedPoint14Fleet(prisma: PrismaClient): Promise<Point14See
             fuelPercent: 70 + (stationVehicleSeq % 25),
             lat: t.lat + latOffset,
             lng: t.lng + lngOffset,
+            gpsSource: regNumber === 'MP07-DG-6386' ? 'AIS_140' : (isStationCompound ? 'AIS_140' : 'SIMULATED'),
             pucExpiry: daysFromNow(stationVehicleSeq === 18 ? -20 : 180),
             insuranceExpiry: daysFromNow(stationVehicleSeq === 18 ? -10 : 240),
             fitnessExpiry: daysFromNow(200),
@@ -551,6 +580,7 @@ export async function seedPoint14Fleet(prisma: PrismaClient): Promise<Point14See
             fuelPercent: 70 + (stationVehicleSeq % 25),
             lat: t.lat + latOffset,
             lng: t.lng + lngOffset,
+            gpsSource: regNumber === 'MP07-DG-6386' ? 'AIS_140' : (isStationCompound ? 'AIS_140' : 'SIMULATED'),
             pucExpiry: daysFromNow(stationVehicleSeq === 18 ? -20 : 180),
             insuranceExpiry: daysFromNow(stationVehicleSeq === 18 ? -10 : 240),
             fitnessExpiry: daysFromNow(200),

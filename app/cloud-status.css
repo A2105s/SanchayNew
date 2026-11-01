@@ -12,6 +12,10 @@
   font-family: inherit;
   cursor: pointer;
   box-shadow: none !important;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  box-sizing: border-box;
 }
 
 .db-health--button:hover {

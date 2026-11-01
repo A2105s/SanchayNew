@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data });
   } catch (error) {
     console.error('[cloud/snapshot]', error);
-    return NextResponse.json({ success: false, error: 'Cloud data is not available.' }, { status: 503 });
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ success: false, error: 'Cloud data is not available.', detail: msg }, { status: 503 });
   }
 }

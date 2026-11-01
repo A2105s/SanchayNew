@@ -259,7 +259,7 @@ export default function IotPage() {
                   </Badge>
                 </div>
                 <div className="text-muted" style={{ fontSize: '0.78rem', marginTop: 2 }}>
-                  Dual-Node ESP8266 Live Architecture · Node 1 (Sensors) + Node 2 (OLED Cockpit & HTTP Gateway)
+                  Smart Fleet Telematics Unit · Real-Time Edge Sensor & Cloud Uplink Gateway
                 </div>
               </div>
             </div>

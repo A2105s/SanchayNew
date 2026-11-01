@@ -38,6 +38,8 @@ export function LanguageSelector() {
           gap: 6,
           padding: '0 10px',
           height: 36,
+          minHeight: 36,
+          maxHeight: 36,
           minWidth: 92,
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--color-border)',

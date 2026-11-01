@@ -104,11 +104,11 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
     fetchData();
   }, [fetchData]);
 
-  // Real-time background sync polling every 3s matching telemetry stream
+  // High-speed real-time polling every 500ms for instant live telemetry response
   useEffect(() => {
     const timer = setInterval(() => {
       fetchData(true);
-    }, 1500);
+    }, 500);
     return () => clearInterval(timer);
   }, [fetchData]);
 
@@ -269,7 +269,7 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
           <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="cluster" style={{ gap: 6, fontWeight: 700, fontSize: '0.85rem' }}>
               <Gauge size={18} color="var(--color-brand)" />
-              <span>Ultrasonic Radar (HC-SR04)</span>
+              <span>Proximity Radar</span>
             </span>
             <Badge
               tone={
@@ -337,7 +337,7 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
           <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="cluster" style={{ gap: 6, fontWeight: 700, fontSize: '0.85rem' }}>
               <Thermometer size={18} color="#06b6d4" />
-              <span>Cabin Climate (DHT22)</span>
+              <span>Cabin Environment</span>
             </span>
             <Badge tone="info">Live Climate</Badge>
           </div>
@@ -383,7 +383,7 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
           <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="cluster" style={{ gap: 6, fontWeight: 700, fontSize: '0.85rem' }}>
               <Eye size={18} color={motion ? 'var(--color-danger)' : 'var(--color-brand)'} />
-              <span>Cabin Security (HC-SR501)</span>
+              <span>Cabin Security Sentinel</span>
             </span>
             <Badge tone={motion ? 'danger' : 'success'}>
               {motion ? 'ALARM ACTIVE' : 'SECURE'}
@@ -423,7 +423,7 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
           <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="cluster" style={{ gap: 6, fontWeight: 700, fontSize: '0.85rem' }}>
               <Satellite size={18} color="#eab308" />
-              <span>GPS Tracking (NEO-M8)</span>
+              <span>Satellite Geolocation</span>
             </span>
             <Badge tone={hasGpsLock ? 'success' : 'warning'}>
               {hasGpsLock ? '3D Fix Active' : 'Default Base (Indoor)'}
@@ -457,68 +457,61 @@ export default function IotDeviceDetailPage({ params }: { params: Promise<{ id: 
         </div>
       </div>
 
-      {/* Dual-Node Hardware Architecture & Live Topology */}
+      {/* Gateway Telemetry & Pipeline Diagnostics */}
       <Panel
-        title="Hardware Architecture & Gateway Pipeline"
-        subtitle="Dual-node NodeMCU ESP8266 distributed wireless sensor topology"
+        title="Gateway Diagnostics & Telemetry Pipeline"
+        subtitle="Real-time edge ingestion stream, protocol verification and gateway synchronization"
         icon={<Server size={16} />}
+        action={
+          <Badge tone={isHeartbeatLive ? 'success' : 'danger'}>
+            <StatusDot tone={isHeartbeatLive ? 'success' : 'danger'} pulse={isHeartbeatLive} />
+            <span style={{ marginLeft: 6, fontWeight: 700 }}>
+              {isHeartbeatLive ? 'Uplink Synchronized' : 'Gateway Disconnected'}
+            </span>
+          </Badge>
+        }
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-          {/* Node 1 Card */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
           <div style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-            <div className="cluster" style={{ justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <strong style={{ fontSize: '0.9rem' }}>Board 1: Sensor Edge Node</strong>
-              <Badge tone="success">NodeMCU v2</Badge>
+            <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Ingest Protocol</div>
+            <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 800, marginTop: 4 }}>
+              {device.protocol} Ingestion
             </div>
-            <ul className="plain-list" style={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
-              <li><strong>HC-SR04:</strong> Proximity Radar (Pin D1/D2)</li>
-              <li><strong>DHT22:</strong> Cabin Temperature & Humidity (Pin D4)</li>
-              <li><strong>HC-SR501:</strong> PIR Motion Sentinel (Pin D5)</li>
-              <li><strong>NEO-M8:</strong> GPS Receiver (Pin D6/D7)</li>
-              <li><strong>RGB LED:</strong> Continuous Analog Proximity Gradient</li>
-            </ul>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              ESP-NOW 2.4 GHz Broadcast · 5 Hz (200 ms)
+            <div className="text-muted" style={{ fontSize: '0.76rem', marginTop: 4 }}>
+              Encrypted Bearer Authentication
             </div>
           </div>
 
-          {/* Node 2 Card */}
           <div style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-            <div className="cluster" style={{ justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <strong style={{ fontSize: '0.9rem' }}>Board 2: Cockpit & Cloud Gateway</strong>
-              <Badge tone="brand">NodeMCU v2</Badge>
+            <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Wireless Signal</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <SignalBars dbm={device.signalDbm} />
+              <span className="mono" style={{ fontSize: '1.05rem', fontWeight: 800 }}>
+                {device.signalDbm != null ? `${device.signalDbm} dBm` : 'Stable Link'}
+              </span>
             </div>
-            <ul className="plain-list" style={{ fontSize: '0.8rem', lineHeight: 1.6 }}>
-              <li><strong>0.96&quot; OLED:</strong> 128x64 Unified Cockpit Screen (SPI D1-D4/D8)</li>
-              <li><strong>Acoustic Buzzer:</strong> Reverse Radar Alert (&lt; 50 cm) (Pin D0)</li>
-              <li><strong>RGB LED:</strong> Environmental & Security Sentinel (Pin D5-D7)</li>
-              <li><strong>Wi-Fi Client:</strong> SSID &quot;NASA&quot; · Channel Synced</li>
-              <li><strong>HTTP Dispatch:</strong> POST /api/iot/ingest (Every 3 sec)</li>
-            </ul>
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--color-border)', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-              Direct Cloud Ingestion · Auth: Bearer Ingest Key
+            <div className="text-muted" style={{ fontSize: '0.76rem', marginTop: 4 }}>
+              Low-latency edge connection
             </div>
           </div>
 
-          {/* Telematics Health & Gateway Status */}
           <div style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-            <div className="cluster" style={{ justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <strong style={{ fontSize: '0.9rem' }}>Ingestion Gateway Status</strong>
-              <Badge tone={isHeartbeatLive ? 'success' : 'danger'}>
-                {isHeartbeatLive ? 'ONLINE (Pinging)' : 'OFFLINE'}
-              </Badge>
+            <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Firmware & Dispatch</div>
+            <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 800, marginTop: 4 }}>
+              {device.firmware ?? 'v2.1-edge'}
             </div>
-            <div className="kv" style={{ fontSize: '0.8rem' }}>
-              <span>Protocol</span>
-              <span className="mono">{device.protocol}</span>
-              <span>Wi-Fi Signal</span>
-              <span><SignalBars dbm={device.signalDbm} /></span>
-              <span>Firmware</span>
-              <span className="mono">{device.firmware ?? 'v2.1-edge'}</span>
-              <span>Last Heartbeat</span>
-              <span>{fmtRelative(currentLastSeen)}</span>
-              <span>Packets In DB</span>
-              <span className="mono" style={{ fontWeight: 700 }}>{telemetryPoints.length}</span>
+            <div className="text-muted" style={{ fontSize: '0.76rem', marginTop: 4 }}>
+              Event-driven real-time dispatch
+            </div>
+          </div>
+
+          <div style={{ padding: '1rem', background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+            <div className="text-muted" style={{ fontSize: '0.74rem', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 700 }}>Ingested Packets</div>
+            <div className="mono" style={{ fontSize: '1.05rem', fontWeight: 800, marginTop: 4 }}>
+              {telemetryPoints.length.toLocaleString('en-IN')} Events
+            </div>
+            <div className="text-muted" style={{ fontSize: '0.76rem', marginTop: 4 }}>
+              Last sync: {fmtRelative(currentLastSeen)}
             </div>
           </div>
         </div>

@@ -710,9 +710,25 @@ void loop() {
   updateRgb(linkUp, view);
   updateBuzzer(linkUp, view);
 
-  // Send telemetry to Sanchay App every 3 seconds (when link and Wi-Fi are up)
-  if (linkUp && (now - lastCloudPostMs >= CLOUD_SYNC_INTERVAL_MS)) {
+  // Event-Driven Fast Telemetry Dispatch & Regular 1000ms Sync
+  static uint8_t lastReportedZone = ZONE_SAFE;
+  static uint8_t lastReportedMotion = 0;
+  static int16_t lastReportedDist = DIST_INVALID;
+
+  bool zoneChanged = (view.zone != lastReportedZone);
+  bool motionChanged = (view.motion != lastReportedMotion);
+  bool distanceShifted = (view.distanceCm != DIST_INVALID && lastReportedDist != DIST_INVALID && abs(view.distanceCm - lastReportedDist) >= 15);
+  bool isAlertTrigger = (view.zone == ZONE_CRITICAL || (view.distanceCm != DIST_INVALID && view.distanceCm <= 50));
+
+  bool isEventTriggered = (zoneChanged || motionChanged || (isAlertTrigger && distanceShifted));
+  bool periodicDue = (now - lastCloudPostMs >= CLOUD_SYNC_INTERVAL_MS);
+  bool eventDue = isEventTriggered && (now - lastCloudPostMs >= 350);
+
+  if (linkUp && (periodicDue || eventDue)) {
     lastCloudPostMs = now;
+    lastReportedZone = view.zone;
+    lastReportedMotion = view.motion;
+    lastReportedDist = view.distanceCm;
     sendTelemetryToSanchay(view);
   }
 

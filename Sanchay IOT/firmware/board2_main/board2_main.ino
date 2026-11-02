@@ -112,11 +112,11 @@ const char *WIFI_PASS = "9936@Pari";
 const bool USE_SANCHAY_CLOUD = true;
 const char *SANCHAY_CLOUD_URL = "https://sanchaynew.vercel.app/api/iot/ingest";
 
-const bool ALSO_POST_TO_LOCAL = true;
-const char *SANCHAY_LOCAL_IP = "192.168.1.32";
+const bool ALSO_POST_TO_LOCAL = false;
+const char *SANCHAY_LOCAL_IP = "10.5.62.121";
 const uint16_t SANCHAY_LOCAL_PORT = 3000;
 const char *DEVICE_CODE = "SANCHAY-IOT-001";
-const char *DEVICE_INGEST_KEY = "sk_sanchay_iot_edge_2026";
+const char *DEVICE_INGEST_KEY = "sk_kJ22pK0L5cacAK52lhaRKiNSpt_oNp-R";
 
 // High-Speed Cloud Telemetry Sync (Every 2000 ms periodic + Immediate Event Dispatch)
 const unsigned long CLOUD_SYNC_INTERVAL_MS = 2000;
@@ -705,8 +705,15 @@ void sendTelemetryToSanchay(const SensorPacket &p) {
     int httpCode = http.POST(json);
     if (httpCode == 200 || httpCode == 202) {
       cloudUploadOk++;
+      Serial.print(" [CLOUD SYNC OK] HTTP ");
+      Serial.println(httpCode);
     } else {
       cloudUploadFail++;
+      Serial.print(" [CLOUD SYNC FAIL] HTTP ");
+      Serial.print(httpCode);
+      Serial.print(" (");
+      Serial.print(http.errorToString(httpCode));
+      Serial.println(")");
     }
     http.end();
 

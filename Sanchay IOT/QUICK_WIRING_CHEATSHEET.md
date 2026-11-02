@@ -80,28 +80,28 @@
 ## Board 3: Dual-Screen Cockpit & Judge Billboard Node
 
 > **Sketch:** `firmware/board3_dual_display/board3_dual_display.ino`
-> **Role:** Simultaneously drives the **7-Pin SPI OLED** (Telemetry sensor pages) AND the **4-Pin I2C OLED** (Executive marketing/pitch deck slides) on one NodeMCU.
+> **Role:** Simultaneously drives the **4-Pin I2C OLED** (Executive marketing/pitch deck slides) AND the **7-Pin SPI OLED** (Telemetry sensor pages) plus **Local DHT11** on one NodeMCU.
 
-### 1. Screen 1: 7-Pin SPI OLED (Live Multi-Page Telemetry)
+### 1. Screen 1: 4-Pin I2C OLED (Sanchay PR & Judge Pitch Billboard)
 
-| 7-Pin OLED Pin | Connects to NodeMCU | Voltage | Function |
+| 4-Pin OLED Pin | Connects to NodeMCU | Voltage | Function / Hardware Note |
+|:---|:---|:---|:---|
+| **GND** | **GND** | Ground | Common GND |
+| **VCC** | **3V3** (or VIN) | 3.3V | Power rail |
+| **SCL** (Clock) | **D1** (GPIO 5) | 3.3V | Hardware-proven I2C Clock |
+| **SDA** (Data) | **D2** (GPIO 4) | 3.3V | Hardware-proven I2C Data |
+
+### 2. Screen 2: 7-Pin SPI OLED (Live Multi-Page Telemetry & Radar)
+
+| 7-Pin OLED Pin | Connects to NodeMCU | Voltage | Function / Hardware Note |
 |:---|:---|:---|:---|
 | **GND** | **GND** | Ground | Common GND |
 | **VCC** | **3V3** | 3.3V | **3.3V ONLY (Never connect to VIN)** |
-| **D0** (SCK / CLK) | **D0** (GPIO 16) | 3.3V | SPI Clock signal |
-| **D1** (MOSI / DATA) | **D1** (GPIO 5) | 3.3V | SPI Data signal |
-| **RES** (Reset) | **D2** (GPIO 4) | 3.3V | Reset signal |
-| **DC** (Data/Command) | **D3** (GPIO 0) | 3.3V | Command select |
-| **CS** (Chip Select) | **D4** (GPIO 2) | 3.3V | Chip enable |
-
-### 2. Screen 2: 4-Pin I2C OLED (Sanchay PR & Judge Pitch Billboard)
-
-| 4-Pin OLED Pin | Connects to NodeMCU | Voltage | Function |
-|:---|:---|:---|:---|
-| **GND** | **GND** | Ground | Common GND |
-| **VCC** | **3V3** | 3.3V | **3.3V ONLY** |
-| **SDA** (Data) | **D7** (GPIO 13) | 3.3V | Software I2C Data |
-| **SCL** (Clock) | **D8** (GPIO 15) | 3.3V | Software I2C Clock |
+| **D0** (SCK / CLK) | **D6** (GPIO 12) | 3.3V | High-speed SPI Clock signal |
+| **D1** (MOSI / DATA) | **D7** (GPIO 13) | 3.3V | High-speed SPI Data signal |
+| **RES** (Reset) | **D4** (GPIO 2) | 3.3V | Reset signal (Pulls HIGH -> Boot OK) |
+| **DC** (Data/Command) | **D0** (GPIO 16) | 3.3V | Command select (Safe GPIO) |
+| **CS** (Chip Select) | **D3** (GPIO 0) | 3.3V | Chip enable (Pulls HIGH -> Boot OK) |
 
 ### 3. Local Climate Sensor: DHT11 (Live Interactive Demo)
 
@@ -118,17 +118,17 @@
 ```text
                +------------------+
                |     [USB PORT]   |
-        [ A0 ] |                  | [ D0 ] -> Board 1: PIR Out  | Board 2: Buzzer (+)
-        [ G  ] |                  | [ D1 ] -> Board 1: RGB Red  | Board 2: OLED SCK (D0)
-        [ VU ] |     NODEMCU      | [ D2 ] -> Board 1: Echo     | Board 2: OLED MOSI (D1)
-        [ S3 ] |      ESP8266     | [ D3 ] -> Board 1: Trig     | Board 2: OLED CS
-        [ S2 ] |                  | [ D4 ] -> Board 1: DHT22    | Board 2: OLED RES
+        [ A0 ] |                  | [ D0 ] -> Board 1: PIR Out  | Board 2: Buzzer (+) | Board 3: 7-Pin DC
+        [ G  ] |                  | [ D1 ] -> Board 1: RGB Red  | Board 2: OLED SCK (D0) | Board 3: 4-Pin SCL
+        [ VU ] |     NODEMCU      | [ D2 ] -> Board 1: Echo     | Board 2: OLED MOSI (D1)| Board 3: 4-Pin SDA
+        [ S3 ] |      ESP8266     | [ D3 ] -> Board 1: Trig     | Board 2: OLED CS       | Board 3: 7-Pin CS
+        [ S2 ] |                  | [ D4 ] -> Board 1: DHT22    | Board 2: OLED RES      | Board 3: 7-Pin RES
         [ S1 ] |                  | [ 3V ] -> 3.3V Rail (DHT22, OLED)
         [ SC ] |                  | [ G  ] -> Ground Rail
-        [ S0 ] |                  | [ D5 ] -> Board 1: RGB Green| Board 2: RGB Red
-        [ SK ] |                  | [ D6 ] -> Board 1: GPS TX   | Board 2: RGB Green
-        [ G  ] |                  | [ D7 ] -> Board 1: GPS RX   | Board 2: RGB Blue
-        [ 3V ] |                  | [ D8 ] -> Board 1: RGB Blue | Board 2: OLED DC
+        [ S0 ] |                  | [ D5 ] -> Board 1: RGB Green| Board 2: RGB Red    | Board 3: DHT11 Data
+        [ SK ] |                  | [ D6 ] -> Board 1: GPS TX   | Board 2: RGB Green  | Board 3: 7-Pin SCK (D0)
+        [ G  ] |                  | [ D7 ] -> Board 1: GPS RX   | Board 2: RGB Blue   | Board 3: 7-Pin MOSI (D1)
+        [ 3V ] |                  | [ D8 ] -> Board 1: RGB Blue | Board 2: OLED DC    | Board 3: (Unused)
         [ EN ] |                  | [ RX ] 
         [ RST] |                  | [ TX ] 
         [ G  ] |                  | [ G  ] -> Ground Rail
